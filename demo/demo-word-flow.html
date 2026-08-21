@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Word式分页最小验证｜模型A</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+
+/* 纸张尺寸切换：body 加 class 即可（A3 时把 --pw/--ph 换成 A3 值） */
+body.A4 { --pw:210mm; }
+body.A3 { --pw:297mm; } /* 纵向 A3；横向可再加 landscape 修饰 */
+
+/* 标题样式（屏幕与打印共享） */
+.title {
+  text-align:center;
+  font-size:20px;
+  font-weight:bold;
+  height:14mm;
+  line-height:14mm;
+}
+
+/* 子表单区域：flow 中的块，宽高可自定义 */
+.region {
+  border:1mm solid blue;
+  padding:2mm;
+  margin-bottom:2mm;
+}
+/* 固定字段区：不跨页 */
+.region--fixed { break-inside:avoid; page-break-inside:avoid; }
+/* 流式区：允许跨页（核心） */
+.region--flow  { break-inside:auto; page-break-inside:auto; }
+
+/* 长表格：跨页自动分页四件套 */
+.data-table { width:100%; border-collapse:collapse; }
+.data-table th, .data-table td { border:1px solid #333; padding:3px; font-size:12px; text-align:center; }
+.data-table thead { display:table-header-group; } /* 表头每页重复 */
+.data-table tr { break-inside:avoid; page-break-inside:avoid; } /* 行不切断 */
+
+/* ========== 屏幕预览：单文档连续滚动（最简，不模拟离散纸张） ========== */
+@media screen {
+  body { background:#eee; padding:20px; display:flex; justify-content:center; }
+  .doc {
+    width:var(--pw);
+    background:#fff;
+    padding:12mm;
+    box-shadow:0 0 0 1px #ccc;
+  }
+  .doc-frame, .title-slot, .body-slot { display:block; } /* 屏幕端不用 table 语义 */
+}
+
+/* ========== 打印：A4，原生分页 + 标题每页重复 ========== */
+@media print {
+  /* @page { size:A4; margin:12mm; }  // 切 A3 改 size:A3 / A3 landscape */
+  @page { 
+    size:A3 landscape;
+     margin:12mm;
+  }
+  body { background:#fff; }
+
+  /* 关键：文档做成 table，标题放 thead 实现每页重复（浏览器原生支持） */
+  .doc-frame { display:table; width:100%; }
+  .title-slot { display:table-header-group; }   /* 标题每页重复 */
+  .body-slot { display:table-row-group; }
+  .title-slot > tr > td, .body-slot > tr > td { display:table-cell; width:100%; }
+
+  .doc { width:auto; padding:0; box-shadow:none; }
+
+  * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+}
+</style>
+</head>
+<body class="A3">
+
+<div class="doc">
+  <table class="doc-frame">
+    <!-- 标题槽：打印时 thead 每页重复 -->
+    <thead class="title-slot">
+      <tr><td><div class="title">云南铝业股份有限公司电气工作票汇总</div></td></tr>
+    </thead>
+    <!-- 主体槽：所有内容纯 flow，超长自动跨页 -->
+    <tbody class="body-slot">
+      <tr><td>
+
+        <!-- 子表单区域1：固定字段区，自定义宽高，不跨页 -->
+        <div class="region region--fixed" style="min-height:30mm;">
+          <strong>固定字段区</strong><br>
+          工作票编号：GD-2026-08-001<br>
+          工作负责人：张三　　日期：2026-08-20<br>
+          工作地点：10kV 配电室　　班组：电气一班
+        </div>
+
+        <!-- 子表单区域2：流式表格区，允许跨页 -->
+        <div class="region region--flow">
+          <strong>工作内容明细表（长表格跨页测试）</strong>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width:14mm;">序号</th>
+                <th>工作内容</th>
+                <th style="width:24mm;">负责人</th>
+                <th style="width:24mm;">工时</th>
+                <th style="width:20mm;">完成</th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+
+      </td></tr>
+    </tbody>
+  </table>
+</div>
+
+<script>
+  /**
+   * 生成演示用超多行表格数据（仅演示数据，不参与布局决策）
+   */
+  (function () {
+    var html = '';
+    for (var i = 1; i <= 80; i++) {
+      html += '<tr><td>' + i + '</td><td>工作内容' + i + '</td><td>张三</td>'
+        + '<td>' + (i * 0.5).toFixed(1) + 'h</td><td>' + (i % 2 ? '是' : '否') + '</td></tr>';
+    }
+    document.getElementById('rows').innerHTML = html;
+  })();
+</script>
+
+</body>
+</html>

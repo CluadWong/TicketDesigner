@@ -1,0 +1,79 @@
+/**
+ * 表单组件全局样式
+ *
+ * 作用域限定在 .form-renderer 内：
+ *   - 浏览器渲染时：FormRenderer 根节点有 .form-renderer class，子组件自动应用
+ *   - 引擎测量时：DomMeasure 的 measurer 容器也加 .form-renderer class，保证测量与渲染一致
+ *
+ * ⚠ CompP/CompImage/CompTable 不再使用 scoped style，
+ *    样式统一在此处维护，避免双份定义导致测量/渲染漂移。
+ */
+
+.form-renderer p {
+  margin: 4px 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #1f2937;
+}
+
+.form-renderer img {
+  max-width: 100%;
+}
+
+.form-renderer table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.form-renderer th,
+.form-renderer td {
+  border: 1px solid #9ca3af;
+  padding: 4px 6px;
+  text-align: left;
+}
+
+.form-renderer th {
+  background: #f3f4f6;
+  font-weight: 600;
+}
+
+/**
+ * block 外层包裹层（Paper 内每个组件 block）
+ *
+ * 同时用于：
+ *   - 浏览器渲染时（Paper 内每个 block）
+ *   - 引擎测量时（DomMeasure measurer 容器内的 .block）
+ *
+ * 让测量与渲染共享此样式，避免结构性 DOM 差异导致测高漂移。
+ */
+.form-renderer .block {
+  position: relative;
+  margin: 1mm 0;
+}
+
+.form-renderer .block.has-warning {
+  outline: 2px solid #ef4444;
+  outline-offset: 1px;
+}
+
+/**
+ * 全局打印重置
+ *
+ * 浏览器默认 body 有 8px margin，会让 .canvas-pane 顶部偏移，
+ * 把第一张 .paper 推到第二打印页起始，产生空白页。
+ * 打印模式下彻底清零所有外层容器约束。
+ */
+@media print {
+  html,
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+  }
+
+  #app {
+    height: auto !important;
+    overflow: visible !important;
+  }
+}

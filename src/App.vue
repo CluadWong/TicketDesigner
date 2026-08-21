@@ -1,17 +1,16 @@
 <script setup lang="ts">
-// 表单低代码设计器 - 根组件
+/**
+ * 应用根组件
+ *
+ * 阶段 3 设计器入口：渲染三栏布局的设计器。
+ *
+ * 之前阶段 2 的渲染器 demo 已合并到设计器的 Toolbar（"示例 A4/A3" 按钮），
+ * 不再单独保留切换逻辑。
+ */
+
+import DesignerApp from '@/components/designer/DesignerApp.vue'
 </script>
 
 <template>
-  <div class="app">
-    <h1>表单低代码设计器</h1>
-    <p>项目骨架已就绪，等待阶段 1.3-1.5 实现 Schema 与分页引擎。</p>
-  </div>
+  <DesignerApp />
 </template>
-
-<style scoped>
-.app {
-  padding: 40px;
-  text-align: center;
-}
-</style>
