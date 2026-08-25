@@ -2,41 +2,44 @@
 /**
  * 中栏：画布面板
  *
- * 职责（v1 阶段 3.2 骨架）：
+ * 职责（v1 阶段 3.3 交互）：
  *   - 承载 FormRenderer，渲染纸张堆叠
  *   - 接收 FormRenderer 的 paginate 事件，转发给父组件
- *   - drop zone 占位（阶段 3.3 实现拖拽生成组件）
- *   - 组件选中交互占位（阶段 3.3 实现点击选中）
+ *   - drop zone：读取 dataTransfer 拿到组件 type，emit add-comp 通知父组件生成实例
+ *   - click 代理：根据点击目标是否在 [data-comp-id] 内，emit select-comp(id|null)
  *
- * 设计依据：docs/design-biz.md §2.1、docs/development-plan.md §3.2.3。
+ * 设计依据：docs/design-biz.md §2.1、docs/development-plan.md §3.3.1、§3.3.4。
  */
 
-import type { FormSchema, PaginateResult } from '@/types'
+import type { FormSchema, PaginateResult, Component } from '@/types'
 import FormRenderer from '@/components/renderer/FormRenderer.vue'
 
 const props = defineProps<{
   /** 表单 schema */
   schema: FormSchema
-  /** 当前选中的组件 id（阶段 3.3 实现选中高亮） */
+  /** 当前选中的组件 id（用于事件代理判断，可选） */
   selectedCompId: string | null
 }>()
 
 const emit = defineEmits<{
   /** 分页结果变化（来自 FormRenderer，转发给父组件供状态栏显示） */
   paginate: [result: PaginateResult]
-  /** 选中/取消选中组件（阶段 3.3 实现点击交互） */
+  /** 选中/取消选中组件（点击 .block 选中，点击画布空白取消） */
   'select-comp': [id: string | null]
+  /** 从左栏拖拽到画布：父组件根据 type 生成默认实例 push 进 schema.body */
+  'add-comp': [type: Component['type']]
 }>()
 
 /**
- * drop 事件：阶段 3.3 实现拖拽生成组件
- *
- * 当前为占位，仅阻止默认行为避免浏览器打开 dataTransfer 内容。
+ * drop 事件：读取 dataTransfer 拿到组件 type，emit add-comp
  */
 function handleDrop(event: DragEvent): void {
   event.preventDefault()
-  // TODO 阶段 3.3：读取 dataTransfer 拿到组件 type，
-  // 调用 config.createDefault(id) 生成实例 push 进 schema.body
+  const type = event.dataTransfer?.getData('application/x-component-type')
+  if (!type) return
+  // 类型守卫：只允许已注册的组件 type
+  if (type !== 'p' && type !== 'image' && type !== 'table') return
+  emit('add-comp', type)
 }
 
 /** dragover 必须阻止默认行为，否则 drop 事件不会触发 */
@@ -47,11 +50,20 @@ function handleDragOver(event: DragEvent): void {
   }
 }
 
-/** 点击画布空白区域：取消选中（阶段 3.3 实现交互） */
+/**
+ * click 代理：根据点击目标是否在 [data-comp-id] 内决定选中或取消
+ *
+ * - 点击 .block（含 data-comp-id）：emit select-comp(id)
+ * - 点击画布空白（.canvas-pane / .canvas-content 自身）：emit select-comp(null)
+ */
 function handleCanvasClick(event: MouseEvent): void {
   const target = event.target as HTMLElement
-  // 点击的是画布容器自身（非组件），取消选中
-  if (target.classList.contains('canvas-content') || target.classList.contains('canvas-pane')) {
+  // 找最近的 [data-comp-id] 祖先（点击可能落在 block 内部子元素上）
+  const blockEl = target.closest('[data-comp-id]') as HTMLElement | null
+  if (blockEl?.dataset.compId) {
+    emit('select-comp', blockEl.dataset.compId)
+  } else {
+    // 点画布空白：取消选中
     emit('select-comp', null)
   }
 }

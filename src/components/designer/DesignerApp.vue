@@ -17,15 +17,17 @@
  * 设计依据：docs/design-biz.md §2、docs/development-plan.md 阶段 3.2。
  */
 
-import { computed, ref } from 'vue'
+import { computed, provide, ref } from 'vue'
 import type { FormSchema, PaginateResult, Component } from '@/types'
 import Toolbar from './Toolbar.vue'
 import ComponentPalette from './ComponentPalette.vue'
 import CanvasPane from './CanvasPane.vue'
 import ConfigPanel from './ConfigPanel.vue'
 import StatusBar from './StatusBar.vue'
+import PreviewDialog from '@/components/preview/PreviewDialog.vue'
 import { makeMockSchema } from '@/dev/mock-schema'
 import { makeMockSchemaA3 } from '@/dev/mock-schema-a3'
+import { getComponentConfig } from '@/config/component-registry'
 
 /** 右栏配置面板的 tab 标识 */
 type ConfigTab = 'form' | 'component'
@@ -36,11 +38,25 @@ const schema = ref<FormSchema>(makeMockSchema())
 /** 当前选中的组件 id（null 表示无选中） */
 const selectedCompId = ref<string | null>(null)
 
+/**
+ * 跨层级 provide selectedCompId 给 Paper.vue
+ *
+ * Paper.vue inject 后用于 .block 选中高亮（蓝色 outline）。
+ * 用 ref 注入让子组件响应 selectedCompId 变化自动更新视图。
+ */
+provide('selectedCompId', selectedCompId)
+
 /** 当前右栏激活的 tab（无选中组件时默认 'form'） */
 const activeTab = ref<ConfigTab>('form')
 
 /** 分页结果（来自 CanvasPane 的 FormRenderer，传给 StatusBar） */
 const paginateResult = ref<PaginateResult | null>(null)
+
+/** 预览弹窗显示状态 */
+const previewVisible = ref(false)
+
+/** 预览弹窗的表单数据（field → value，独立于 schema 维护） */
+const previewData = ref<Record<string, unknown>>({})
 
 /** 选中组件实例（基于 selectedCompId 计算） */
 const selectedComp = computed<Component | null>(() =>
@@ -80,11 +96,63 @@ function handlePaginate(result: PaginateResult): void {
 }
 
 /**
+ * 从左栏拖拽到画布：根据组件 type 生成默认实例 push 进 schema.body
+ *
+ * 调用注册表的 createDefault(id) 拿到默认值，自动选中新建组件并切到组件属性 tab。
+ * @param type 组件类型（'p' | 'image' | 'table'）
+ */
+function handleAddComp(type: Component['type']): void {
+  const config = getComponentConfig(type)
+  if (!config) return
+  // 生成唯一 id：type-时间戳-随机串
+  const id = `${type}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+  const comp = config.createDefault(id) as Component
+  schema.value = {
+    ...schema.value,
+    body: [...schema.value.body, comp],
+  }
+  // 自动选中新组件并切到组件属性 tab
+  selectedCompId.value = id
+  activeTab.value = 'component'
+}
+
+/**
  * 选中组件（CanvasPane 点击组件触发；阶段 3.3 实现交互）
  */
 function handleSelectComp(id: string | null): void {
   selectedCompId.value = id
   activeTab.value = id ? 'component' : 'form'
+}
+
+/**
+ * 上下移动选中组件（来自 ConfigPanel 的 move-comp 事件）
+ *
+ * 交换 body 中目标组件与相邻位置，保持其他组件顺序不变。
+ * @param id 目标组件 id
+ * @param direction 'up' 上移 / 'down' 下移
+ */
+function handleMoveComp(id: string, direction: 'up' | 'down'): void {
+  const body = [...schema.value.body]
+  const idx = body.findIndex(c => c.id === id)
+  if (idx < 0) return
+  const target = direction === 'up' ? idx - 1 : idx + 1
+  if (target < 0 || target >= body.length) return
+  // 交换 idx 与 target
+  ;[body[idx], body[target]] = [body[target], body[idx]]
+  schema.value = { ...schema.value, body }
+}
+
+/**
+ * 删除选中组件（来自 ConfigPanel 的 delete-comp 事件）
+ *
+ * 删除后取消选中并切回表单属性 tab。
+ * @param id 目标组件 id
+ */
+function handleDeleteComp(id: string): void {
+  const body = schema.value.body.filter(c => c.id !== id)
+  schema.value = { ...schema.value, body }
+  selectedCompId.value = null
+  activeTab.value = 'form'
 }
 
 /**
@@ -100,6 +168,28 @@ function handleConfigUpdate(newSchema: FormSchema): void {
 function handleTabChange(tab: ConfigTab): void {
   activeTab.value = tab
 }
+
+/**
+ * 打开预览弹窗
+ *
+ * 传入当前 schema + 空数据对象（用户可在弹窗内编辑填入）。
+ */
+function handleOpenPreview(): void {
+  previewData.value = {}
+  previewVisible.value = true
+}
+
+/** 关闭预览弹窗 */
+function handleClosePreview(): void {
+  previewVisible.value = false
+}
+
+/**
+ * 预览弹窗数据更新（来自 FormPreview 的 input 事件回写）
+ */
+function handleUpdatePreviewData(newData: Record<string, unknown>): void {
+  previewData.value = newData
+}
 </script>
 
 <template>
@@ -109,6 +199,7 @@ function handleTabChange(tab: ConfigTab): void {
       @update:schema="handleSchemaUpdate"
       @load-mock-a4="loadMockA4"
       @load-mock-a3="loadMockA3"
+      @open-preview="handleOpenPreview"
     />
     <div class="designer-body">
       <ComponentPalette />
@@ -117,6 +208,7 @@ function handleTabChange(tab: ConfigTab): void {
         :selected-comp-id="selectedCompId"
         @paginate="handlePaginate"
         @select-comp="handleSelectComp"
+        @add-comp="handleAddComp"
       />
       <ConfigPanel
         :schema="schema"
@@ -124,11 +216,21 @@ function handleTabChange(tab: ConfigTab): void {
         :active-tab="activeTab"
         @update:schema="handleConfigUpdate"
         @update:active-tab="handleTabChange"
+        @move-comp="handleMoveComp"
+        @delete-comp="handleDeleteComp"
       />
     </div>
     <StatusBar
       :page-count="paginateResult?.pages.length ?? 0"
       :warning-count="paginateResult?.warnings.length ?? 0"
+    />
+    <!-- 预览弹窗（Teleport to body，打印时隐藏设计器只输出纸张） -->
+    <PreviewDialog
+      :visible="previewVisible"
+      :schema="schema"
+      :data="previewData"
+      @close="handleClosePreview"
+      @update:data="handleUpdatePreviewData"
     />
   </div>
 </template>

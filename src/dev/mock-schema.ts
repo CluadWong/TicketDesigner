@@ -72,18 +72,11 @@ export function makeMockSchema(): FormSchema {
         id: "p-title",
         type: "p",
         field: "title",
-        text: "电气第一种工作票",
       },
       {
         id: "p-workcontent",
         type: "p",
         field: "workContent",
-        text: workContent,
-      },
-      {
-        id: "p-blank",
-        type: "p",
-        text: "──────── 工作设备清单 ────────",
       },
       {
         id: "t-devices",
@@ -102,7 +95,6 @@ export function makeMockSchema(): FormSchema {
         id: "p-remark",
         type: "p",
         field: "remark",
-        text: "注意事项：工作前必须验电、挂接地线；工作票签发人需到场确认安全措施落实到位；工作结束后工作负责人应组织清理现场，确认无遗留工具材料后申请工作终结。",
       },
     ],
   };

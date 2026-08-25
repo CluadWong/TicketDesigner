@@ -28,6 +28,10 @@ const emit = defineEmits<{
   'update:schema': [schema: FormSchema]
   /** 切换 tab */
   'update:active-tab': [tab: 'form' | 'component']
+  /** 上下移动选中组件 */
+  'move-comp': [id: string, direction: 'up' | 'down']
+  /** 删除选中组件 */
+  'delete-comp': [id: string]
 }>()
 
 /** 选中组件的 config（基于 selectedComp.type 查找） */
@@ -35,6 +39,22 @@ const selectedConfig = computed(() => {
   if (!props.selectedComp) return null
   return getComponentConfig(props.selectedComp.type) ?? null
 })
+
+/** 选中组件在 schema.body 中的索引（-1 表示未找到） */
+const selectedIndex = computed(() => {
+  if (!props.selectedComp) return -1
+  return props.schema.body.findIndex(c => c.id === props.selectedComp!.id)
+})
+
+/** 是否可上移（非首个） */
+const canMoveUp = computed(() => selectedIndex.value > 0)
+
+/** 是否可下移（非末个） */
+const canMoveDown = computed(
+  () =>
+    selectedIndex.value >= 0 &&
+    selectedIndex.value < props.schema.body.length - 1,
+)
 
 /**
  * 修改 schema 字段
@@ -78,6 +98,30 @@ function switchToFormTab(): void {
 /** 切换到组件属性 tab */
 function switchToComponentTab(): void {
   emit('update:active-tab', 'component')
+}
+
+/**
+ * 上移选中组件
+ */
+function handleMoveUp(): void {
+  if (!props.selectedComp || !canMoveUp.value) return
+  emit('move-comp', props.selectedComp.id, 'up')
+}
+
+/**
+ * 下移选中组件
+ */
+function handleMoveDown(): void {
+  if (!props.selectedComp || !canMoveDown.value) return
+  emit('move-comp', props.selectedComp.id, 'down')
+}
+
+/**
+ * 删除选中组件
+ */
+function handleDelete(): void {
+  if (!props.selectedComp) return
+  emit('delete-comp', props.selectedComp.id)
 }
 </script>
 
@@ -195,6 +239,26 @@ function switchToComponentTab(): void {
         <span class="empty-hint">点击画布中的组件以编辑属性</span>
       </div>
       <div v-else>
+        <!-- 组件操作工具栏：上移/下移/删除 -->
+        <div class="comp-toolbar">
+          <button
+            class="comp-btn"
+            :disabled="!canMoveUp"
+            @click="handleMoveUp"
+          >
+            ↑ 上移
+          </button>
+          <button
+            class="comp-btn"
+            :disabled="!canMoveDown"
+            @click="handleMoveDown"
+          >
+            ↓ 下移
+          </button>
+          <button class="comp-btn danger" @click="handleDelete">
+            删除
+          </button>
+        </div>
         <div class="section">
           <div class="section-title">{{ selectedConfig.displayName }}</div>
           <div
@@ -383,6 +447,53 @@ select.form-control {
   font-size: 13px;
   color: #9ca3af;
   line-height: 1.6;
+}
+
+/**
+ * 组件操作工具栏：上移/下移/删除
+ *
+ * 替代 vuedraggable 排序（vuedraggable 直接包裹 body 与 paginate 切片冲突，
+ * 故 v1 阶段 3.3.2 改用按钮排序，完整拖拽排序待后续优化）。
+ */
+.comp-toolbar {
+  display: flex;
+  gap: 6px;
+  padding: 8px 0 12px;
+  border-bottom: 1px solid #f3f4f6;
+  margin-bottom: 12px;
+}
+
+.comp-btn {
+  flex: 1;
+  padding: 6px 8px;
+  background: #f9fafb;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.comp-btn:hover:not(:disabled) {
+  background: #eff6ff;
+  border-color: #3b82f6;
+  color: #1d4ed8;
+}
+
+.comp-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.comp-btn.danger {
+  color: #dc2626;
+}
+
+.comp-btn.danger:hover {
+  background: #fef2f2;
+  border-color: #ef4444;
+  color: #b91c1c;
 }
 
 .empty-hint {

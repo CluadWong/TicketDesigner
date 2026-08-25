@@ -71,11 +71,16 @@ export interface BaseComponent {
   field?: string
 }
 
-/** 段落文本：可直接编辑的文本组件（主要输入标签） */
+/**
+ * 段落文本：表单主要输入标签
+ *
+ * p 组件是**数据无关的空壳**——不含 text 内容字段。
+ * - 模板编辑器：画布显示 `{field}` 占位（如 field='单位' 显示 {单位}）
+ * - 表单预览组件：渲染 `<p contenteditable data-field="单位">`，
+ *   读取 data[field] 填入文本
+ */
 export interface PComponent extends BaseComponent {
   type: 'p'
-  /** 段落文本内容 */
-  text: string
 }
 
 /** 图片组件：固定或自然尺寸的图片 */

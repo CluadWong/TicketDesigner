@@ -33,10 +33,18 @@ const props = withDefaults(
      * 测试时注入 mock 工厂便于控制测高
      */
     measureFactory?: () => MeasureAPI
+    /**
+     * schema 变化后重新分页的 debounce 延迟（毫秒，默认 300）
+     *
+     * 设计器模式下用户连续修改组件属性时避免频繁重算；
+     * 测试时传 0 跳过 debounce 同步执行，便于断言。
+     */
+    debounceMs?: number
   }>(),
   {
     showWarnings: true,
     measureFactory: () => new DomMeasure(),
+    debounceMs: 300,
   }
 )
 
@@ -50,6 +58,9 @@ const result = ref<PaginateResult>({ pages: [], warnings: [] })
 
 /** 测量器实例（仅在 compute 期间持有） */
 let measure: MeasureAPI | null = null
+
+/** debounce timer 引用（onUnmounted 时清除 pending） */
+let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
 /**
  * 重新计算分页：创建 measure → paginate → destroy measure
@@ -66,16 +77,41 @@ const compute = (): void => {
   emit('paginate', result.value)
 }
 
+/**
+ * debounce 包裹的 compute：schema 变化后延迟 300ms 执行
+ *
+ * 用户在设计器中连续修改组件属性（拖拽、改文字）时会频繁触发 watch，
+ * debounce 避免每次按键都重新测量 DOM + 重算分页（性能损耗）。
+ * 首次 onMounted 仍立即 compute 一次，不 debounce。
+ */
+const computeDebounced = (): void => {
+  // debounceMs=0 时同步执行（测试场景）
+  if (props.debounceMs <= 0) {
+    compute()
+    return
+  }
+  if (debounceTimer) clearTimeout(debounceTimer)
+  debounceTimer = setTimeout(() => {
+    debounceTimer = null
+    compute()
+  }, props.debounceMs)
+}
+
 onMounted(() => {
+  // 首次立即计算，避免初始 300ms 空白
   compute()
-  // schema 变化时重新分页（deep 监听 body 内组件变化）
-  watch(() => props.schema, compute, { deep: true })
+  // schema 变化时 debounce 300ms 后重新分页（deep 监听 body 内组件变化）
+  watch(() => props.schema, computeDebounced, { deep: true })
 })
 
 onUnmounted(() => {
   if (measure) {
     measure.destroy?.()
     measure = null
+  }
+  if (debounceTimer) {
+    clearTimeout(debounceTimer)
+    debounceTimer = null
   }
 })
 

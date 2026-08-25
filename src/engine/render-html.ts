@@ -59,8 +59,11 @@ function dataFieldAttr(field?: string): string {
  */
 export function renderComponentHtml(comp: Component): string {
   switch (comp.type) {
-    case 'p':
-      return `<p${dataFieldAttr(comp.field)}>${escapeHtml(comp.text)}</p>`
+    case 'p': {
+      // p 组件不含 text，模板模式显示 {field} 占位（与 CompP.vue 一致）
+      const placeholder = comp.field ? `{${comp.field}}` : ''
+      return `<p${dataFieldAttr(comp.field)}>${escapeHtml(placeholder)}</p>`
+    }
     case 'image': {
       const w = comp.width ? ` width="${comp.width}"` : ''
       const h = comp.height ? ` height="${comp.height}"` : ''

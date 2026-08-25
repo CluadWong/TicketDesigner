@@ -3,9 +3,9 @@
  *
  * 设计依据：docs/design-biz.md §5.3 p 组件示例
  *
+ * p 组件是数据无关的空壳——不含 text 内容字段。
  * 可配置字段：
- *   - field: 字段标识（v2 流程数据绑定键，空则不参与数据绑定）
- *   - text: 段落文本内容（必填）
+ *   - field: 字段标识（预览组件用，绑定 data[field] 填入文本）
  */
 
 import type { ComponentConfig, ConfigField } from '@/types'
@@ -19,14 +19,7 @@ const fields: ReadonlyArray<ConfigField & { key: keyof PComponent }> = [
     label: '字段标识',
     type: 'text',
     required: false,
-    help: '用于与流程数据绑定；空则不参与数据绑定',
-  },
-  {
-    key: 'text',
-    label: '文本内容',
-    type: 'textarea',
-    required: true,
-    default: '段落文本',
+    help: '预览时绑定 data[field] 填入文本；空则不参与数据绑定',
   },
 ]
 
@@ -35,6 +28,6 @@ export const pConfig: ComponentConfig<PComponent> = {
   type: 'p',
   displayName: '段落文本',
   fields,
-  // 通过 createDefaultFactory 从 fields[].default 自动组装，避免双份维护
+  // 通过 createDefaultFactory 从 fields[].default 自动组装，产出空壳模板
   createDefault: createDefaultFactory<PComponent>('p', fields),
 }

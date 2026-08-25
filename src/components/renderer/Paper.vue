@@ -18,7 +18,8 @@
  *
  * 设计依据：docs/design.md §2、docs/engine.md §3。
  */
-import { computed } from 'vue'
+import { computed, inject, ref } from 'vue'
+import type { Ref } from 'vue'
 import type { FormSchema, Page, Warning, Block } from '@/types'
 import { geom } from '@/engine'
 import CompP from '@/components/p/CompP.vue'
@@ -36,6 +37,22 @@ const props = defineProps<{
   /** 引擎警告列表（用于超高标记叠加） */
   warnings: Warning[]
 }>()
+
+/**
+ * 当前选中的组件 id（来自 DesignerApp provide，跨层级透传）
+ *
+ * 用于 .block 选中高亮（蓝色 outline）。
+ * 设计器模式下注入；纯渲染器模式（如 FormRenderer 单独使用）未注入时为 null，无选中效果。
+ */
+const selectedCompId = inject<Ref<string | null>>('selectedCompId', ref(null))
+
+/**
+ * 判断某 block 是否处于选中态
+ * @param block 当前 block
+ */
+function isSelected(block: Block): boolean {
+  return selectedCompId.value === block.comp.id
+}
 
 /** 纸张几何（mm） */
 const paperGeom = computed(() =>
@@ -111,7 +128,8 @@ function hasWarning(block: Block): boolean {
         v-for="(block, idx) in page.blocks"
         :key="idx"
         class="block"
-        :class="{ 'has-warning': hasWarning(block) }"
+        :class="{ 'has-warning': hasWarning(block), 'selected': isSelected(block) }"
+        :data-comp-id="block.comp.id"
       >
         <CompP v-if="block.type === 'item' && block.comp.type === 'p'" :comp="block.comp" />
         <CompImage

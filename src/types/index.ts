@@ -8,3 +8,4 @@
 export * from './schema'
 export * from './paginate'
 export * from './component-config'
+export * from './rules'

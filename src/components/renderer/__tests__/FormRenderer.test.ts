@@ -50,7 +50,7 @@ describe('FormRenderer', () => {
   it('空 schema 渲染 0 张纸', () => {
     const schema = makeSchema()
     const wrapper = mount(FormRenderer, {
-      props: { schema, measureFactory: mockMeasureFactory() },
+      props: { schema, measureFactory: mockMeasureFactory(), debounceMs: 0 },
     })
     expect(wrapper.findAll('.paper')).toHaveLength(0)
   })
@@ -58,7 +58,7 @@ describe('FormRenderer', () => {
   it('单个 p 渲染 1 张纸', async () => {
     const schema = makeSchema({ body: [makeP('p1')] })
     const wrapper = mount(FormRenderer, {
-      props: { schema, measureFactory: mockMeasureFactory() },
+      props: { schema, measureFactory: mockMeasureFactory(), debounceMs: 0 },
     })
     await nextTick()
     expect(wrapper.findAll('.paper')).toHaveLength(1)
@@ -69,7 +69,7 @@ describe('FormRenderer', () => {
     const schema = makeSchema({ body: [makeP('p1')] })
     const factory = vi.fn(mockMeasureFactory())
     mount(FormRenderer, {
-      props: { schema, measureFactory: factory },
+      props: { schema, measureFactory: factory, debounceMs: 0 },
     })
     expect(factory).toHaveBeenCalled()
   })
@@ -77,7 +77,7 @@ describe('FormRenderer', () => {
   it('无警告时不渲染警告面板', () => {
     const schema = makeSchema({ body: [makeP('p1')] })
     const wrapper = mount(FormRenderer, {
-      props: { schema, measureFactory: mockMeasureFactory() },
+      props: { schema, measureFactory: mockMeasureFactory(), debounceMs: 0 },
     })
     expect(wrapper.find('.warnings-panel').exists()).toBe(false)
   })
@@ -89,6 +89,7 @@ describe('FormRenderer', () => {
       props: {
         schema,
         measureFactory: mockMeasureFactory(100000),
+        debounceMs: 0,
       },
     })
     await nextTick()
@@ -105,6 +106,7 @@ describe('FormRenderer', () => {
         schema,
         showWarnings: false,
         measureFactory: mockMeasureFactory(100000),
+        debounceMs: 0,
       },
     })
     await nextTick()
@@ -118,7 +120,7 @@ describe('FormRenderer', () => {
     const body: Component[] = Array.from({ length: 56 }, (_, i) => makeP(`p${i}`))
     const schema = makeSchema({ body })
     const wrapper = mount(FormRenderer, {
-      props: { schema, measureFactory: mockMeasureFactory() },
+      props: { schema, measureFactory: mockMeasureFactory(), debounceMs: 0 },
     })
     await nextTick()
     expect(wrapper.findAll('.paper')).toHaveLength(2)
@@ -127,7 +129,7 @@ describe('FormRenderer', () => {
   it('注入了 @page <style> 节点', () => {
     const schema = makeSchema({ body: [makeP('p1')] })
     const wrapper = mount(FormRenderer, {
-      props: { schema, measureFactory: mockMeasureFactory() },
+      props: { schema, measureFactory: mockMeasureFactory(), debounceMs: 0 },
     })
     const el = document.getElementById(STYLE_ID)
     expect(el).not.toBeNull()
@@ -139,7 +141,7 @@ describe('FormRenderer', () => {
   it('schema 变化时重新分页', async () => {
     const schema = makeSchema({ body: [makeP('p1')] })
     const wrapper = mount(FormRenderer, {
-      props: { schema, measureFactory: mockMeasureFactory() },
+      props: { schema, measureFactory: mockMeasureFactory(), debounceMs: 0 },
     })
     await nextTick()
     expect(wrapper.findAll('.paper')).toHaveLength(1)
@@ -156,7 +158,7 @@ describe('FormRenderer', () => {
   it('卸载时移除 @page <style> 节点', () => {
     const schema = makeSchema({ body: [makeP('p1')] })
     const wrapper = mount(FormRenderer, {
-      props: { schema, measureFactory: mockMeasureFactory() },
+      props: { schema, measureFactory: mockMeasureFactory(), debounceMs: 0 },
     })
     expect(document.getElementById(STYLE_ID)).not.toBeNull()
     wrapper.unmount()
@@ -169,7 +171,7 @@ describe('FormRenderer', () => {
       body: [makeP('p1')],
     })
     const wrapper = mount(FormRenderer, {
-      props: { schema, measureFactory: mockMeasureFactory() },
+      props: { schema, measureFactory: mockMeasureFactory(), debounceMs: 0 },
     })
     expect(document.getElementById(STYLE_ID)!.textContent).toContain('a3 landscape')
     wrapper.unmount()

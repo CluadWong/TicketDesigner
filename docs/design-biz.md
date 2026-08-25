@@ -10,34 +10,42 @@
 
 ## 1. 业务定位
 
-### 1.1 双使命
+### 1.1 双产物：表单模板编辑器 + 表单预览组件
 
-同一份表单设计产物（FormSchema），承载两种使用模式：
+系统产出两个独立产物，职责严格分离：
 
-| 模式 | 用途 | 数据来源 | 输入交互 | 当前阶段 |
+| 产物 | 职责 | 输入 | 输出 | 当前阶段 |
 |---|---|---|---|---|
-| **打印模式** | 设计 → 打印 → **手写填写** | 无数据 | 纸张手填 | **v1 实现** |
-| **审批模式** | 流程运行时 → 渲染表单 → **流程数据自动填充** + 用户补填 | 流程实例数据 `{field: value}` | 屏幕表单交互 | **v2 预留** |
+| **表单模板编辑器** | 设计数据无关的表单模板 | 用户操作（拖拽/配置） | `FormSchema`（模板配置，含 field + 样式 + 结构，**不含数据**） | **阶段 3 实现** |
+| **表单预览组件** | 接收模板 + 数据 + 权限，渲染填入 | `FormSchema` + `data {field: value}` + `RulesMap` | 渲染后的表单 DOM（数据已填入 + 权限生效） | **阶段 4 实现** |
 
-> 设计器只做一件事：**设计表单模板**（FormSchema）。
-> 模板被两种消费方使用：打印器（v1） / 流程运行时（v2）。
+> **关键边界**：表单模板编辑器产出的 `FormSchema` 是**数据无关的配置**，不含具体内容数据（如 p 的文本、image 的 src、table 的行数据）。
+> 数据由表单预览组件在渲染时通过 `field` 从 `data` 中查找填入。
+>
+> 这样分离的好处：
+> - 同一份模板可被多次复用（不同流程实例填不同数据）
+> - 模板设计者不需要知道运行时数据
+> - 预览组件可独立测试和演进
 
 ### 1.2 双阶段开发路线
 
 ```
-阶段 A（v1，当前）：
-  设计器 → FormSchema → 打印 → 手写
-  ⚠ 不涉及流程、数据填充、权限运行时
+阶段 3（当前）：表单模板编辑器
+  用户拖拽/配置 → FormSchema（数据无关模板）
+  ├─ p 组件：field + 样式（无 text 内容，预览时由 data[field] 填入）
+  ├─ image 组件：field + 尺寸（src 可选，模板固定图片如 logo；无 src 则预览时由 data[field] 提供）
+  └─ table 组件：field + columns 结构 + rows 模板行数（打印手写场景固定 N 行空行）
+  ⚠ 不涉及流程数据、权限运行时
 
-阶段 B（v2，后续）：
-  设计器产物（FormSchema） + 流程数据 + 权限规则
-    → 运行时渲染器
-    → DOM 按 field 注入数据
-    → 按 rules 控制字段权限
+阶段 4（后续）：表单预览组件
+  FormSchema（模板） + data {field: value} + RulesMap（权限）
+    → 表单预览组件
+    → 按 comp.field 查找 data[field] 填入对应位置
+    → 按 rules 控制字段权限（readonly/hidden/required）
     → 屏幕审批 / 打印归档
 ```
 
-> v1 不实现 v2 的运行时，但 Schema 必须**预留 v2 接入点**（field 字段），避免 v2 时回头改 Schema。
+> 阶段 3 不实现阶段 4 的运行时，但 Schema 必须**预留 field 接入点**，避免阶段 4 时回头改 Schema。
 
 ---
 
@@ -106,42 +114,48 @@ DOM:       <p data-field="workName">...</p>
 
 ### 3.2 哪些组件可绑定 field
 
-| 组件 | 可绑定 field | 绑定语义 | 备注 |
-|---|---|---|---|
-| **p** | ✅ | 单值文本 | 主要输入标签，几乎所有输入项用 p |
-| **image** | ✅ | 图片 src（URL 或 base64） | 如签名图片 |
-| **table** | ✅ | 整表数据（见 §3.3） | 表格绑定形态单一化 |
+| 组件 | 可绑定 field | 绑定语义 | 模板阶段内容 | 预览阶段填充 |
+|---|---|---|---|---|
+| **p** | ✅ | 单值文本 | **无 text 内容**（纯空壳，field 标识数据位置） | `data[field]` 填入文本 |
+| **image** | ✅ | 图片 src（URL 或 base64） | src 可选（模板固定图片如 logo/印章）；无 src 则空 | 有 src 用模板 src，无 src 用 `data[field]` |
+| **table** | ✅ | 整表数据（见 §3.3） | rows 是模板配置（N 行空行，打印手写场景） | `data[field]` 覆盖 rows 填入实际数据 |
 
 > **p 是主要输入标签**：从工作票样例看，"单位/编号/工作负责人/班组/工作内容"等字段都用 p 承载，通过 field 标识。
-> 设计器默认所有投放的 p 都建议填 field（不填则仅作静态文本）。
+> p 组件**不含 text 内容字段**——模板阶段是空壳，预览时完全由 `data[field]` 填入文本。
+> 设计器画布中 p 显示 field 名作为占位（如 `<p data-field="workName">{workName}</p>`），方便设计者识别。
 
 ### 3.3 表格组件的字段绑定（整表数据形态）
 
 表格 field 绑定语义：**整表对应流程数据的一个数组**。
 
 ```
-TableComponent {
+TableComponent {              // 模板阶段（数据无关）
   field: 'deviceList'         // 整表对应流程数据的一个数组
   columns: [
     { key: 'name',  title: '设备名' },
     { key: 'status', title: '状态' }
   ]
-  rows: []                    // v1 设计时为空模板；v2 运行时由流程数据替换
+  rows: [                     // 模板配置：N 行空行（打印手写场景）
+    { name: '', status: '' },
+    { name: '', status: '' },
+    ... // 共 N 行
+  ]
 }
 
-流程数据（v2）：
+流程数据（预览阶段）：
 {
-  deviceList: [
+  deviceList: [                // 覆盖模板的 rows
     { name: '设备A', status: '正常' },
     { name: '设备B', status: '检修' }
   ]
 }
 ```
 
-- v1 渲染时：表格按 columns 渲染表头 + 空行模板（不绑定数据）
-- v2 渲染时：`data[field]` 直接替换 `rows`，DOM 上 `<table data-field="deviceList">`
+- 模板渲染（编辑器画布）：表格按 columns 渲染表头 + 模板 N 行空行（供打印手写）
+- 预览渲染（表单预览组件）：`data[field]` 覆盖模板 `rows`，DOM 上 `<table data-field="deviceList">`
 
-> v1 不实现"表格内散点字段绑定"（即列级 field），如有需求 v2 再扩展。
+> 表格的 `rows` 在模板阶段是**配置**（固定行数供打印手写），不是数据。
+> 预览阶段 `data[field]` 若提供则覆盖模板 rows；若未提供则保留模板空行（如审批中尚未填写的表格）。
 
 ---
 
@@ -248,11 +262,13 @@ interface ComponentConfig {
   "type": "p",
   "displayName": "段落文本",
   "fields": [
-    { "key": "field", "label": "字段标识", "type": "text", "required": false, "help": "用于与流程数据绑定；空则不参与数据绑定" },
-    { "key": "text", "label": "文本内容", "type": "textarea", "required": true }
+    { "key": "field", "label": "字段标识", "type": "text", "required": false, "help": "用于与流程数据绑定；空则不参与数据绑定（纯静态文本）" }
   ]
 }
 ```
+
+> p 组件**不含 text 字段**——模板阶段是空壳，预览时由 `data[field]` 填入文本。
+> 画布中 p 显示 `{field}` 占位（如 field='workName' 显示 `{workName}`），方便设计者识别数据位置。
 
 #### image 组件
 
@@ -261,13 +277,16 @@ interface ComponentConfig {
   "type": "image",
   "displayName": "图片",
   "fields": [
-    { "key": "field", "label": "字段标识", "type": "text", "help": "v2 用于绑定图片 src（URL/base64）" },
-    { "key": "src",   "label": "图片地址", "type": "text", "required": true },
+    { "key": "field", "label": "字段标识", "type": "text", "help": "预览时绑定图片 src（URL/base64）；与 src 二选一" },
+    { "key": "src",   "label": "图片地址", "type": "text", "required": false, "help": "模板固定图片（如 logo/印章）；留空则预览时由 field 数据提供" },
     { "key": "width", "label": "宽度(mm)", "type": "number" },
     { "key": "height","label": "高度(mm)", "type": "number" }
   ]
 }
 ```
+
+> image 的 src 改为**可选**：模板固定图片（logo/印章）填 src；动态图片（签名/附件）留空 src，预览时由 `data[field]` 提供。
+> src 与 field 二选一：有 src 用模板 src，无 src 用 `data[field]`。
 
 #### table 组件
 
@@ -276,12 +295,14 @@ interface ComponentConfig {
   "type": "table",
   "displayName": "表格",
   "fields": [
-    { "key": "field", "label": "字段标识", "type": "text", "help": "v2 绑定整表数据数组" }
+    { "key": "field", "label": "字段标识", "type": "text", "help": "预览时绑定整表数据数组，覆盖模板 rows" }
   ]
 }
 ```
 
-> 表格的 columns / rows 配置较复杂，不在右栏用简单表单控件配置，单独在画布内编辑（点击表格进入列编辑模式）。
+> table 的 rows 是**模板配置**（N 行空行，createDefault 时生成默认 5 行空行供打印手写）。
+> 预览时 `data[field]` 若提供则覆盖模板 rows；未提供则保留模板空行。
+> 表格的 columns 结构配置较复杂，不在右栏用简单表单控件配置，单独在画布内编辑（点击表格进入列编辑模式）。
 
 ### 5.4 实现约定
 
@@ -307,16 +328,34 @@ src/config/
 
 ---
 
-## 6. v2 数据填充机制（预留）
+## 6. 表单预览组件（阶段 4）
 
-### 6.1 v1 vs v2 渲染器对比
+> 阶段 3（表单模板编辑器）产出数据无关的 `FormSchema`。
+> 阶段 4（表单预览组件）接收 `FormSchema` + `data` + `rules`，渲染填入数据并应用权限。
 
-| 项 | v1 打印渲染器 | v2 审批渲染器 |
+### 6.1 渲染契约
+
+```
+FormPreview({
+  schema: FormSchema,           // 阶段 3 产出的模板（数据无关）
+  data: { field: value },       // 流程实例数据
+  rules?: RulesMap              // 权限规则（按 field 配置）
+}) → 渲染后的表单 DOM（数据已填入 + 权限生效）
+```
+
+> 预览组件接收三参数：模板 schema + 数据 data + 权限 rules。
+> 渲染流程：按 schema 渲染纸张结构 → 按 comp.field 查找 data[field] 填入 → 按 rules 控制字段权限。
+
+### 6.2 模板渲染器 vs 预览组件对比
+
+| 项 | 表单模板编辑器（阶段 3） | 表单预览组件（阶段 4） |
 |---|---|---|
-| 输入 | FormSchema | FormSchema + `{field: value}` + `RulesMap` |
-| 输出 | 离散纸张 DOM（空字段/占位符） | 离散纸张 DOM（数据已填入 + 权限生效） |
-| 字段渲染 | `<p data-field="x"></p>` | `<p data-field="x">实际值</p>` |
-| 交互 | 只读预览 | 可编辑（按 rules 控制可编辑/必填/隐藏） |
+| 输入 | 用户操作 | `FormSchema` + `data {field: value}` + `RulesMap` |
+| 输出 | `FormSchema`（数据无关模板） | 离散纸张 DOM（数据已填入 + 权限生效） |
+| p 渲染 | `<p data-field="x">{x}</p>`（占位） | `<p contenteditable data-field="x">实际值</p>`（contenteditable + data[x] 填入） |
+| image 渲染 | `<img data-field="x">` 或 `<img src="logo.png">` | 有 data[x] 用 data[x]，否则用模板 src |
+| table 渲染 | 模板 N 行空行 | `data[field]` 覆盖模板 rows |
+| 交互 | 设计（拖拽/配置） | 按 rules 控制可编辑/必填/隐藏 |
 
 ### 6.2 v2 数据填充算法（DOM 操作式，按用户描述）
 
@@ -380,11 +419,17 @@ function applyRules(dom, rules: RulesMap):
 
 | 决策点 | 选型 | 落地位置 |
 |---|---|---|
+| 双产物分离 | 表单模板编辑器（阶段 3）+ 表单预览组件（阶段 4） | §1.1 |
+| 模板 vs 数据分离 | 模板编辑器产出数据无关配置；预览组件接收 data 填入 | §1.1、§3 |
+| p 组件不含 text | p 是空壳，预览时由 data[field] 填入文本 | §3.2、§5.3 |
+| image src 可选 | src 模板固定图片（logo/印章）；无 src 由 data[field] 提供 | §3.2、§5.3 |
+| table rows 是模板配置 | N 行空行（打印手写），预览时由 data[field] 覆盖 | §3.3、§5.3 |
 | v1 组件清单 | p / image / table（不含 grid/flex） | §2.1、[schema.ts](../src/types/schema.ts) Component 联合 |
 | field 唯一性 | 软警告（不强制阻止） | §3.1 |
 | 表格 field 绑定 | 仅形态 1（整表数据） | §3.3 |
 | 权限配置 | 不在设计器内，由专门流程页面处理 | §4 |
-| Schema 含 field | 是（v1 设计器可填，v2 渲染时用） | [schema.ts](../src/types/schema.ts) BaseComponent.field |
+| Schema 含 field | 是（设计器可填，预览组件用） | [schema.ts](../src/types/schema.ts) BaseComponent.field |
 | Schema 不含 rules | 是（权限归流程页面） | [schema.ts](../src/types/schema.ts) FormSchema 无 rules |
 | 组件配置项 | UI 组件 + config.ts 单独声明 JSON，驱动右栏面板 | §5 |
 | 设计器布局 | 三栏式（左组件库/中画布/右配置面板） | §2.1 |
+| 预览组件契约 | schema + data + rules → 渲染填入 + 权限 | §6.1 |

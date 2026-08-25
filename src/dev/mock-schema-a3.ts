@@ -55,18 +55,11 @@ export function makeMockSchemaA3(): FormSchema {
         id: "p-title",
         type: "p",
         field: "reportTitle",
-        text: "铝合金板材质量检验报告",
       },
       {
         id: "p-basis",
         type: "p",
         field: "inspectionBasis",
-        text: inspectionBasis,
-      },
-      {
-        id: "p-sep",
-        type: "p",
-        text: "──── 检验数据明细 ────",
       },
       {
         id: "t-inspection",
@@ -86,12 +79,6 @@ export function makeMockSchemaA3(): FormSchema {
         id: "p-remark",
         type: "p",
         field: "remark",
-        text:
-          "备注：1) 本报告所列检验数据为原始记录，不得涂改；" +
-          "2) 不合格批次已隔离存放，待复检后处置；" +
-          "3) 检验结论由质检部门审核盖章后生效；" +
-          "4) 本报告复印件未加盖质检专用章无效；" +
-          "5) 异议提出期限为收货后 15 日内。",
       },
     ],
   };

@@ -11,16 +11,16 @@ describe('pConfig', () => {
     expect(pConfig.displayName).toBe('段落文本')
   })
 
-  it('fields 包含 field + text 两项', () => {
+  it('fields 仅含 field 一项', () => {
     const keys = pConfig.fields.map(f => f.key)
-    expect(keys).toEqual(['field', 'text'])
+    expect(keys).toEqual(['field'])
   })
 
   it('field 配置：text 控件 + 非必填 + 含帮助文案', () => {
     const fieldConfig = pConfig.fields.find(f => f.key === 'field')!
     expect(fieldConfig.type).toBe('text')
     expect(fieldConfig.required).toBe(false)
-    expect(fieldConfig.help).toContain('流程数据绑定')
+    expect(fieldConfig.help).toContain('数据绑定')
   })
 
   it('text 配置：textarea 控件 + 必填 + 默认值', () => {

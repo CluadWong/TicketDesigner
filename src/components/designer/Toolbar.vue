@@ -31,6 +31,8 @@ const emit = defineEmits<{
   'load-mock-a4': []
   /** 加载 A3 mock 示例 */
   'load-mock-a3': []
+  /** 打开预览弹窗 */
+  'open-preview': []
 }>()
 
 /** 纸张选项 */
@@ -76,9 +78,9 @@ function patchFooter(patch: Partial<FormSchema['footer']>): void {
   patchSchema({ footer: { ...footer.value, ...patch } })
 }
 
-/** 触发浏览器打印 */
-function handlePrint(): void {
-  window.print()
+/** 打开预览弹窗（预览/打印在弹窗内进行） */
+function handlePreview(): void {
+  emit('open-preview')
 }
 </script>
 
@@ -143,7 +145,7 @@ function handlePrint(): void {
 
     <!-- 操作按钮 -->
     <div class="toolbar-group toolbar-actions">
-      <button class="btn btn-primary" @click="handlePrint">打印</button>
+      <button class="btn btn-primary" @click="handlePreview">预览</button>
       <button class="btn" disabled title="阶段 5 实现">保存</button>
       <button class="btn" disabled title="阶段 5 实现">加载</button>
       <span class="divider"></span>

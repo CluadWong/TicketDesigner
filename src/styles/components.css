@@ -58,6 +58,18 @@
 }
 
 /**
+ * 选中态高亮（设计器模式）
+ *
+ * 由 DesignerApp provide('selectedCompId') 注入，Paper.vue inject 后 :class 控制。
+ * 纯渲染器模式（未注入 selectedCompId）时不会出现选中态。
+ */
+.form-renderer .block.selected {
+  outline: 2px solid #2563eb;
+  outline-offset: 1px;
+  cursor: pointer;
+}
+
+/**
  * 全局打印重置
  *
  * 浏览器默认 body 有 8px margin，会让 .canvas-pane 顶部偏移，
