@@ -1,255 +1,197 @@
 # 开发计划
 
-> 配套 [design.md](./design.md)、[engine.md](./engine.md)、[design-biz.md](./design-biz.md)。
-> 本文档描述分阶段落地路径。
-
-## 已锁定的技术决策
-
-| 决策点 | 选型 | 来源 |
-|---|---|---|
-| 双产物分离 | 表单模板编辑器（阶段 3）+ 表单预览组件（阶段 4） | design-biz.md §1.1 |
-| 模板 vs 数据分离 | 模板编辑器产出数据无关配置；预览组件接收 data 填入 | design-biz.md §1.1、§3 |
-| p 组件不含 text | p 是空壳，预览时由 data[field] 填入文本 | design-biz.md §3.2、§5.3 |
-| image src 可选 | src 模板固定图片（logo/印章）；无 src 由 data[field] 提供 | design-biz.md §3.2、§5.3 |
-| table rows 是模板配置 | N 行空行（打印手写），预览时由 data[field] 覆盖 | design-biz.md §3.3、§5.3 |
-| 预览组件契约 | schema + data + rules → 渲染填入 + 权限 | design-biz.md §6.1 |
-| 页眉/页脚内容 | 仅文本 + 页码（不做组件容器） | design.md §2.5 |
-| 超高组件 | 裁剪 + 警告（不跨页） | design.md §4.5 |
-| 拖拽方案 | vuedraggable（v1 暂用按钮排序替代，与 paginate 冲突） | — |
-| 分页引擎 | off-screen 测高 + 按行/按块切分（已验证） | engine.md §1 |
-| 屏幕与打印 | 复用同一 DOM 结构 | design.md §4.1 |
-| 边距模型 | 上下 0 / 左右统一 | design.md §2.3 |
-| 技术栈 | Vue 3 + TS + Vite + Element Plus | — |
-| v1 组件清单 | p / image / table（不含 grid/flex） | design-biz.md §2.1 |
-| field 字段 | Schema 内置，设计器可填，预览组件用 | design-biz.md §3.1 |
-| 权限配置 | 不在设计器内，由专门流程页面处理 | design-biz.md §4 |
-| 组件配置项 | UI 组件 + config.ts 单独声明 JSON | design-biz.md §5 |
-
-## 阶段 1：项目骨架与 Schema（基础设施）
-
-**目标**：搭好项目，定义数据契约，引擎函数化。
-
-- [x] 1.1 初始化 Vue 3 + TS + Vite + Element Plus 项目骨架
-- [x] 1.2 安装 vuedraggable（已含在 1.1 的 package.json）
-- [x] 1.3 定义 Schema 类型体系（[src/types/schema.ts](../src/types/schema.ts)）
-  - v1 范围：p / image / table 三种组件（不含 grid/flex）
-  - BaseComponent 含 `field?` 字段（v2 流程数据绑定键）
-  - FormSchema 不含 rules（权限归流程页面）
-  - 输出契约 [src/types/paginate.ts](../src/types/paginate.ts)：Page / Block / Warning / PaginateResult
-- [ ] 1.4 引擎抽函数化：`paginate(schema) → PaginateResult`，TS 类型
-- [ ] 1.5 引擎单测：覆盖表格切分、超高裁剪警告
-
-**产出**：`FormSchema` 类型 + `paginate()` 纯函数 + 单测。
-
-## 阶段 2：渲染器（只读视图）
-
-**目标**：给 schema → 渲染出离散纸张，复刻 demo-v2 效果。
+> 本计划配套 [design.md](./design.md)。项目现有 v1 流式设计器已经完成基础分页、渲染和三栏交互，
+> 当前主线转为扁平组件数组驱动的 Grid 固定版式设计器。
 
-- [ ] 2.1 `<FormRenderer :schema :warnings>`：调 `paginate()` → `v-for <Paper>`
-- [ ] 2.2 `<Paper>`：纸张容器 + 页眉槽 + 正文槽 + 页脚槽（含页码注入）
-- [ ] 2.3 组件渲染器（v1 仅三种）：
-  - `<CompP>`：渲染 `<p data-field="...">`，v1 不填值
-  - `<CompImage>`：渲染 `<img data-field="...">`
-  - `<CompTable>`：渲染 `<table data-field="...">`，按 columns 渲染表头 + 空行模板
-- [ ] 2.4 `usePrintStyle` composable：按 schema.paper 动态注入 `@page` 规则
-- [ ] 2.5 打印集成：`window.print()` + 打印媒体查询
-- [ ] 2.6 超高警告提示：在裁剪组件上叠加红色"超高"标记
+## 1. 当前基线
 
-**产出**：只读渲染器，能渲染 schema 为离散纸张 + 打印 + 警告。
+以下能力已经存在，应保留作为回归基线，不在 Grid 重构初期删除：
+
+- Vue 3 + TypeScript + Vite 工程骨架。
+- A3/A4、横向/纵向纸张显示及打印样式。
+- v1 `p / image / table` 渲染器。
+- off-screen 测量、普通组件分页、Table 按行切分。
+- 三栏设计器、组件选择、属性面板和状态栏。
+- FormPreview、字段填值和基础权限相关代码。
+- 云铝工作票 v1 近似 Schema，用于证明旧模型的表达上限。
+- 云铝第二种工作票前五行 Grid 原型，已验证固定行高和嵌套布局方向可行。
+
+现有测试中仍有一组 `PComponent.text` 与当前 v1 类型不一致的错误。该问题需要在 v2 类型迁移前
+单独清理，避免将历史契约错误混入 Grid 重构。
+
+## 2. 已锁定的新架构决策
 
-## 阶段 3：表单模板编辑器（可编辑）
+| 决策点 | 目标方案 |
+|---|---|
+| Schema 关系 | 单一 `components[]`，通过 `id / parentId / index` 关联 |
+| 静态布局 | 可嵌套 Grid，不使用绝对定位 |
+| 固定文字与输入 | 统一为 P，通过 `editable` 区分 |
+| 规则明细 | Table，仅负责表头、固定/动态行和数组数据 |
+| 复杂扩展 | 受控 HTML 组件，限定作用域并做安全过滤 |
+| 图片 | 保留 Image，按扁平关系放入 Grid |
+| 行高 | `baseRowHeight × height`，使用确定 CSS height |
+| 边框 | 父 Grid 管理 `all / inner / none`，避免嵌套双边框 |
+| 页面模式 | 固定工作票优先 fixed，溢出警告；动态报表后续支持 flow |
+| 运行时数据 | Schema 与 data/rules 分离 |
+| 迁移方式 | v1/v2 暂时并存，v2 验收完成后切换默认设计器 |
 
-**目标**：拖拽编辑 schema，产出数据无关的表单模板。模板含 field + 样式 + 结构，不含数据。
+## 3. 阶段 G0：原型收口与基线清理
 
-### 3.1 组件库 + 配置项 JSON（组件开发强约束）
+**目标**：把当前实验代码整理成可继续演进的稳定起点。
+
+- [x] G0.1 使用嵌套 Grid 原型渲染工作票前五行
+- [x] G0.2 验证基础行高为 8mm、工作任务行为 5 倍高度
+- [x] G0.3 验证竖排标签、输入 P、下划线和明细 Table
+- [ ] G0.4 将原型 Schema 改为扁平 `components[]`
+- [ ] G0.5 Renderer 只通过 `parentId/index` 解析关系
+- [ ] G0.6 增加前五行 Schema 结构单测和渲染快照
+- [ ] G0.7 修复现有测试仍使用旧 `PComponent.text` 的类型错误
+- [ ] G0.8 为原型增加开发模式切换，不再硬编码替换正式 CanvasPane
 
-每个组件**必须同时提供 UI 组件 + config.ts**，二者配套：
+**验收**：`vue-tsc --noEmit` 通过；前五行截图与嵌套对象版本一致；打乱 `components[]` 数组顺序后
+渲染结果不变。
 
-```
-src/components/
-├─ p/
-│  ├─ CompP.vue              ← UI 组件（阶段 2.3 复用）
-│  └─ config.ts              ← 配置项 JSON（export const pConfig: ComponentConfig）
-├─ image/
-│  ├─ CompImage.vue
-│  └─ config.ts
-└─ table/
-   ├─ CompTable.vue
-   └─ config.ts
+## 4. 阶段 G1：正式 Schema V2
 
-src/config/
-└─ component-registry.ts      ← 注册表：汇集各组件 config
-src/types/
-└─ component-config.ts         ← ComponentConfig / ConfigField 类型定义
-```
+**目标**：将已验证的关系模型从 `src/dev` 提升为正式公共类型。
+
+- [ ] G1.1 在 `FormSchema` 增加 `version: 2`
+- [ ] G1.2 定义 `ComponentBase { id, parentId, index, colspan?, padding? }`
+- [ ] G1.3 定义 Grid、P、Table、HTML、Image 联合类型
+- [ ] G1.4 定义 `baseRowHeight`、固定页面模式和纸张配置
+- [ ] G1.5 实现 `componentsById`、`childrenByParentId` 索引工具
+- [ ] G1.6 实现结构校验器：唯一 ID、父节点类型、循环、index、边界
+- [ ] G1.7 定义容器级联删除、同父重排和跨父移动纯函数
+- [ ] G1.8 定义 Schema JSON 版本迁移入口
 
-各组件配置项内容（参见 [design-biz.md §5.3](./design-biz.md#53-各组件配置项示例)）：
-- p：field（text，可选）—— **不含 text 内容字段**，预览时由 data[field] 填入
-- image：field（text）+ src（text，可选）+ width（number）+ height（number）—— src 可选，模板固定图片或预览由 data[field] 提供
-- table：field（text）—— rows 是模板配置（默认 5 行空行），columns 在画布内编辑
+**产出**：`src/types/schema-v2.ts`、索引工具、结构变更工具及单元测试。
 
-### 3.2 三栏布局骨架
-
-- [x] 3.2.1 顶部工具栏：纸张选择、方向切换、边距配置、页眉/页脚文本与页码开关、打印按钮、保存/加载 JSON
-- [x] 3.2.2 左栏组件库：遍历 `component-registry`，按 `displayName` 渲染可拖拽项（v1 仅 p/image/table）
-- [x] 3.2.3 中栏画布：承载 `<FormRenderer>`，离散纸张垂直堆叠；点击选中组件；拖拽排序
-- [x] 3.2.4 右栏配置面板：两个 tab 切换
-  - 表单属性 tab：纸张/边距/页眉页脚
-  - 组件属性 tab：按选中组件的 `config.fields` 自动渲染表单控件
-- [x] 3.2.5 底部状态栏：页数 / 警告数 / 缩放
+**验收**：非法 parentId、父子循环、重复 index、Grid/Table 越界都返回可定位到组件 ID 的错误。
 
-### 3.3 交互能力
+## 5. 阶段 G2：递归渲染器
+
+**目标**：正式 Renderer 可以从扁平数组还原组件关系并稳定打印。
 
-- [x] 3.3.1 从左栏拖到画布 → push 进 `schema.body`（生成默认 id + 空壳模板）
-- [x] 3.3.2 画布内组件排序（v1 用右栏上移/下移按钮替代 vuedraggable，因 vuedraggable 与 paginate 切片冲突）
-- [x] 3.3.3 选中组件：点击高亮 + 触发右栏切到组件属性 tab
-- [x] 3.3.4 取消选中：点画布空白 → 右栏切回表单属性 tab
-- [x] 3.3.5 编辑后 debounce 重算分页（300ms）
-
-### 3.4 field 软校验
-
-- [ ] 3.4.1 同表单内 field 重复时，在画布对应组件上叠加黄色"重复"标记
-- [ ] 3.4.2 状态栏显示重复 field 警告数
-
-**产出**：表单模板编辑器，拖拽编辑 + 实时分页预览 + 配置项驱动右栏面板。产出数据无关的 `FormSchema` 模板。
-
-## 阶段 4：表单预览组件（数据填入 + 权限）
-
-**目标**：接收模板 schema + 数据 data + 权限 rules，渲染填入数据并应用权限。
-
-### 4.1 预览组件骨架
-
-- [ ] 4.1.1 `<FormPreview :schema :data :rules>` 组件骨架
-- [ ] 4.1.2 复用阶段 2 的 FormRenderer 渲染纸张结构，扩展数据填入逻辑
-
-### 4.2 数据填入
-
-- [ ] 4.2.1 p 组件：渲染 `<p contenteditable data-field="x">`，按 `comp.field` 查找 `data[field]` 填入文本
-- [ ] 4.2.2 image 组件：有 `comp.src` 用模板 src；无 src 用 `data[field]` 作为图片地址
-- [ ] 4.2.3 table 组件：`data[field]` 覆盖模板 `rows`，按 `columns` 渲染实际数据行
-
-> p 组件预览渲染为 `<p contenteditable data-field="单位"></p>`（空 contenteditable），
-> 读取 `data: {'单位': '单位1'}` 后填入文本"单位1"。
-> rules 控制权限：readonly 时去掉 contenteditable 或加 data-readonly。
-
-### 4.3 权限应用
-
-- [ ] 4.3.1 接收 `RulesMap`，按 `field` 查找规则
-- [ ] 4.3.2 `readonly`：字段不可编辑
-- [ ] 4.3.3 `hidden`：字段隐藏
-- [ ] 4.3.4 `required`：字段必填（视觉标记 + 提交校验）
-
-**产出**：表单预览组件，接收 schema + data + rules，渲染填入数据 + 应用权限。
-
-## 阶段 5：页眉/页脚/页码完善
-
-**目标**：页眉/页脚配置生效（已在阶段 2 基本实现，本阶段完善）。
-
-- [ ] 5.1 页眉/页脚：文本输入框 + "显示页码"勾选（已在 Toolbar/ConfigPanel 实现）
-- [ ] 5.2 页码格式：`第 {n} 页 / 共 {N} 页`，引擎注入 n/N（已实现）
-- [ ] 5.3 未配置时仍占位（高度=边距）（已实现）
-
-**产出**：页眉页脚可视化配置 + 页码动态注入（基本完成，本阶段补全细节）。
-
-## 阶段 6：打磨与扩展
-
-- [ ] 6.1 撤销/重做（历史栈）
-- [ ] 6.2 schema 序列化/反序列化（保存/加载 JSON）
-- [ ] 6.3 组件库扩展：grid/flex 容器、签名、勾选框、日期、分隔线
-- [ ] 6.4 测量性能优化（行高缓存、批量测量）
-- [ ] 6.5 表单预览组件扩展：表格列级 field 绑定、复杂校验规则
-
-## 优先级与风险
-
-| 阶段 | 优先级 | 风险点 |
-|---|---|---|
-| 1 | 高 | 引擎抽函数化，注意保留 demo-v2 验证过的测量宽度对齐 |
-| 2 | 高 | 低，纯渲染 |
-| 3 | 高 | 拖拽排序与分页重算的性能（debounce 策略）；组件配置项 JSON 驱动右栏面板的开发模式新引入 |
-| 4 | 高 | 数据填入与权限应用，p 去掉 text 后的渲染逻辑调整 |
-| 5 | 中 | 页码注入时机（引擎生成 Page[] 时确定） |
-| 6 | 低 | — |
-
-## 验证基线
-
-阶段 2 完成后应复刻 demo-v2.html 的全部验证点：
-
-1. JS 分页引擎自动分页
-2. 屏幕离散纸张垂直堆叠
-3. 表格按行切分 + 表头每页重复
-4. 页眉/页脚占位贴纸张顶/底
-5. A4/A3 × 横/纵 动态切换 + `@page` 注入
-6. 打印复用屏幕 DOM，效果一致
-7. 组件含 `data-field` 属性（预览组件接入点）
-
-阶段 3 完成后追加验证点：
-
-8. 三栏布局 + 顶部工具栏 + 底部状态栏
-9. 拖拽投放 p/image/table 到画布，生成空壳模板
-10. 选中组件 → 右栏按 config.fields 自动渲染控件
-11. 修改组件属性 → debounce 重算分页
-12. field 重复软警告显示（阶段 3.4 待实现）
-
-阶段 4 完成后追加验证点：
-
-13. 传入 data {field: value} → p/image/table 数据正确填入
-14. 传入 rules → readonly/hidden/required 权限生效
-
-## 进度跟踪
-
-| 阶段 | 状态 | 备注 |
-|---|---|---|
-| 1.1 项目骨架 | ✅ 完成 | Vue 3 + TS + Vite + Element Plus + vuedraggable |
-| 1.2 vuedraggable 安装 | ✅ 完成 | 含在 1.1 |
-| 1.3 Schema 类型 | ✅ 完成 | 含 field；不含 grid/flex；不含 rules；**待调整：p 去 text** |
-| 1.4 引擎函数化 | ✅ 完成 | geom/measure/paginate/render-html |
-| 1.5 引擎单测 | ✅ 完成 | 50 单测覆盖切分/超高/表格 |
-| 2 渲染器 | ✅ 完成 | FormRenderer/Paper/CompP/CompImage/CompTable + usePrintStyle + 54 单测 |
-| 3.1 组件配置项 JSON | ✅ 完成 | ComponentConfig 泛型 + createDefaultFactory + 注册表 + 30 单测 |
-| 3.2 三栏骨架 | ✅ 完成 | DesignerApp/Toolbar/ComponentPalette/CanvasPane/ConfigPanel/StatusBar |
-| 3.3 交互能力 | ✅ 完成 | 拖拽生成 + 选中高亮 + 排序按钮 + debounce 300ms |
-| 3.4 field 软校验 | ⏳ 待开始 | — |
-| 4 表单预览组件 | ⏳ 待开始 | 需先完成阶段 3.4 + schema 调整（p 去 text） |
-| 5 页眉页脚完善 | ⏳ 待开始 | 基本已在阶段 2 实现，本阶段补全细节 |
-| 6 打磨扩展 | ⏳ 待开始 | — |
-
-## 阶段 4 前置：Schema 与组件调整清单
-
-> 阶段 4（表单预览组件）开始前，需先完成以下 schema 与组件调整，让模板真正"数据无关"。
-
-### A. Schema 调整（src/types/schema.ts）
-
-- [ ] PComponent：去掉 `text` 字段（p 是空壳，预览时由 data[field] 填入）
-- [ ] ImageComponent：`src` 改为可选（模板固定图片或预览由 data[field] 提供）
-- [ ] TableComponent：rows 保留为模板配置（默认 5 行空行）；不加 rowCount 字段
-
-### B. 组件配置项调整（src/components/{p,image,table}/config.ts）
-
-- [ ] pConfig：去掉 text field；保留 field（可选）
-- [ ] imageConfig：src 改为可选（required: false）
-- [ ] tableConfig：保留 field；不加 rowCount（rows 直接是模板配置，createDefault 生成默认 5 行空行）
-
-### C. createDefault 调整（产出空壳模板）
-
-- [ ] pConfig.createDefault：产出 `{ id, type: 'p', field: '' }`（无 text）
-- [ ] imageConfig.createDefault：产出 `{ id, type: 'image', field: '', src: '', width: undefined, height: undefined }`
-- [ ] tableConfig.createDefault：产出 `{ id, type: 'table', field: '', columns: [默认 2 列], rows: [5 行空行] }`
-
-### D. UI 组件渲染调整
-
-- [ ] CompP.vue：模板模式显示 `{field}` 占位（如 field='workName' 显示 `{workName}`）；无 field 显示空
-- [ ] CompImage.vue：有 src 渲染图片；无 src 显示占位框
-- [ ] CompTable.vue：按 rows 模板渲染 N 行空行
-
-### E. Mock schema 调整
-
-- [ ] mock-schema.ts（A4）：去掉 p 的 text，改为 field 标识；table rows 改为 5 行空行
-- [ ] mock-schema-a3.ts：同上
-
-### F. 测试调整
-
-- [ ] CompP.test.ts：去掉 text 相关断言，改为 field 占位断言
-- [ ] pConfig.test.ts：去掉 text field 断言
-- [ ] imageConfig.test.ts：src 改可选断言
-- [ ] tableConfig.test.ts：rows 默认 5 行空行断言
-- [ ] paginate.test.ts / FormRenderer.test.ts：mock schema 调整后同步更新
+- [ ] G2.1 实现 `GridFormRenderer`
+- [ ] G2.2 实现递归 `GridNodeRenderer`
+- [ ] G2.3 实现 Grid 的 mm/fr 列轨道、colspan、边框和内边距
+- [ ] G2.4 实现固定/输入两种 P 状态
+- [ ] G2.5 实现 Table 表头、固定行数、基础行高和单元格子组件
+- [ ] G2.6 实现受控 HTML 渲染与 CSS 作用域
+- [ ] G2.7 复用 Image 渲染能力
+- [ ] G2.8 实现 fixed 页面溢出检测和组件定位警告
+- [ ] G2.9 保证设计态、预览态、打印态 DOM 结构一致
+
+**产出**：正式 Grid Renderer、渲染测试和打印样式。
+
+**验收**：前五行在 Chrome/Edge 中尺寸一致；打印为 A4；所有行高误差不超过 0.5mm；无双边框。
+
+## 6. 阶段 G3：Grid 设计器交互
+
+**目标**：用户可以通过格子操作构造前五行 Schema，而不是手写 JSON。
+
+### G3.1 画布选择
+
+- [ ] 通过 `data-component-id` 选择任意组件
+- [ ] 显示当前 Grid 格子边界和投放位置
+- [ ] 面包屑显示当前组件的父级链
+- [ ] 点击空白回到纸张或根 Grid 配置
+
+### G3.2 格子编辑
+
+- [ ] 新增/删除 Grid 直接子格子
+- [ ] 将一行拆分为 1～N 列
+- [ ] 编辑固定 mm 和 fr 列宽
+- [ ] 设置基础行高倍数
+- [ ] 设置 all/inner/none 边框
+- [ ] 设置 padding、文本对齐和垂直对齐
+- [ ] 通过 colspan 合并/拆分相邻列
+- [ ] 将格子包装成子 Grid
+
+### G3.3 拖拽和移动
+
+- [ ] 从组件库拖入 Grid 格子
+- [ ] 写入目标 `parentId/index`
+- [ ] 同父拖动时交换 index
+- [ ] 跨父拖动时更新 parentId 并重排两侧 index
+- [ ] 删除容器时展示后代数量并级联删除
+- [ ] 所有结构操作接入撤销/重做历史
+
+### G3.4 属性面板
+
+- [ ] Grid：列轨道、高度倍数、边框、内边距
+- [ ] P：固定文字、editable、field、输入类型、下划线、文字样式
+- [ ] Table：field、列、rowCount、rowHeight、repeatable
+- [ ] HTML：HTML、局部 CSS、可信状态和 bindings
+- [ ] Image：src、field、宽高和适配方式
+
+**验收**：从空白 A4 开始，仅通过 UI 能重新构造前五行工作票；保存后加载，ID 关系和视觉结果不变。
+
+## 7. 阶段 G4：预览、数据与打印
+
+**目标**：Grid 模板可用于真实填写和打印。
+
+- [ ] G4.1 P 根据 editable 决定固定文字或 contenteditable/input
+- [ ] G4.2 按 field 从 data 填值并回写
+- [ ] G4.3 Table 使用 data[field] 替换设计态明细行
+- [ ] G4.4 应用 readonly/hidden/required 规则
+- [ ] G4.5 日期和签名先作为 P inputType 实现
+- [ ] G4.6 HTML bindings 显式填值，不扫描任意内部 DOM
+- [ ] G4.7 打印隐藏选择框和格子辅助线，但不改变业务尺寸
+- [ ] G4.8 fixed 模式溢出时禁止静默裁剪并给出组件 ID
+
+**验收**：单位、负责人、班组、工作任务等字段可填写；打印输出与设计态位置一致；刷新前的数据可以回写宿主。
+
+## 8. 阶段 G5：完整工作票
+
+**目标**：用同一模型实现云铝电气第二种工作票全部内容。
+
+- [ ] G5.1 计划工作时间和日期输入
+- [ ] G5.2 工作条件多行区
+- [ ] G5.3 注意事项和补充安全措施
+- [ ] G5.4 工作负责人、许可人和成员签名区
+- [ ] G5.5 工作票延期
+- [ ] G5.6 工作票终结和备注
+- [ ] G5.7 完整字段清单和重复 field 检查
+- [ ] G5.8 A4 单页/显式多页方案确认
+- [ ] G5.9 与参考 HTML 和图片进行截图对比
+
+**验收**：主要边框、列宽、行高、标题、字段位置和签名区域与参考图一致；所有输入位置都有独立 field。
+
+## 9. 阶段 G6：迁移与清理
+
+**目标**：正式切换默认设计器，处理旧模板和技术债务。
+
+- [ ] G6.1 实现可转换部分的 v1 → v2 Schema 转换
+- [ ] G6.2 无法转换的布局输出明确迁移报告
+- [ ] G6.3 DesignerApp 默认切换到 v2
+- [ ] G6.4 保存/加载 JSON 加入 version 检查
+- [ ] G6.5 保留旧 Renderer 只读兼容期
+- [ ] G6.6 兼容期结束后移除旧默认 mock 和无效入口
+- [ ] G6.7 同步 `engine.md`、`design-biz.md` 和组件开发说明
+
+## 10. 风险与控制
+
+| 风险 | 控制措施 |
+|---|---|
+| 扁平数组形成父子循环 | 保存和渲染前运行循环检测 |
+| index 重复导致格子重叠 | 结构操作集中在纯函数中并自动重排 |
+| colspan 越界 | 校验列边界，设计器禁止非法拖放 |
+| 固定高度被内容撑开 | 使用确定 height；设计态显示 overflow 警告 |
+| 嵌套边框变粗 | 外层 all、内层 inner，边框只由父 Grid 负责 |
+| HTML 污染页面 | sanitize、CSS scope、禁止 script 和事件属性 |
+| 设计态与打印态漂移 | 共用 DOM，仅隐藏辅助 UI，不重排业务内容 |
+| v1/v2 状态混用 | Schema version 分流，Designer 同一时刻只编辑一种版本 |
+| 大型模板查询变慢 | 保存 `childrenByParentId` 索引，结构变化时增量重建 |
+
+## 11. 当前优先级
+
+当前只推进以下顺序，避免同时扩展完整工作票和设计器交互：
+
+1. 完成 G0.4～G0.8，将前五行原型切换为扁平数组并恢复全量类型检查。
+2. 完成 G1 Schema V2 和结构操作纯函数。
+3. 完成 G2 正式 Renderer。
+4. 用 UI 重建前五行，完成 G3 最小闭环。
+5. 接入预览数据后再扩展完整工作票。
+
+在前五行能够“UI 构建 → 保存 → 加载 → 填写 → 打印”之前，不新增更多表单区块或复杂组件类型。

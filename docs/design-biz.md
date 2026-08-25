@@ -1,435 +1,231 @@
-# 表单设计器 业务设计文档
+# 表单设计器业务设计
 
-> 配套 [design.md](./design.md)（产品形态/概念体系/分页机制）与 [engine.md](./engine.md)（分页引擎算法）。
->
-> 本文回答"**做什么表单、给谁用、怎么用**"——业务流程、双模式、字段绑定、组件配置项。
-> design.md/engine.md 回答"**怎么把表单渲染/分页/打印**"——技术机制。
-> 两者正交，不互相覆盖。
+> 本文描述 Schema V2 下的组件业务语义和设计器行为。总体架构见 [design.md](./design.md)，
+> 渲染算法见 [engine.md](./engine.md)，落地顺序见 [development-plan.md](./development-plan.md)。
 
----
+## 1. 产品产物
 
-## 1. 业务定位
+系统提供两个可独立使用的产物：
 
-### 1.1 双产物：表单模板编辑器 + 表单预览组件
+1. **表单模板设计器**：编辑数据无关的 `FormSchema`。
+2. **表单预览组件**：接收 `schema + data + rules`，用于填写、只读查看和打印。
 
-系统产出两个独立产物，职责严格分离：
-
-| 产物 | 职责 | 输入 | 输出 | 当前阶段 |
-|---|---|---|---|---|
-| **表单模板编辑器** | 设计数据无关的表单模板 | 用户操作（拖拽/配置） | `FormSchema`（模板配置，含 field + 样式 + 结构，**不含数据**） | **阶段 3 实现** |
-| **表单预览组件** | 接收模板 + 数据 + 权限，渲染填入 | `FormSchema` + `data {field: value}` + `RulesMap` | 渲染后的表单 DOM（数据已填入 + 权限生效） | **阶段 4 实现** |
-
-> **关键边界**：表单模板编辑器产出的 `FormSchema` 是**数据无关的配置**，不含具体内容数据（如 p 的文本、image 的 src、table 的行数据）。
-> 数据由表单预览组件在渲染时通过 `field` 从 `data` 中查找填入。
->
-> 这样分离的好处：
-> - 同一份模板可被多次复用（不同流程实例填不同数据）
-> - 模板设计者不需要知道运行时数据
-> - 预览组件可独立测试和演进
-
-### 1.2 双阶段开发路线
-
-```
-阶段 3（当前）：表单模板编辑器
-  用户拖拽/配置 → FormSchema（数据无关模板）
-  ├─ p 组件：field + 样式（无 text 内容，预览时由 data[field] 填入）
-  ├─ image 组件：field + 尺寸（src 可选，模板固定图片如 logo；无 src 则预览时由 data[field] 提供）
-  └─ table 组件：field + columns 结构 + rows 模板行数（打印手写场景固定 N 行空行）
-  ⚠ 不涉及流程数据、权限运行时
-
-阶段 4（后续）：表单预览组件
-  FormSchema（模板） + data {field: value} + RulesMap（权限）
-    → 表单预览组件
-    → 按 comp.field 查找 data[field] 填入对应位置
-    → 按 rules 控制字段权限（readonly/hidden/required）
-    → 屏幕审批 / 打印归档
+```text
+Designer                          FormPreview
+   │                                  │
+   ├─ 编辑 components[]               ├─ 读取 schema
+   ├─ 调整 parentId/index             ├─ 填入 data[field]
+   ├─ 配置尺寸和样式                   ├─ 应用 rules[field]
+   └─ 保存 FormSchema                 └─ 输出/打印同一套 DOM
 ```
 
-> 阶段 3 不实现阶段 4 的运行时，但 Schema 必须**预留 field 接入点**，避免阶段 4 时回头改 Schema。
+模板不包含流程实例值，预览组件不修改模板结构。
 
----
+## 2. 设计器布局
 
-## 2. 设计器布局范式
-
-### 2.1 三栏式低代码布局
-
-```
-┌─ 顶部工具栏（纸张/方向/边距/页眉页脚/打印预览/保存） ────────┐
+```text
+┌─ 工具栏：纸张 / 边距 / 基础行高 / 预览 / 保存 ──────────┐
 ├──────────┬──────────────────────────┬──────────────────┤
-│ 左栏     │ 中栏：预览画布            │ 右栏：配置面板    │
-│ 组件库   │  ┌──────────────────┐    │                  │
-│          │  │ 离散纸张         │    │ ▸ 表单属性       │
-│ ▸ p      │  │  ┌────────────┐ │    │   (纸张/边距/    │
-│ ▸ image  │  │  │ 页眉        │ │    │    页眉页脚)     │
-│ ▸ table  │  │  │ ────        │ │    │                  │
-│          │  │  │ 正文组件    │ │    │ ▸ 选中组件属性   │
-│          │  │  │ ────        │ │    │   (由组件配置项   │
-│          │  │  │ 页脚        │ │    │    JSON 驱动，    │
-│          │  │  └────────────┘ │    │    见 §5)         │
-│          │  └──────────────────┘    │                  │
+│ 组件库   │ A3/A4 固定纸张画布       │ 配置面板         │
+│ Grid     │ 格子边界、选择和投放提示 │ 表单/组件/格子    │
+│ P        │                          │                  │
+│ Table    │                          │                  │
+│ HTML     │                          │                  │
+│ Image    │                          │                  │
 ├──────────┴──────────────────────────┴──────────────────┤
-│ 底部状态栏（页数/警告/缩放）                              │
-└────────────────────────────────────────────────────────┘
+│ 状态栏：页面 / 缩放 / 结构错误 / 溢出警告              │
+└─────────────────────────────────────────────────────────┘
 ```
 
-| 区域 | 职责 | 主要内容 |
-|---|---|---|
-| 顶部工具栏 | 表单级配置 + 操作 | 纸张选择、方向、边距、页眉页脚文本/页码、打印、保存 JSON |
-| 左栏组件库 | 组件投放源 | **v1 仅 p / image / table** 三种；拖到中栏画布 |
-| 中栏画布 | 所见即所得预览 | 渲染 `<FormRenderer>`，离散纸张垂直堆叠；点击选中组件；可拖拽排序 |
-| 右栏配置面板 | 属性编辑 | 切换"表单属性"/"选中组件属性"两个 tab |
+画布不是自由坐标编辑器。任何组件都必须属于纸张根级或某个 Grid/Table 格子。
 
-> v1 组件库不含 grid/flex 容器；架构已预留扩展点，后续需要时再追加。
+## 3. 组件关系
 
-### 2.2 右栏配置面板的两种模式
-
-- **表单属性模式**（默认/无选中组件时）：
-  纸张配置、边距、页眉（文本 + 页码开关）、页脚（同）、保存/加载 JSON
-- **组件属性模式**（选中某组件时）：
-  由该组件的**配置项 JSON** 驱动渲染（见 §5）；至少包含 field 字段输入框
-
-> 选中组件时面板自动切到组件属性；取消选中（点画布空白）切回表单属性。
-
----
-
-## 3. 字段绑定模型
-
-### 3.1 核心约定
-
-**每个可输入组件都有一个 `field` 字段**，对应 DOM 节点的 `data-field` 属性：
-
-```
-Schema:    Component.field = 'workName'
-            ↓ 渲染器
-DOM:       <p data-field="workName">...</p>
-            ↓ v2 流程运行时
-流程数据:  { workName: '更换10kV开关柜' }
-            ↓ DOM 操作
-渲染结果:  <p data-field="workName">更换10kV开关柜</p>
-```
-
-- `field` 是**字符串标识符**，由设计器用户在右栏配置面板填写
-- `field` 在同一表单内**应唯一**；设计器做**软警告**：重复时提示但不强制阻止
-- `field` 缺省时组件**不参与数据绑定**（纯展示用，如说明性文字）
-
-### 3.2 哪些组件可绑定 field
-
-| 组件 | 可绑定 field | 绑定语义 | 模板阶段内容 | 预览阶段填充 |
-|---|---|---|---|---|
-| **p** | ✅ | 单值文本 | **无 text 内容**（纯空壳，field 标识数据位置） | `data[field]` 填入文本 |
-| **image** | ✅ | 图片 src（URL 或 base64） | src 可选（模板固定图片如 logo/印章）；无 src 则空 | 有 src 用模板 src，无 src 用 `data[field]` |
-| **table** | ✅ | 整表数据（见 §3.3） | rows 是模板配置（N 行空行，打印手写场景） | `data[field]` 覆盖 rows 填入实际数据 |
-
-> **p 是主要输入标签**：从工作票样例看，"单位/编号/工作负责人/班组/工作内容"等字段都用 p 承载，通过 field 标识。
-> p 组件**不含 text 内容字段**——模板阶段是空壳，预览时完全由 `data[field]` 填入文本。
-> 设计器画布中 p 显示 field 名作为占位（如 `<p data-field="workName">{workName}</p>`），方便设计者识别。
-
-### 3.3 表格组件的字段绑定（整表数据形态）
-
-表格 field 绑定语义：**整表对应流程数据的一个数组**。
-
-```
-TableComponent {              // 模板阶段（数据无关）
-  field: 'deviceList'         // 整表对应流程数据的一个数组
-  columns: [
-    { key: 'name',  title: '设备名' },
-    { key: 'status', title: '状态' }
-  ]
-  rows: [                     // 模板配置：N 行空行（打印手写场景）
-    { name: '', status: '' },
-    { name: '', status: '' },
-    ... // 共 N 行
-  ]
-}
-
-流程数据（预览阶段）：
-{
-  deviceList: [                // 覆盖模板的 rows
-    { name: '设备A', status: '正常' },
-    { name: '设备B', status: '检修' }
-  ]
-}
-```
-
-- 模板渲染（编辑器画布）：表格按 columns 渲染表头 + 模板 N 行空行（供打印手写）
-- 预览渲染（表单预览组件）：`data[field]` 覆盖模板 `rows`，DOM 上 `<table data-field="deviceList">`
-
-> 表格的 `rows` 在模板阶段是**配置**（固定行数供打印手写），不是数据。
-> 预览阶段 `data[field]` 若提供则覆盖模板 rows；若未提供则保留模板空行（如审批中尚未填写的表格）。
-
----
-
-## 4. 权限模型（不在表单 Schema 内）
-
-### 4.1 权限归属
-
-权限配置（required / readonly / hidden 等）**不在表单设计器内实现**，由**专门的流程配置页面**处理：
-
-```
-表单设计器          流程配置页面            流程运行时
-   │                    │                       │
-   │ FormSchema         │ rules: RulesMap        │
-   │ (含 field)         │ (按 field 配置权限)     │
-   │                    │                        │
-   └────────────────────┴────────────────────────┘
-                          ↓
-                  运行时渲染器
-                  按 rules 控制 field 权限
-```
-
-- 表单设计器只产出 `FormSchema`（含 `field` 字段，不含 rules）
-- 流程配置页面读取 FormSchema 的所有 field 列表，按流程节点为每个 field 配置权限规则
-- 运行时渲染器同时接收 FormSchema + RulesMap，按 rules 控制字段权限
-
-### 4.2 权限数据结构（参考，由流程页面定义）
+Schema 使用扁平组件数组：
 
 ```ts
-/** 单个字段在某流程节点的权限规则 */
-interface FieldRule {
-  required?: boolean
-  readonly?: boolean
-  hidden?: boolean
-  validate?: {
-    min?: number
-    max?: number
-    pattern?: string
-    validator?: string
-  }
+interface ComponentBase {
+  id: string
+  parentId: string | null
+  index: number
+  colspan?: number
+  padding?: number
 }
-
-/** 权限规则集：field → FieldRule */
-type RulesMap = Record<string, FieldRule>
 ```
 
-> 此数据结构由流程配置页面负责维护，**不放入表单 Schema**。本设计器仅依赖 `field` 字段作为权限配置的键名来源。
+- `id`：组件稳定标识，用于选中、字段定位、警告和历史记录。
+- `parentId`：所属容器；根级组件为 `null`。
+- `index`：父容器中的逻辑格子序号。
+- `colspan`：仅在父容器为 Grid 时生效。
+- `padding`：该组件所在父格子的内边距，单位 mm。
 
----
+一个格子默认只放一个直接子组件。需要标签、字段等多个元素时，将该格子的直接子组件设为 Grid，
+再把多个 P 放入子 Grid。这样关系始终只有一层 `parentId/index` 语义。
 
-## 5. 组件配置项 JSON 声明（关键模式）
+## 4. 组件业务语义
 
-### 5.1 设计目标
+### 4.1 Grid
 
-每个组件除 UI 渲染逻辑外，**单独声明一份配置项 JSON**，用于：
+Grid 是静态版式的唯一通用容器：
 
-1. **驱动右栏配置面板**：选中组件时，按其配置项 JSON 自动渲染对应的表单控件
-2. **约束组件可配置属性**：组件开发时显式声明可配字段，避免散落在代码各处
-3. **组件可扩展性**：新增组件 = UI 组件 + 配置项 JSON，两者配套
+- 根 Grid：整张表单外框。
+- 行 Grid：单位/编号、负责人/班组等一行内容。
+- 子 Grid：在一个格子中继续拆列。
+- 无边框 Grid：实现标签与输入区域的自然混排。
 
-### 5.2 配置项 JSON 结构
+Grid 的 `height` 是基础行高倍数。用户在属性面板选择 1、2、3 等整数，设计器显示实际 mm 高度。
+
+### 4.2 P
+
+P 同时覆盖固定文字和输入字段：
+
+| 模式 | 配置 | 设计态 | 预览态 |
+|---|---|---|---|
+| 固定文字 | `editable=false, text` | 显示 text | 显示 text，不可编辑 |
+| 输入字段 | `editable=true, field` | 显示字段占位/空输入线 | 填入 data[field]，按规则编辑 |
+
+业务约束：
+
+- 固定文字不需要 field。
+- 输入 P 必须设置 field 后才能参与数据保存和权限控制。
+- 一个 P 不混合固定标签和输入值；通过 Grid 相邻放置。
+- `inputType` 第一阶段支持 text、number、date、signature。
+- 下划线属于字段样式，Web 与打印可分别控制是否显示。
+
+### 4.3 Table
+
+Table 只用于规则明细，例如工作地点/工作内容：
+
+- columns 定义表头和列宽。
+- rowCount 定义设计态空白行数。
+- rowHeight 使用基础行高倍数。
+- repeatable 决定预览数据是否可以扩展行数。
+- 子 P 通过 `parentId=table.id`、`index=row*columnCount+column` 放入单元格。
+
+静态表单外框、签名布局和说明区域不使用 Table，统一使用 Grid。
+
+### 4.4 HTML
+
+HTML 是高级组件，用于暂时无法由 Grid/P/Table 表达的局部内容。
+
+- 仅高级用户或可信模板可编辑原始 HTML。
+- 必须经过安全过滤和 CSS 作用域处理。
+- HTML 内部数据绑定使用显式 bindings，不通过任意 DOM 扫描推断。
+- HTML 的外层尺寸仍由所属 Grid 格子约束。
+
+### 4.5 Image
+
+Image 用于 Logo、二维码和图片签章：
+
+- 固定图片使用 src。
+- 动态图片使用 field 从 data 获取地址。
+- width/height 和 objectFit 由属性面板配置。
+- Image 与其他组件一样通过 parentId/index 放入 Grid。
+
+## 5. 设计操作
+
+### 5.1 新增
+
+从组件库拖入目标格子时：
+
+1. 生成唯一 ID。
+2. 写入目标 Grid/Table 的 ID 作为 parentId。
+3. 写入目标格子 index。
+4. 如果格子已有组件，提示替换、交换或包装为子 Grid，禁止静默覆盖。
+
+### 5.2 移动
+
+- 同父移动：交换两个组件的 index。
+- 跨父移动：更新组件 parentId/index，同时整理源父和目标父的 index。
+- 移动容器不修改后代；后代通过 parentId 链自然跟随。
+- 非法目标（P、Image、非容器 HTML）不接受投放。
+
+### 5.3 删除
+
+- 普通组件直接删除。
+- 删除 Grid/Table 前显示其后代数量。
+- 确认后级联删除全部后代。
+- 删除后重新编号父容器的直接子组件，避免无意义空洞。
+
+### 5.4 拆分与合并
+
+- 拆分 Grid 列时更新 columns，并为新增格子预留 index。
+- 合并相邻列通过第一个组件的 colspan 实现。
+- 合并范围内存在多个组件时，必须先包装为子 Grid或选择保留项。
+- 第一阶段不提供 rowspan；跨行视觉结构用嵌套 Grid 完成。
+
+## 6. 配置面板
+
+每种组件继续提供 UI Renderer 和 config 声明：
+
+```text
+src/components-v2/
+├─ grid/    GridRenderer.vue + config.ts
+├─ p/       PRenderer.vue + config.ts
+├─ table/   TableRenderer.vue + config.ts
+├─ html/    HtmlRenderer.vue + config.ts
+└─ image/   ImageRenderer.vue + config.ts
+```
+
+配置项最小集合：
+
+| 组件 | 配置项 |
+|---|---|
+| Grid | columns、height、border、gap、padding |
+| P | text、editable、field、inputType、underline、文字样式 |
+| Table | field、columns、rowCount、rowHeight、repeatable |
+| HTML | html、css、trusted、bindings |
+| Image | src、field、width、height、objectFit |
+
+关系字段 parentId/index 不允许在普通文本输入框中直接修改，由画布结构操作维护。
+
+## 7. 数据和权限
+
+预览契约：
 
 ```ts
-/**
- * 单个配置项定义
- * 右栏面板按此结构渲染对应的表单控件
- */
-interface ConfigField {
-  /** 配置项 key（对应 Component 上的字段名） */
-  key: keyof Component
-  /** 显示标签 */
-  label: string
-  /** 控件类型 */
-  type: 'text' | 'textarea' | 'number' | 'select' | 'switch'
-  /** 是否必填（设计器层校验，非运行时权限） */
-  required?: boolean
-  /** 默认值 */
-  default?: unknown
-  /** select 类型的选项列表 */
-  options?: { label: string; value: string | number }[]
-  /** 帮助文案 */
-  help?: string
-}
-
-/**
- * 组件配置项声明
- * 每个组件开发时单独导出此声明
- */
-interface ComponentConfig {
-  /** 组件类型 */
-  type: Component['type']
-  /** 组件显示名（左栏组件库展示） */
-  displayName: string
-  /** 配置项列表（按顺序在右栏渲染） */
-  fields: ConfigField[]
+interface FormPreviewProps {
+  schema: FormSchema
+  data: Record<string, unknown>
+  rules?: Record<string, {
+    readonly?: boolean
+    hidden?: boolean
+    required?: boolean
+  }>
 }
 ```
 
-### 5.3 各组件配置项示例
+- 可编辑 P：`data[field]` 填值，输入后回写。
+- 固定 P：只显示 text。
+- 动态 Image：`data[field]` 提供图片地址。
+- repeatable Table：`data[field]` 提供明细数组。
+- readonly：禁止编辑但保留显示。
+- hidden：隐藏字段内容，是否保留布局空间由规则明确配置。
+- required：显示标记并在提交时校验。
 
-#### p 组件
+权限是流程运行配置，不写入模板 Schema。
 
-```json
-{
-  "type": "p",
-  "displayName": "段落文本",
-  "fields": [
-    { "key": "field", "label": "字段标识", "type": "text", "required": false, "help": "用于与流程数据绑定；空则不参与数据绑定（纯静态文本）" }
-  ]
-}
-```
+## 8. 保存与加载
 
-> p 组件**不含 text 字段**——模板阶段是空壳，预览时由 `data[field]` 填入文本。
-> 画布中 p 显示 `{field}` 占位（如 field='workName' 显示 `{workName}`），方便设计者识别数据位置。
+保存前必须：
 
-#### image 组件
+1. 校验组件 ID 和父子关系。
+2. 检测父子循环。
+3. 校验 index、colspan 和 Table 单元格边界。
+4. 扫描重复 field 并生成软警告。
+5. 写入 Schema version。
 
-```json
-{
-  "type": "image",
-  "displayName": "图片",
-  "fields": [
-    { "key": "field", "label": "字段标识", "type": "text", "help": "预览时绑定图片 src（URL/base64）；与 src 二选一" },
-    { "key": "src",   "label": "图片地址", "type": "text", "required": false, "help": "模板固定图片（如 logo/印章）；留空则预览时由 field 数据提供" },
-    { "key": "width", "label": "宽度(mm)", "type": "number" },
-    { "key": "height","label": "高度(mm)", "type": "number" }
-  ]
-}
-```
+加载时按 version 选择 Renderer 和迁移器。未知版本不得静默按当前版本解析。
 
-> image 的 src 改为**可选**：模板固定图片（logo/印章）填 src；动态图片（签名/附件）留空 src，预览时由 `data[field]` 提供。
-> src 与 field 二选一：有 src 用模板 src，无 src 用 `data[field]`。
+## 9. 第一条业务验收
 
-#### table 组件
+云铝电气第二种工作票前五行必须可以完全通过 Grid 设计器构造：
 
-```json
-{
-  "type": "table",
-  "displayName": "表格",
-  "fields": [
-    { "key": "field", "label": "字段标识", "type": "text", "help": "预览时绑定整表数据数组，覆盖模板 rows" }
-  ]
-}
-```
-
-> table 的 rows 是**模板配置**（N 行空行，createDefault 时生成默认 5 行空行供打印手写）。
-> 预览时 `data[field]` 若提供则覆盖模板 rows；未提供则保留模板空行。
-> 表格的 columns 结构配置较复杂，不在右栏用简单表单控件配置，单独在画布内编辑（点击表格进入列编辑模式）。
-
-### 5.4 实现约定
-
-```
-src/components/
-├─ p/
-│  ├─ PComponent.vue          ← UI 组件
-│  └─ config.ts              ← 配置项 JSON（export const pConfig: ComponentConfig）
-├─ image/
-│  ├─ ImageComponent.vue
-│  └─ config.ts
-└─ table/
-   ├─ TableComponent.vue
-   └─ config.ts
-
-src/config/
-└─ component-registry.ts      ← 注册表：汇集各组件 config，供左栏面板 + 右栏面板读取
-```
-
-- 左栏组件库：遍历注册表，按 `displayName` 渲染可拖拽项
-- 右栏配置面板：选中组件时，按其 `config.fields` 自动渲染对应控件
-- 组件开发强约束：**新增组件必须同时提供 UI 组件 + config.ts**，否则注册表不接受
-
----
-
-## 6. 表单预览组件（阶段 4）
-
-> 阶段 3（表单模板编辑器）产出数据无关的 `FormSchema`。
-> 阶段 4（表单预览组件）接收 `FormSchema` + `data` + `rules`，渲染填入数据并应用权限。
-
-### 6.1 渲染契约
-
-```
-FormPreview({
-  schema: FormSchema,           // 阶段 3 产出的模板（数据无关）
-  data: { field: value },       // 流程实例数据
-  rules?: RulesMap              // 权限规则（按 field 配置）
-}) → 渲染后的表单 DOM（数据已填入 + 权限生效）
-```
-
-> 预览组件接收三参数：模板 schema + 数据 data + 权限 rules。
-> 渲染流程：按 schema 渲染纸张结构 → 按 comp.field 查找 data[field] 填入 → 按 rules 控制字段权限。
-
-### 6.2 模板渲染器 vs 预览组件对比
-
-| 项 | 表单模板编辑器（阶段 3） | 表单预览组件（阶段 4） |
-|---|---|---|
-| 输入 | 用户操作 | `FormSchema` + `data {field: value}` + `RulesMap` |
-| 输出 | `FormSchema`（数据无关模板） | 离散纸张 DOM（数据已填入 + 权限生效） |
-| p 渲染 | `<p data-field="x">{x}</p>`（占位） | `<p contenteditable data-field="x">实际值</p>`（contenteditable + data[x] 填入） |
-| image 渲染 | `<img data-field="x">` 或 `<img src="logo.png">` | 有 data[x] 用 data[x]，否则用模板 src |
-| table 渲染 | 模板 N 行空行 | `data[field]` 覆盖模板 rows |
-| 交互 | 设计（拖拽/配置） | 按 rules 控制可编辑/必填/隐藏 |
-
-### 6.2 v2 数据填充算法（DOM 操作式，按用户描述）
-
-```
-function fillForm(schema, data: Record<string, any>, rules?: RulesMap):
-  // 1. 渲染空表单 DOM（复用 v1 渲染器输出）
-  dom = renderEmpty(schema)
-
-  // 2. 遍历所有 [data-field] 节点，按 field 查 data 填值
-  dom.querySelectorAll('[data-field]').forEach(el => {
-    field = el.getAttribute('data-field')
-    if (data[field] !== undefined) {
-      // 按 DOM 节点类型填值
-      if (el is <p>)     el.textContent = data[field]
-      if (el is <img>)   el.src = data[field]
-      if (el is <table>) rebuildRows(el, data[field])   // 表格整表数据
-    }
-  })
-
-  // 3. 应用权限规则
-  if (rules) applyRules(dom, rules)
-
-  return dom
-```
-
-### 6.3 v2 权限应用算法
-
-```
-function applyRules(dom, rules: RulesMap):
-  dom.querySelectorAll('[data-field]').forEach(el => {
-    field = el.getAttribute('data-field')
-    rule = rules[field]
-    if (!rule) return
-
-    if (rule.hidden)   el.style.display = 'none'
-    if (rule.readonly) el.setAttribute('contenteditable', 'false')
-    if (rule.required) el.setAttribute('data-required', 'true')
-
-    if (rule.validate?.pattern) el.dataset.pattern = rule.validate.pattern
-  })
-```
-
-> 上述伪代码仅说明填充思路，v2 实现时可能改用 Vue 响应式数据驱动而非直接 DOM 操作；但**数据契约（field/value/rules）不变**。
-
----
-
-## 7. 与现有文档的关系
-
-| 文档 | 回答的问题 | 是否被本文影响 |
-|---|---|---|
-| [design.md](./design.md) | 产品形态、概念体系（纸张/页/边距/页眉页脚/组件/容器）、分页机制 | **不受影响**——本文扩展的是组件语义层，不改纸张/分页/页眉页脚等概念 |
-| [engine.md](./engine.md) | 分页引擎算法、Schema TS 类型、PaginateResult 契约 | **已小幅扩展**——Component 联合收窄为 p/image/table；BaseComponent 追加 field |
-| [development-plan.md](./development-plan.md) | 分阶段开发计划 | **需补充**——v1 阶段追加"字段配置面板"、"组件配置项 JSON 声明"等子任务 |
-| 本文 design-biz.md | 业务流程、双模式、字段绑定、组件配置项 | — |
-
-> 三份技术文档与本文是**正交关系**：技术文档讲"怎么渲染/分页/打印"，本文讲"渲染什么内容、内容怎么来、内容怎么填"。
-
----
-
-## 8. 已锁定的业务决策
-
-| 决策点 | 选型 | 落地位置 |
-|---|---|---|
-| 双产物分离 | 表单模板编辑器（阶段 3）+ 表单预览组件（阶段 4） | §1.1 |
-| 模板 vs 数据分离 | 模板编辑器产出数据无关配置；预览组件接收 data 填入 | §1.1、§3 |
-| p 组件不含 text | p 是空壳，预览时由 data[field] 填入文本 | §3.2、§5.3 |
-| image src 可选 | src 模板固定图片（logo/印章）；无 src 由 data[field] 提供 | §3.2、§5.3 |
-| table rows 是模板配置 | N 行空行（打印手写），预览时由 data[field] 覆盖 | §3.3、§5.3 |
-| v1 组件清单 | p / image / table（不含 grid/flex） | §2.1、[schema.ts](../src/types/schema.ts) Component 联合 |
-| field 唯一性 | 软警告（不强制阻止） | §3.1 |
-| 表格 field 绑定 | 仅形态 1（整表数据） | §3.3 |
-| 权限配置 | 不在设计器内，由专门流程页面处理 | §4 |
-| Schema 含 field | 是（设计器可填，预览组件用） | [schema.ts](../src/types/schema.ts) BaseComponent.field |
-| Schema 不含 rules | 是（权限归流程页面） | [schema.ts](../src/types/schema.ts) FormSchema 无 rules |
-| 组件配置项 | UI 组件 + config.ts 单独声明 JSON，驱动右栏面板 | §5 |
-| 设计器布局 | 三栏式（左组件库/中画布/右配置面板） | §2.1 |
-| 预览组件契约 | schema + data + rules → 渲染填入 + 权限 | §6.1 |
+- 标题固定 P。
+- 单位/编号为四列 Grid，标签 P + 输入 P。
+- 负责人/班组为无内部边框 Grid。
+- 成员行为五列 Grid。
+- 设备名称行为两列 Grid。
+- 工作任务为两列 Grid，左侧竖排 P，右侧 Table。
+- 工作任务外层高度等于表头加四行明细的高度。
+- 保存的 components 数组可以任意重排，不影响加载后的视觉结果。

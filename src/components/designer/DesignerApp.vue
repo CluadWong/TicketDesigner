@@ -9,7 +9,7 @@
  *   └─ 底部状态栏（StatusBar）─┘
  *
  * 状态职责（v1 阶段 3.2 骨架）：
- *   - schema：当前表单 schema（默认加载 mock A4 示例）
+ *   - schema：当前表单 schema（默认加载云铝电气第二种工作票能力验证示例）
  *   - selectedCompId：选中的组件 id（拖拽/选中交互待阶段 3.3 实现）
  *   - activeTab：右栏激活的 tab（'form' | 'component'）
  *   - paginateResult：来自 FormRenderer 的分页结果，传给状态栏
@@ -25,15 +25,21 @@ import CanvasPane from './CanvasPane.vue'
 import ConfigPanel from './ConfigPanel.vue'
 import StatusBar from './StatusBar.vue'
 import PreviewDialog from '@/components/preview/PreviewDialog.vue'
+import GridSchemaRenderer from '@/dev/GridSchemaRenderer.vue'
 import { makeMockSchema } from '@/dev/mock-schema'
 import { makeMockSchemaA3 } from '@/dev/mock-schema-a3'
+import { makeYunlvSecondWorkTicketSchema } from '@/dev/yunlv-second-work-ticket-schema'
+import { makeYunlvSecondTicketFirstFiveRowsSchema } from '@/dev/yunlv-second-ticket-first-five-rows'
 import { getComponentConfig } from '@/config/component-registry'
 
 /** 右栏配置面板的 tab 标识 */
 type ConfigTab = 'form' | 'component'
 
 /** 当前表单 schema */
-const schema = ref<FormSchema>(makeMockSchema())
+const schema = ref<FormSchema>(makeYunlvSecondWorkTicketSchema())
+
+/** 嵌套格子方案的前五行渲染原型；暂与 v1 FormSchema 隔离。 */
+const gridPrototypeSchema = makeYunlvSecondTicketFirstFiveRowsSchema()
 
 /** 当前选中的组件 id（null 表示无选中） */
 const selectedCompId = ref<string | null>(null)
@@ -203,13 +209,7 @@ function handleUpdatePreviewData(newData: Record<string, unknown>): void {
     />
     <div class="designer-body">
       <ComponentPalette />
-      <CanvasPane
-        :schema="schema"
-        :selected-comp-id="selectedCompId"
-        @paginate="handlePaginate"
-        @select-comp="handleSelectComp"
-        @add-comp="handleAddComp"
-      />
+      <GridSchemaRenderer :schema="gridPrototypeSchema" />
       <ConfigPanel
         :schema="schema"
         :selected-comp="selectedComp"
@@ -221,7 +221,7 @@ function handleUpdatePreviewData(newData: Record<string, unknown>): void {
       />
     </div>
     <StatusBar
-      :page-count="paginateResult?.pages.length ?? 0"
+      :page-count="1"
       :warning-count="paginateResult?.warnings.length ?? 0"
     />
     <!-- 预览弹窗（Teleport to body，打印时隐藏设计器只输出纸张） -->
