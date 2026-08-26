@@ -37,6 +37,8 @@ Page、Grid、TableCellTemplate 和组件都有唯一 ID；GridRow/GridCell 的 
 
 选择链只包含 Page、Grid 和实际组件。点击 Cell 空白区域时，选择其所属 Grid；Row/Cell 不会成为 active 节点。
 
+节点索引提供按 ID 查询节点、祖先链和所属插槽的 API；Schema 更新后通过计算索引重新派生，避免保留旧对象引用。
+
 ```ts
 interface EditorNodeRef {
   node: SchemaNode
@@ -232,7 +234,7 @@ interface FormPreviewProps {
 2. 扫描空 field 和重复 field。
 3. 检测固定尺寸溢出。
 4. 清除设计器临时状态和运行时索引。
-5. 写入 version 并序列化嵌套 Schema。
+5. 写入 version 并序列化嵌套 Schema；加载时只接受 V2，并补全兼容默认字段。
 
 加载流程：
 

@@ -77,7 +77,7 @@
 - [x] P0.3 确认 V2 vitest 全量通过
 - [x] P0.4 删除旧默认 mock 和旧流式 Renderer 入口
 - [x] P0.5 保留前五行截图作为视觉基线
-- [ ] P0.6 为前五行 Schema 增加最小渲染测试
+- [x] P0.6 为前五行 Schema 增加最小渲染测试
 
 **完成门槛**：
 
@@ -108,22 +108,22 @@ type PNode = StaticPNode | FieldPNode
 
 ### P1.2 默认值
 
-- [ ] A4 fixed Page 默认配置
-- [ ] 空 Grid 默认一行一格
-- [ ] static P 默认文本
+- [x] A4 fixed Page 默认配置
+- [x] 空 Grid 默认一行一格
+- [x] static P 默认文本
 - [x] field P 默认 field 和 inputType
 - [x] field P 支持 prefix/suffix 复合标签
-- [ ] Table 默认两列、表头 1、行高 1、minRows 4
+- [x] Table 默认两列、表头 1、行高 1、minRows 4
 - [x] Table 默认每个数据列生成一个 Field P，允许删除后替换为其他组件
-- [ ] HTML/Image 安全默认值
+- [x] HTML/Image 安全默认值
 
 ### P1.3 序列化
 
-- [ ] 保存时写入 version=2
+- [x] 保存时写入 version=2
 - [x] 定义运行时校验入口
-- [ ] 加载未知版本时报错
-- [ ] 加载时补全可兼容的缺省字段
-- [ ] 不将 selectedId、缩放、索引等编辑器状态写入模板
+- [x] 加载未知版本时报错
+- [x] 加载时补全可兼容的缺省字段
+- [x] 不将 selectedId、缩放、索引等编辑器状态写入模板
 
 **完成门槛**：前五行 Schema 使用正式类型；JSON 往返后深度等价；非法 P 模式不能通过 TypeScript 构造。
 
@@ -137,38 +137,38 @@ type PNode = StaticPNode | FieldPNode
 - [x] 索引 Page/Grid/TableTemplate/组件；Row/Cell 不进入可选节点链
 - [x] 返回 node、parent、path 和 ownerCell
 - [x] 检测重复 ID
-- [ ] 提供 `getNodeById`、`getAncestors`、`getOwnerCell`
-- [ ] Schema 变化后重建或增量更新索引
+- [x] 提供 `getNodeById`、`getAncestors`、`getOwnerCell`
+- [x] Schema 变化后重建或增量更新索引
 
 ### P2.2 结构操作纯函数
 
-- [ ] `insertRow`
-- [ ] `copyRow`
-- [ ] `removeRow`
-- [ ] `moveRow`
-- [ ] `splitCell`
-- [ ] `mergeCells`
-- [ ] `insertNode`
-- [ ] `moveNode`
-- [ ] `removeNode`
-- [ ] `wrapCellChildrenWithGrid`
+- [x] `insertRow`
+- [x] `copyRow`
+- [x] `removeRow`
+- [x] `moveRow`
+- [x] `splitCell`
+- [x] `mergeCells`
+- [x] `insertNode`
+- [x] `moveNode`
+- [x] `removeNode`
+- [x] `wrapCellChildrenWithGrid`
 - [x] `updateNode`
 
 ### P2.3 ID 策略
 
-- [ ] 统一 ID 生成器
-- [ ] 深复制子树时重建全部 ID
+- [x] 统一 ID 生成器
+- [x] 深复制子树时重建全部 ID
 - [ ] 保存加载后保留原 ID
 - [ ] DOM data-node-id 与 Schema ID 一致
 
 ### P2.4 单测
 
-- [ ] 行增删移动
-- [ ] 格子拆分合并
-- [ ] 跨格移动组件
-- [ ] 防止移动到自身后代
-- [ ] 删除和复制完整子树
-- [ ] 包装为子 Grid
+- [x] 行增删移动
+- [x] 格子拆分合并
+- [x] 跨格移动组件
+- [x] 防止移动到自身后代
+- [x] 删除和复制完整子树
+- [x] 包装为子 Grid
 - [x] 操作后索引仍能定位正确 path（基础 update 操作）
 
 **完成门槛**：所有设计器结构变更都只能通过纯函数完成；测试覆盖嵌套三层以上结构。
@@ -268,7 +268,7 @@ type PNode = StaticPNode | FieldPNode
 
 - [x] 新增行
 - [x] 设置行高倍数
-- [ ] 复制行
+- [x] 复制行
 - [x] 上下移动行
 - [x] 删除行
 
@@ -294,11 +294,11 @@ type PNode = StaticPNode | FieldPNode
 - [x] 已有内容时支持插入而非覆盖
 - [x] 删除选中节点并级联删除后代
 - [x] 删除最后一个 Cell/Row 时清理空父级，避免产生非法 Grid
-- [ ] 一键包装为子 Grid
-- [ ] 禁止移动到自身后代
+- [x] 一键包装为子 Grid
+- [x] 禁止移动到自身后代
 
-**当前进度**：已完成空白模板、根 Grid、添加行、拆分为 2/4 格、向格子插入 static/field P 和 Table；
-拖拽、复制行、格子内/跨格移动、合并格子和完整前五行 UI 构建仍待完成。
+**当前进度**：基础结构纯函数已覆盖空白模板、根 Grid、行增删移动、复制行、格子拆分合并、跨格移动、子 Grid 包装和节点插入；
+组件库拖拽、格子内排序及完整前五行 UI 构建仍待完成。
 
 **完成门槛**：不手写 JSON，可以创建外层 Grid 和五个目标行；保存 Schema 与手写基线结构等价。
 

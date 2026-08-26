@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { mount } from "@vue/test-utils";
 import GridSchemaNode from "@/dev/GridSchemaNode.vue";
+import GridSchemaRenderer from "@/dev/GridSchemaRenderer.vue";
+import { makeYunlvSecondTicketFirstFiveRowsSchema } from "@/dev/yunlv-second-ticket-first-five-rows";
 
 describe("GridSchemaNode selection state", () => {
   it("adds a visible selected class without changing the node type", () => {
@@ -50,5 +52,22 @@ describe("GridSchemaNode selection state", () => {
     expect(wrapper.find(".layout-p__input").text()).toBe("");
     expect(wrapper.find(".layout-p__input").attributes("data-field")).toBe("工作班成员人数");
     expect(wrapper.find(".layout-p__input").classes()).toContain("layout-p--underline");
+  });
+
+  it("renders the Yunlv sample schema's first five rows", () => {
+    const wrapper = mount(GridSchemaRenderer, {
+      props: {
+        schema: makeYunlvSecondTicketFirstFiveRowsSchema(),
+      },
+    });
+
+    const grids = wrapper.findAll(":scope > .grid-schema-paper > .layout-grid");
+    expect(grids).toHaveLength(4);
+
+    const workTaskGrid = grids[3];
+    expect(workTaskGrid?.find(".layout-p").exists()).toBe(true);
+    expect(workTaskGrid?.find("table").exists()).toBe(true);
+    expect(workTaskGrid?.find("thead > tr > th").exists()).toBe(true);
+    expect(workTaskGrid?.find("tbody > tr > td").exists()).toBe(true);
   });
 });

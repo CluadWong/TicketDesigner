@@ -17,6 +17,45 @@ export interface EditorNodeRefV2 {
 
 export type EditorNodeIndexV2 = Map<string, EditorNodeRefV2>;
 
+export function getNodeRefByIdV2(
+  schema: FormSchemaV2,
+  nodeId: string,
+): EditorNodeRefV2 | undefined {
+  return buildEditorNodeIndexV2(schema).get(nodeId);
+}
+
+export function getNodeByIdV2(
+  schema: FormSchemaV2,
+  nodeId: string,
+): EditorNodeV2 | undefined {
+  return getNodeRefByIdV2(schema, nodeId)?.node;
+}
+
+export function getOwnerCellV2(
+  schema: FormSchemaV2,
+  nodeId: string,
+): GridCellV2 | TableCellTemplateV2 | undefined {
+  return getNodeRefByIdV2(schema, nodeId)?.ownerCell;
+}
+
+/** Returns ancestors from the root Page down to the direct parent. */
+export function getAncestorsV2(
+  schema: FormSchemaV2,
+  nodeId: string,
+): EditorNodeV2[] {
+  const index = buildEditorNodeIndexV2(schema);
+  const ref = index.get(nodeId);
+  if (!ref) return [];
+  const ancestors: EditorNodeV2[] = [];
+  let current = ref.parent;
+  while (current) {
+    ancestors.unshift(current);
+    const parentRef = index.get(current.id);
+    current = parentRef?.parent ?? null;
+  }
+  return ancestors;
+}
+
 function addNode(
   index: EditorNodeIndexV2,
   node: EditorNodeV2,

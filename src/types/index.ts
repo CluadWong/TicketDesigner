@@ -3,3 +3,4 @@ export * from "./schema-v2";
 export * from "./schema-v2-index";
 export * from "./schema-v2-validation";
 export * from "./schema-v2-operations";
+export * from "./schema-v2-serialization";

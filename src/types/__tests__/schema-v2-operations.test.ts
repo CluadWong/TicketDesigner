@@ -7,6 +7,8 @@ import {
   createGridRowV2,
   createStaticPNodeV2,
   createTableNodeV2,
+  createHtmlNodeV2,
+  createImageNodeV2,
   insertRootGridV2,
   moveGridRowV2,
   removeNodeV2,
@@ -18,6 +20,11 @@ import {
   updateGridRowHeightV2,
   updateTableMinRowsV2,
   updateSchemaNodeV2,
+  cloneNodeWithFreshIdsV2,
+  copyGridRowV2,
+  mergeGridCellsV2,
+  moveNodeV2,
+  wrapCellChildrenWithGridV2,
 } from "@/types/schema-v2-operations";
 import { validateFormSchemaV2 } from "@/types/schema-v2-validation";
 
@@ -49,6 +56,66 @@ describe("Schema V2 operations", () => {
         field: column.key,
       })]),
     );
+  });
+
+  it("creates safe HTML and image defaults", () => {
+    expect(createHtmlNodeV2()).toMatchObject({ type: "html", html: "", trusted: false });
+    expect(createImageNodeV2()).toMatchObject({ type: "image", objectFit: "contain" });
+  });
+
+  it("clones a nested subtree with fresh IDs and unchanged content", () => {
+    const schema = makeYunlvSecondTicketFirstFiveRowsSchema();
+    const source = schema.pages[0].children[3];
+    if (source.type !== "grid") throw new Error("grid missing");
+    const clone = cloneNodeWithFreshIdsV2(source);
+    expect(clone.type).toBe("grid");
+    expect(clone.id).not.toBe(source.id);
+    expect(clone.rows[0].cells[1].children[0]).toMatchObject({ type: "table" });
+    expect(clone.rows[0].cells[1].children[0].id).not.toBe(source.rows[0].cells[1].children[0].id);
+  });
+
+  it("copies a row next to the source with fresh nested IDs", () => {
+    const schema = makeYunlvSecondTicketFirstFiveRowsSchema();
+    const next = copyGridRowV2(schema, "basic-station");
+    const grid = next.pages[0].children.find(node => node.id === "ticket-member-layout");
+    if (!grid || grid.type !== "grid") throw new Error("grid missing");
+    expect(grid.rows).toHaveLength(3);
+    expect(grid.rows[0].id).toBe("basic-members");
+    expect(grid.rows[1].id).toBe("basic-station");
+    expect(grid.rows[2].id).not.toBe("basic-station");
+    expect(grid.rows[2].cells[1].children[0].id).not.toBe("station-field");
+  });
+
+  it("moves a component across cells and rejects moves into descendants", () => {
+    const source = createEmptyFormSchemaV2();
+    const grid = createGridNodeV2({ rows: 1, columns: 2 });
+    const withGrid = insertRootGridV2(source, grid);
+    const p = createStaticPNodeV2("移动");
+    const withP = appendNodeToCellV2(withGrid, grid.rows[0].cells[0].id, p);
+    const nodeId = p.id;
+    const moved = moveNodeV2(withP, nodeId, grid.rows[0].cells[1].id);
+    const nextGrid = moved.pages[0].children[0];
+    if (nextGrid.type !== "grid") throw new Error("grid missing");
+    expect(nextGrid.rows[0].cells[0].children).toHaveLength(0);
+    expect(nextGrid.rows[0].cells[1].children[0].id).toBe(nodeId);
+    expect(moveNodeV2(withP, grid.id, grid.rows[0].cells[0].id)).toEqual(withP);
+  });
+
+  it("merges sibling cells and wraps cell contents with a nested Grid", () => {
+    const source = createEmptyFormSchemaV2();
+    const grid = createGridNodeV2({ rows: 1, columns: 2 });
+    const withGrid = insertRootGridV2(source, grid);
+    const withP = appendNodeToCellV2(withGrid, grid.rows[0].cells[0].id, createStaticPNodeV2("左"));
+    const withQ = appendNodeToCellV2(withP, grid.rows[0].cells[1].id, createStaticPNodeV2("右"));
+    const merged = mergeGridCellsV2(withQ, grid.rows[0].cells[0].id, grid.rows[0].cells[1].id);
+    const mergedGrid = merged.pages[0].children[0];
+    if (mergedGrid.type !== "grid") throw new Error("grid missing");
+    expect(mergedGrid.rows[0].cells).toHaveLength(1);
+    expect(mergedGrid.rows[0].cells[0].colspan).toBe(2);
+    const wrapped = wrapCellChildrenWithGridV2(withQ, grid.rows[0].cells[0].id);
+    const wrappedGrid = wrapped.pages[0].children[0];
+    if (wrappedGrid.type !== "grid") throw new Error("grid missing");
+    expect(wrappedGrid.rows[0].cells[0].children[0].type).toBe("grid");
   });
 
   it("allows replacing a table cell P with another component", () => {

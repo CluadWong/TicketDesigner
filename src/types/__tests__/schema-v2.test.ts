@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { FormSchemaV2 } from "@/types/schema-v2";
-import { buildEditorNodeIndexV2 } from "@/types/schema-v2-index";
+import { buildEditorNodeIndexV2, getAncestorsV2, getNodeByIdV2, getOwnerCellV2 } from "@/types/schema-v2-index";
 import { validateFormSchemaV2 } from "@/types/schema-v2-validation";
+import {
+  normalizeFormSchemaV2,
+  parseFormSchemaV2,
+  SchemaV2SerializationError,
+  serializeFormSchemaV2,
+} from "@/types/schema-v2-serialization";
 import { makeYunlvSecondTicketFirstFiveRowsSchema } from "@/dev/yunlv-second-ticket-first-five-rows";
 
 function rootGrid(schema: FormSchemaV2) {
@@ -87,6 +93,20 @@ describe("Schema V2 index", () => {
     });
     expect(() => buildEditorNodeIndexV2(schema)).toThrow(/Duplicate Schema V2 node id/);
   });
+
+  it("provides node, owner slot, and ancestor queries", () => {
+    const schema = makeYunlvSecondTicketFirstFiveRowsSchema();
+    expect(getNodeByIdV2(schema, "work-task-table")?.type).toBe("table");
+    expect(getOwnerCellV2(schema, "work-task-table")?.id).toBe("work-task-table-cell");
+    expect(getAncestorsV2(schema, "work-task-table").map(node => node.id)).toEqual([
+      "ticket-page-1",
+      "ticket-work-task-layout",
+      "work-task",
+      "work-task-table-cell",
+    ]);
+    expect(getNodeByIdV2(schema, "missing")).toBeUndefined();
+    expect(getAncestorsV2(schema, "missing")).toEqual([]);
+  });
 });
 
 describe("Schema V2 validation", () => {
@@ -144,5 +164,31 @@ describe("Yunlv sample schema layout", () => {
     if (workGrid.type !== "grid") throw new Error("work grid missing");
     const workCellChildren = workGrid.rows[0].cells.flatMap(cell => cell.children);
     expect(workCellChildren.map(node => node.type)).toEqual(["p", "table"]);
+  });
+});
+
+describe("Schema V2 serialization", () => {
+  it("round-trips a valid schema and preserves IDs", () => {
+    const schema = makeSchema();
+    const restored = parseFormSchemaV2(serializeFormSchemaV2(schema));
+    expect(restored).toEqual(schema);
+  });
+
+  it("fills compatible optional defaults while loading", () => {
+    const schema = makeSchema();
+    const input = JSON.parse(JSON.stringify(schema)) as Record<string, unknown>;
+    delete input.baseRowHeight;
+    delete (input.paper as Record<string, unknown>).orientation;
+    const restored = parseFormSchemaV2(input);
+    expect(restored.baseRowHeight).toBe(8);
+    expect(restored.paper.orientation).toBe("portrait");
+    expect(restored.pages[0].children[0]).toMatchObject({ type: "grid", border: "all" });
+  });
+
+  it("rejects unknown versions and invalid structures", () => {
+    expect(() => parseFormSchemaV2('{"version":1}')).toThrow(SchemaV2SerializationError);
+    expect(() => serializeFormSchemaV2({ ...makeSchema(), baseRowHeight: 0 })).toThrow(SchemaV2SerializationError);
+    expect(() => normalizeFormSchemaV2({ version: 2, pages: "invalid" })).toThrow(SchemaV2SerializationError);
+    expect(() => parseFormSchemaV2({ ...makeSchema(), pages: [{ ...makeSchema().pages[0], children: [{ id: "unknown", type: "unknown" }] }] })).toThrow(SchemaV2SerializationError);
   });
 });
