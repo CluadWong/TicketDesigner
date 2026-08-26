@@ -1,11 +1,5 @@
-/**
- * 类型定义统一出口
- *
- * 外部模块按 `import type { FormSchema, Page } from '@/types'` 引用，
- * 无需关心内部分文件结构。
- */
-
-export * from './schema'
-export * from './paginate'
-export * from './component-config'
-export * from './rules'
+/** V2 Schema、索引、校验和结构操作的统一出口。 */
+export * from "./schema-v2";
+export * from "./schema-v2-index";
+export * from "./schema-v2-validation";
+export * from "./schema-v2-operations";

@@ -1,153 +1,162 @@
-# Grid Schema V2 渲染引擎设计
+# 嵌套 Grid Schema V2 渲染引擎设计
 
-> 本文定义扁平组件数组的索引、校验、递归渲染、尺寸和打印契约。
-> 现有 `paginate(FormSchemaV1)` 继续作为旧流式模板兼容实现，不再扩展固定工作票能力。
+> 本文定义唯一正式 Schema V2 的索引、校验、递归渲染、尺寸、溢出和打印契约。
 
 ## 1. 引擎职责
 
 V2 引擎负责：
 
-- 校验 `components[]` 的结构正确性。
-- 建立 ID 和父子索引。
-- 从根组件递归生成 Grid/P/Table/HTML/Image DOM。
-- 按 mm 和基础行高计算固定尺寸。
-- 检测纸张、格子和字段内容溢出。
-- 为设计态、预览态和打印态提供同一结构。
+- 校验嵌套 Schema 的结构和尺寸。
+- 建立设计器需要的运行时节点索引。
+- 递归渲染 Page、Grid、P、Table、HTML 和 Image。
+- 按 mm 和基础行高计算固定版式。
+- 检测格子、组件和纸张溢出。
+- 让设计态、填写态和打印态共享 DOM 结构。
 
-引擎不负责：
+引擎不负责流程数据持久化、权限决策和设计器拖拽策略。
 
-- 流程数据持久化。
-- 权限决策。
-- 设计器选中状态和拖拽策略。
-- 未经声明的 HTML 内部字段解析。
-
-## 2. 输入契约
+## 2. 输入和输出
 
 ```ts
-interface FormSchemaV2 {
-  version: 2
-  paper: {
-    size: 'A3' | 'A4'
-    orientation: 'portrait' | 'landscape'
-    mode: 'fixed' | 'flow'
-  }
-  margin: number
-  baseRowHeight: number
-  components: DesignerComponent[]
+interface RenderInput {
+  schema: FormSchemaV2
+  mode: 'designer' | 'preview' | 'print'
+  data?: Record<string, unknown>
+  rules?: RulesMap
 }
 
-interface ComponentBase {
-  id: string
-  parentId: string | null
-  index: number
-  colspan?: number
-  padding?: number
-}
-```
-
-组件详细字段以 [design.md](./design.md) 第 3 节为准。
-
-## 3. 索引构建
-
-每次加载 Schema 或结构发生变化时建立：
-
-```ts
-interface ComponentIndex {
-  byId: Map<string, DesignerComponent>
-  childrenByParentId: Map<string | null, DesignerComponent[]>
+interface RenderResult {
+  pages: RenderedPage[]
+  issues: SchemaIssue[]
+  nodeIndex: EditorNodeIndex
 }
 
-function buildComponentIndex(components: DesignerComponent[]): ComponentIndex {
-  const byId = new Map<string, DesignerComponent>()
-  const childrenByParentId = new Map<string | null, DesignerComponent[]>()
-
-  for (const component of components) {
-    byId.set(component.id, component)
-    const children = childrenByParentId.get(component.parentId) ?? []
-    children.push(component)
-    childrenByParentId.set(component.parentId, children)
-  }
-
-  for (const children of childrenByParentId.values()) {
-    children.sort((left, right) => left.index - right.index)
-  }
-
-  return { byId, childrenByParentId }
-}
-```
-
-数组物理顺序不能影响结果。测试必须随机打乱 components 后比较相同渲染结构。
-
-## 4. 结构校验
-
-渲染前运行 `validateSchemaV2()`，返回错误列表而不是在第一个错误处抛出：
-
-```ts
 interface SchemaIssue {
   level: 'error' | 'warning'
   code: string
-  componentId?: string
+  nodeId?: string
+  path?: Array<string | number>
   message: string
 }
 ```
 
-### 4.1 必须阻止渲染的错误
+存在结构 error 时设计器仍可显示错误面板，但预览和打印应被阻止，避免输出不确定版式。
 
-- `DUPLICATE_ID`：组件 ID 重复。
-- `MISSING_PARENT`：parentId 不存在。
-- `INVALID_PARENT_TYPE`：父组件不是 Grid/Table。
-- `PARENT_CYCLE`：父子链形成循环。
-- `INVALID_INDEX`：index 不是非负整数。
-- `DUPLICATE_INDEX`：同父格子出现多个直接组件。
-- `GRID_COLUMN_OVERFLOW`：index/colspan 越过 Grid 列边界。
-- `TABLE_CELL_OVERFLOW`：index 超出 Table 行列范围。
-- `INVALID_DIMENSION`：基础行高、height、rowHeight 或尺寸非法。
+## 3. 运行时索引
 
-### 4.2 可继续渲染的警告
-
-- `INDEX_GAP`：同父 index 存在空洞。
-- `DUPLICATE_FIELD`：输入 field 重复。
-- `EMPTY_FIELD`：editable P 未设置 field。
-- `UNTRUSTED_HTML`：HTML 未标记可信或过滤失败。
-- `CONTENT_OVERFLOW`：内容超过固定格子。
-- `PAPER_OVERFLOW`：根内容超过纸张可用范围。
-
-### 4.3 循环检测
-
-对每个组件沿 parentId 向上访问，维护 visiting/visited 集合。检测到 visiting 节点时，将循环链上的所有
-组件 ID 写入错误信息。不能依赖递归 Renderer 自然栈溢出来发现循环。
-
-## 5. Grid 定位
-
-Grid 子组件按行优先 index 定位：
+嵌套 Schema 是唯一渲染输入。索引由遍历函数派生：
 
 ```ts
-const columnCount = grid.columns.length
-const column = child.index % columnCount
-const row = Math.floor(child.index / columnCount)
+interface EditorNodeRef {
+  node: SchemaNode
+  parent: SchemaNode | null
+  path: Array<string | number>
+  ownerCell?: GridCell | TableCellTemplate
+}
+
+function buildNodeIndex(schema: FormSchemaV2): Map<string, EditorNodeRef>
 ```
 
-对应 CSS：
+内部索引遍历范围包括：
+
+- Page、Grid 和 P/Table/HTML/Image 等实际组件
+- GridRow、GridCell、TableCellTemplate 仅作为内部布局记录参与路径解析
+- 所有 children 后代
+
+索引要求：
+
+- ID 唯一。
+- path 可以直接定位到原 Schema 节点。
+- parent 是实际拥有该记录或组件的 Page/Grid/Row/Cell/Table。
+- 对外的选择链只暴露 Page、Grid 和实际组件，不暴露 Row/Cell/Template。
+- Schema 结构变化后索引必须更新，禁止保存旧对象引用。
+
+## 4. Schema 校验
+
+### 4.1 结构错误
+
+- DUPLICATE_ID：任意节点 ID 重复。
+- EMPTY_PAGE：Page 没有内容。
+- INVALID_CHILD_TYPE：节点出现在不允许的 children 中。
+- INVALID_ROW：GridRow 没有 Cell 或 height 非法。
+- INVALID_CELL_WIDTH：宽度不是正数、fr 或 auto。
+- INVALID_COLSPAN：colspan 超出当前行可用列。
+- INVALID_TABLE_COLUMN：列 key 重复或宽度非法。
+- INVALID_TABLE_TEMPLATE：rowTemplate 缺少列或引用未知 columnKey。
+- INVALID_DIMENSION：基础行高、行高、边距或图片尺寸非法。
+- INVALID_P_MODE：static 缺 text，field 缺 field，或属性组合冲突。
+
+### 4.2 警告
+
+- DUPLICATE_FIELD：字段名重复。
+- EMPTY_FIELD：field P 未配置 field。
+- UNUSED_PROPERTY：当前 mode 下存在无效属性。
+- CONTENT_OVERFLOW：内容超过固定节点尺寸。
+- PAPER_OVERFLOW：Page 内容超过可用纸张。
+- UNTRUSTED_HTML：HTML 未通过安全过滤。
+- IMAGE_LOAD_FAILED：图片资源加载失败。
+
+### 4.3 校验时机
+
+- 加载 Schema 后。
+- 每次结构操作后。
+- 保存前。
+- 打开预览前。
+- 打印前。
+
+属性输入时可以 debounce 校验；结构操作必须同步校验并返回明确失败原因。
+
+## 5. 递归渲染
 
 ```ts
-{
-  gridColumn: `${column + 1} / span ${child.colspan ?? 1}`,
-  gridRow: row + 1
+function renderNode(node: FormNode, context: RenderContext): VNode {
+  switch (node.type) {
+    case 'grid': return renderGrid(node, context)
+    case 'p': return renderP(node, context)
+    case 'table': return renderTable(node, context)
+    case 'html': return renderHtml(node, context)
+    case 'image': return renderImage(node, context)
+  }
 }
 ```
 
-列轨道转换：
+Page Renderer 遍历 page.children；Grid Renderer 遍历 rows/cells；Cell Renderer 遍历 children。
 
-- number → `${value}mm`
-- `${number}fr` → 原样写入
-- auto → auto
+设计态为所有节点添加 `data-node-id` 和必要的辅助包装。预览/打印可以隐藏辅助样式，但不能生成不同业务层级。
 
-Renderer 不通过数组顺序自动填格，必须显式设置 gridColumn/gridRow，确保 index 空洞不会导致后续
-组件前移。
+## 6. Grid 渲染
 
-## 6. 尺寸计算
+每个 GridRow 使用 CSS Grid：
 
-### 6.1 纸张
+```ts
+const tracks = row.cells.map(cell => toCssTrack(cell.width ?? '1fr'))
+
+rowStyle = {
+  display: 'grid',
+  gridTemplateColumns: tracks.join(' '),
+  minHeight: `${row.height * baseRowHeight}mm`
+}
+```
+
+如果存在 colspan，Renderer 根据逻辑 cell 顺序生成 `grid-column: span N`，并在校验阶段确保总占用列数合法。
+
+Cell：
+
+```ts
+cellStyle = {
+  padding: `${cell.padding ?? 0}mm`,
+  alignItems: toAlignItems(cell.verticalAlign),
+  justifyContent: toJustifyContent(cell.align),
+  overflow: 'hidden',
+  boxSizing: 'border-box'
+}
+```
+
+Cell.children 按数组顺序渲染。多个子节点默认纵向流；需要横向排列时使用子 Grid，不增加隐式 flex 规则。
+
+## 7. 固定尺寸
+
+### 7.1 纸张
 
 | 纸张 | 竖向 | 横向 |
 |---|---|---|
@@ -155,169 +164,201 @@ Renderer 不通过数组顺序自动填格，必须显式设置 gridColumn/gridR
 | A3 | 297×420mm | 420×297mm |
 
 ```text
-contentWidth  = paperWidth  - 2 × margin
-contentHeight = paperHeight - 2 × margin
+contentWidth  = paperWidth  - margin.left - margin.right
+contentHeight = paperHeight - margin.top  - margin.bottom
 ```
 
-V2 初期使用四边统一 margin；需要四边独立配置时再扩展 PaperConfig，不从页眉高度隐式推导。
-
-### 6.2 基础行高
+### 7.2 Grid 与 Table
 
 ```text
-gridHeight  = baseRowHeight × grid.height
-tableRow    = baseRowHeight × table.rowHeight
-tableHeight = baseRowHeight × (1 + rowCount × rowHeight)
+GridRowHeight     = baseRowHeight × row.height
+TableHeaderHeight = baseRowHeight × table.headerHeight
+TableDataHeight   = baseRowHeight × table.rowHeight
+EmptyTableHeight  = headerHeight + minRows × dataHeight
 ```
 
-`1` 表示 Table 表头一行。需要不同表头高度时增加 headerHeight，而不是让内容自动撑高。
+行高必须输出 CSS `min-height`，并统一 `box-sizing: border-box`。当 `minRows` 增加时，Table 内容允许撑开父 GridRow；禁止用 flex-grow 把纸张剩余高度分配给 Table 行。
 
-固定行必须生成 CSS `height`，同时设置 `box-sizing: border-box`。不得使用 flex-grow 或只设置
-min-height，否则空白区域会被分配给明细行，导致设计和打印尺寸不可推导。
+### 7.3 字体和边框
 
-### 6.3 内容溢出
+- 字号和行高写入 Schema 或设计系统默认值。
+- letter-spacing 固定为 0。
+- 边框宽度纳入 border-box。
+- Web 字体未加载完成前不进行最终溢出测量。
+- 打印态不得改变字号、行高、padding 和边框宽度。
 
-固定格子默认：
+## 8. 边框算法
 
-```css
-overflow: hidden;
+Grid 根据 border 配置决定外框和内部线：
+
+- all：Grid 外框 + Row/Cell 内部边界。
+- outer：仅外框。
+- inner：仅内部边界。
+- none：无边框。
+
+同一条边只由一个层级负责。建议：
+
+- 根表单 Grid 使用 all。
+- 负责人等混排行使用 none，由父 Grid 的行边界包围。
+- 工作任务子 Grid 使用 inner，外框由父 Cell 承担。
+- Table 绘制内部表头和行列线，外边界由所属 Cell 或 Table 自己按配置负责，二者不能重复。
+
+浏览器验收必须检查 1px 边框是否出现 2px 重叠。
+
+## 9. P 渲染
+
+### static
+
+```html
+<p data-node-id="label-unit">单位</p>
 ```
 
-设计态同时测量 `scrollWidth/clientWidth` 和 `scrollHeight/clientHeight`。发生溢出时保留固定尺寸，
-给组件增加警告，不允许内容反向撑高父 Grid。
+### field
 
-## 7. 边框算法
+设计态：
 
-边框由父 Grid 的格子槽绘制：
+```html
+<p data-node-id="field-unit" data-field="单位"></p>
+```
 
-- `all`：Grid 绘制 top/left，每个格子绘制 right/bottom。
-- `inner`：只绘制非末列格子的 right 和非末行格子的 bottom。
-- `none`：不绘制。
+填写态：
 
-子组件自身不绘制所属格子的外边框。嵌套时由父槽承担外框、子 Grid inner 承担内部格线，避免双线。
+```html
+<p contenteditable data-node-id="field-unit" data-field="单位"></p>
+```
 
-Table 使用同一原则：所属 Grid 槽承担外框，Table 只绘制表头/数据行之间和列之间的内部线。
+inputType=date/signature 可以使用专用内部控件，但外层仍保持 PNode 的 data-node-id/data-field 契约。
 
-## 8. 递归渲染
+字段输入后更新外部 data。固定页面默认不因输入自动改变行高；内容超出时标记溢出。
+
+## 10. Table 渲染
+
+渲染顺序：
+
+1. 根据 columns 生成表头。
+2. 计算数据行数量。
+3. 对每行克隆 rowTemplate，输出语义化 `tbody > tr > td`。
+4. 根据 columnKey 渲染每个 TableCellTemplate.children；新建 Table 默认每个模板包含一个 Field P。
+5. 用户删除默认 P 后，模板 children 可以为空或替换为 Grid、HTML 等其他组件。
+6. 为 rowTemplate 内 field 提供当前行上下文。
+
+数据行数量：
 
 ```ts
-function renderNode(component: DesignerComponent, index: ComponentIndex) {
-  switch (component.type) {
-    case 'grid':
-      return renderGrid(component, index.childrenByParentId.get(component.id) ?? [])
-    case 'table':
-      return renderTable(component, index.childrenByParentId.get(component.id) ?? [])
-    case 'p':
-      return renderP(component)
-    case 'html':
-      return renderHtml(component)
-    case 'image':
-      return renderImage(component)
-  }
-}
+const dataRows = repeatable ? toArray(data[table.field]) : []
+const rowCount = Math.max(table.minRows, dataRows.length)
 ```
 
-根渲染从 `childrenByParentId.get(null)` 开始。Grid/Table 是允许拥有子组件的容器；其他节点即使由于
-错误数据出现子组件也不渲染，并由校验器报告错误。
+重复行字段不能简单生成相同 DOM ID。VNode/DOM 标识应组合 template node ID 和 row key；模板 Schema ID 保持不变。
 
-### 8.1 Table 单元格
+## 11. HTML 安全
+
+HTML 渲染流程：
+
+1. 按 trusted 决定过滤策略。
+2. 删除 script、iframe、事件属性和危险 URL。
+3. 给 CSS 选择器添加 `[data-node-id="..."]` 作用域。
+4. 应用显式 bindings。
+5. 放入限制 overflow 的 Cell 容器。
+
+HTML 内部 DOM 不参与普通节点索引，bindings 之外的 contenteditable 不回写 FormData。
+
+## 12. 溢出检测
+
+固定节点渲染稳定后测量：
 
 ```ts
-const row = Math.floor(child.index / table.columns.length)
-const column = child.index % table.columns.length
+const horizontalOverflow = element.scrollWidth > element.clientWidth + tolerance
+const verticalOverflow = element.scrollHeight > element.clientHeight + tolerance
 ```
 
-Table Renderer 先生成表头，再生成 rowCount × columnCount 个数据槽，根据 index 放入子组件。
-空槽仍必须生成，不能因缺少组件改变后续格子位置。
+容差建议 1px，避免小数像素舍入误报。
 
-### 8.2 HTML
+检测层级：
 
-HTML 渲染顺序：
+- P 内容溢出。
+- Image 超出 Cell。
+- HTML 超出 Cell。
+- Table 高度与所属行不匹配。
+- GridRow 子内容超过最小高度后的实际扩展。
+- Page 根内容超出 contentHeight。
 
-1. 按可信级别运行 sanitizer。
-2. 删除 script、事件属性和危险 URL。
-3. 给 CSS 选择器添加组件 ID 作用域。
-4. 在独立包装节点中设置内容。
-5. 观察尺寸但不允许突破父格子。
+设计态显示节点定位警告；预览可继续查看；打印前由业务决定是否阻止。
 
-## 9. 页面模式
+## 13. 页面模式
 
-### 9.1 fixed
+### fixed
 
-工作票默认使用 fixed：
+- Page 对应真实纸张。
+- 不运行自动块分页。
+- 多页由 pages[] 显式定义。
+- PAPER_OVERFLOW 不自动移动节点。
+- 适用于工作票、证书和审批单。
 
-- 根组件按确定尺寸渲染在单张纸内容区。
-- 不运行普通块自动分页。
-- 超过 contentHeight 返回 PAPER_OVERFLOW。
-- 多页固定票据使用显式 Page 节点或每页独立根 Grid；第一阶段先支持单页。
+### flow
 
-### 9.2 flow
+- 后续用于动态报表。
+- 根级 Grid 作为不可拆分块。
+- repeatable Table 可按完整行切分并重复表头。
+- flow 不属于前五行设计器闭环的前置条件。
 
-flow 是旧报表能力的后续迁移目标：
+## 14. 设计器结构操作
 
-- 根级普通 Grid 作为不可拆分块。
-- 放不下时整体移到下一页。
-- repeatable Table 可以按完整数据行切片，每页重复表头。
-- Table 单行不能拆分。
-
-在 fixed 模式闭环完成之前，不把旧 paginate 算法直接套到嵌套 Grid 上。
-
-## 10. 设计态、预览态和打印态
-
-三种状态必须复用结构 DOM：
-
-| 状态 | 差异 |
-|---|---|
-| 设计态 | 显示组件 ID、格子辅助线、选中框、投放提示和警告 |
-| 预览态 | 隐藏设计辅助元素；editable P 开放输入；填入 data |
-| 打印态 | 复用预览 DOM；隐藏工具栏和交互标记；保持业务尺寸 |
-
-打印样式不得修改 Grid columns、height、padding、font-size 或 Table 行高。
-
-## 11. 结构操作函数
-
-设计器不能散落地直接修改 parentId/index，应统一调用纯函数：
+操作嵌套 Schema 的函数必须集中实现：
 
 ```ts
-moveComponent(components, componentId, targetParentId, targetIndex)
-swapComponents(components, leftId, rightId)
-removeComponentTree(components, componentId)
-wrapCellWithGrid(components, componentId, gridConfig)
-resizeGridColumns(components, gridId, columns)
-normalizeChildIndexes(components, parentId)
+insertRow(schema, gridId, at, row)
+removeRow(schema, rowId)
+moveRow(schema, rowId, targetIndex)
+splitCell(schema, cellId, tracks)
+mergeCells(schema, rowId, cellIds)
+insertNode(schema, targetCellId, at, node)
+moveNode(schema, nodeId, targetCellId, at)
+removeNode(schema, nodeId)
+wrapCellChildrenWithGrid(schema, cellId, config)
+updateNode(schema, nodeId, patch)
 ```
 
-每个函数返回新数组和变更摘要，便于撤销/重做及测试。
+每个函数返回新 Schema、更新后的节点索引和结构 patch。禁止组件内部直接寻找路径并修改原对象。
 
-## 12. 测试基线
+## 15. 撤销与重做
 
-### 12.1 结构测试
+历史记录保存结构化 patch 或 Schema 快照：
 
-- components 数组随机重排后索引结果一致。
-- 多级 parentId 正确还原。
-- 循环、缺失父级和非法父类型被识别。
-- Grid/Table index 和边界校验完整。
-- 容器级联删除不误删兄弟节点。
+- 属性输入按 debounce 合并为一次历史记录。
+- 拖拽、拆分、合并和删除各是一条原子记录。
+- 复制和删除必须包含完整子树。
+- 撤销后重建节点索引并重新校验。
 
-### 12.2 尺寸测试
+原型阶段可先使用不可变 Schema 快照，确认性能问题后再切换 patch。
 
-- baseRowHeight=8 时普通行高为 8mm。
-- 工作任务外层高度为 40mm。
-- Table 表头和四行数据各为 8mm。
+## 16. 测试基线
+
+### 结构
+
+- 所有节点 ID 唯一。
+- ID 索引能定位 node、parent 和 path。
+- 移动节点后原位置删除、目标顺序正确。
+- 删除/复制容器正确处理完整子树。
+- 保存再加载的 Schema 深度等价。
+
+### 尺寸
+
+- baseRowHeight=8 时普通行精确为 8mm。
+- 工作任务外层行精确为 40mm。
+- 表头和 4 行数据各为 8mm。
+- 内容过长或 Table 增加 `minRows` 时允许撑高所属 GridRow，并报告对应节点的尺寸变化。
 - 嵌套 Grid 不产生双边框。
-- 内容过长只产生警告，不改变固定高度。
 
-### 12.3 浏览器验收
+### UI 闭环
 
-- 1600×1000 设计器截图无重叠和裁切。
-- A4 打印预览尺寸正确。
-- Edge/Chrome 渲染关键尺寸一致。
-- 前五行截图与参考 HTML 的结构、列宽和纵向节奏接近。
+- 从空白页通过 UI 构建前五行。
+- 保存、加载后节点仍可编辑。
+- 填入数据后字段正确。
+- A4 打印截图结构正确。
 
-## 13. v1 兼容边界
+## 17. 旧代码清理
 
-现有 `src/engine/paginate.ts`、`FormRenderer` 和 `FormSchema.body[]` 属于 v1：
-
-- 继续通过现有回归测试。
-- 不为固定工作票继续增加嵌套 Grid 特例。
-- V2 使用独立类型和 Renderer，按 schema.version 分流。
-- 完整工作票通过 V2 验收后，再决定 v1 的迁移和删除时间。
+现有 `src/engine/paginate.ts`、`FormRenderer` 和 `FormSchema.body[]` 是迁移前遗留实现，
+不属于正式产品契约。V2 Renderer 完成前五行 UI 闭环后，应删除或隔离这些旧入口，避免出现两套
+Schema、分页和设计器状态。

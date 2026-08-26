@@ -1,191 +1,211 @@
 # 表单设计器业务设计
 
-> 本文描述 Schema V2 下的组件业务语义和设计器行为。总体架构见 [design.md](./design.md)，
-> 渲染算法见 [engine.md](./engine.md)，落地顺序见 [development-plan.md](./development-plan.md)。
+> 本文描述嵌套 Schema 下的组件语义和设计器操作。总体架构见 [design.md](./design.md)，
+> 渲染算法见 [engine.md](./engine.md)，实施路线见 [development-plan.md](./development-plan.md)。
 
 ## 1. 产品产物
 
-系统提供两个可独立使用的产物：
+系统提供两个独立产物：
 
-1. **表单模板设计器**：编辑数据无关的 `FormSchema`。
-2. **表单预览组件**：接收 `schema + data + rules`，用于填写、只读查看和打印。
+1. **模板设计器**：通过 UI 编辑数据无关的 FormSchema。
+2. **表单预览组件**：接收 schema、data 和 rules，完成填写、查看和打印。
 
-```text
-Designer                          FormPreview
-   │                                  │
-   ├─ 编辑 components[]               ├─ 读取 schema
-   ├─ 调整 parentId/index             ├─ 填入 data[field]
-   ├─ 配置尺寸和样式                   ├─ 应用 rules[field]
-   └─ 保存 FormSchema                 └─ 输出/打印同一套 DOM
-```
+模板设计器是否合格，必须由“UI 构建 → 保存 → 加载 → 填写 → 打印”完整链路验证，
+不能只以人工编写 Schema 后 Renderer 能显示作为验收。
 
-模板不包含流程实例值，预览组件不修改模板结构。
-
-## 2. 设计器布局
+## 2. 设计器界面
 
 ```text
-┌─ 工具栏：纸张 / 边距 / 基础行高 / 预览 / 保存 ──────────┐
+┌─ 工具栏：纸张 / 边距 / 基础行高 / 预览 / 保存 / 撤销 ───┐
 ├──────────┬──────────────────────────┬──────────────────┤
-│ 组件库   │ A3/A4 固定纸张画布       │ 配置面板         │
-│ Grid     │ 格子边界、选择和投放提示 │ 表单/组件/格子    │
+│ 组件库   │ 固定纸张画布             │ 配置面板         │
+│ Grid     │ 格子辅助线、选中和投放点 │ 页面/行/格/组件  │
 │ P        │                          │                  │
 │ Table    │                          │                  │
 │ HTML     │                          │                  │
 │ Image    │                          │                  │
 ├──────────┴──────────────────────────┴──────────────────┤
-│ 状态栏：页面 / 缩放 / 结构错误 / 溢出警告              │
+│ 节点面包屑 / 缩放 / 结构错误 / 字段与溢出警告           │
 └─────────────────────────────────────────────────────────┘
 ```
 
-画布不是自由坐标编辑器。任何组件都必须属于纸张根级或某个 Grid/Table 格子。
+画布操作围绕 Page、Grid 和组件进行，不提供绝对坐标定位；GridRow/GridCell 仅作为内部布局槽位。
 
-## 3. 组件关系
+## 3. 节点与选择
 
-Schema 使用扁平组件数组：
+Page、Grid、TableCellTemplate 和组件都有唯一 ID；GridRow/GridCell 的 ID 仅用于布局引用。设计器运行时建立节点索引：
+
+选择链只包含 Page、Grid 和实际组件。点击 Cell 空白区域时，选择其所属 Grid；Row/Cell 不会成为 active 节点。
 
 ```ts
-interface ComponentBase {
-  id: string
-  parentId: string | null
-  index: number
-  colspan?: number
-  padding?: number
+interface EditorNodeRef {
+  node: SchemaNode
+  parent: SchemaNode | null
+  path: Array<string | number>
+  ownerCell?: GridCell | TableCellTemplate
 }
 ```
 
-- `id`：组件稳定标识，用于选中、字段定位、警告和历史记录。
-- `parentId`：所属容器；根级组件为 `null`。
-- `index`：父容器中的逻辑格子序号。
-- `colspan`：仅在父容器为 Grid 时生效。
-- `padding`：该组件所在父格子的内边距，单位 mm。
+索引用于：
 
-一个格子默认只放一个直接子组件。需要标签、字段等多个元素时，将该格子的直接子组件设为 Grid，
-再把多个 P 放入子 Grid。这样关系始终只有一层 `parentId/index` 语义。
+- 根据 ID 选择节点。
+- 展示 Page > Grid > Row > Cell > Component 面包屑。
+- 确定拖拽源和目标。
+- 更新配置面板。
+- 生成结构 patch 和撤销记录。
 
-## 4. 组件业务语义
+索引不写入 Schema，重新加载后根据嵌套结构重建。
 
-### 4.1 Grid
+## 4. Grid 业务语义
 
-Grid 是静态版式的唯一通用容器：
+Grid 是静态布局容器，由 rows 和 cells 构成。
 
-- 根 Grid：整张表单外框。
-- 行 Grid：单位/编号、负责人/班组等一行内容。
-- 子 Grid：在一个格子中继续拆列。
-- 无边框 Grid：实现标签与输入区域的自然混排。
+### 4.1 行操作
 
-Grid 的 `height` 是基础行高倍数。用户在属性面板选择 1、2、3 等整数，设计器显示实际 mm 高度。
+- 在指定位置新增空行。
+- 复制行及其所有子组件，并重新生成后代 ID。
+- 删除行及其内容。
+- 上下移动行。
+- 设置基础行高倍数。
+- 将内容过高的行标记为溢出，不自动改变固定高度。
 
-### 4.2 P
+### 4.2 Grid 布局操作
 
-P 同时覆盖固定文字和输入字段：
+- 选中 Grid 后设置整体行数和列数，自动维护内部布局槽位。
+- Grid 内部槽位支持固定 mm、fr 或 auto 宽度，以及 padding、水平和垂直对齐。
+- 复杂内容通过在槽位内嵌套 Grid 实现，不把行和格子提升为独立组件。
+- 拆分已合并格子。
+- 将格子内组件排序。
+- 将多个组件包装为子 Grid。
 
-| 模式 | 配置 | 设计态 | 预览态 |
+### 4.3 边框
+
+- all：外框和内部格线。
+- outer：仅外框。
+- inner：仅内部格线。
+- none：无边框。
+
+嵌套 Grid 默认不重复绘制父格子的边框。
+
+## 5. P 业务语义
+
+P 有两种互斥模式：
+
+| 模式 | 主要属性 | 设计态 | 预览态 |
 |---|---|---|---|
-| 固定文字 | `editable=false, text` | 显示 text | 显示 text，不可编辑 |
-| 输入字段 | `editable=true, field` | 显示字段占位/空输入线 | 填入 data[field]，按规则编辑 |
+| static | text | 显示固定标签 | 固定显示，不可编辑 |
+| field | field、inputType、prefix、suffix | 输入格，可带前后固定标签；字段名写入 data-field 属性 | 填入 data[field] 并按权限编辑 |
 
-业务约束：
+约束：
 
-- 固定文字不需要 field。
-- 输入 P 必须设置 field 后才能参与数据保存和权限控制。
-- 一个 P 不混合固定标签和输入值；通过 Grid 相邻放置。
-- `inputType` 第一阶段支持 text、number、date、signature。
-- 下划线属于字段样式，Web 与打印可分别控制是否显示。
+- field P 的字段名不作为可见文本或占位符渲染，只写入组件的 data-field 属性。
+- field P 的 `prefix` / `suffix` 用于同一组件内的前后固定标签；只配置 `prefix` 可表达“标签 + 输入器”。
+- 切换 field → static 时提示 field 将不再参与数据绑定。
+- field 模式未设置字段名时显示结构警告。
+- field 重复是软警告，不阻止保存。
+- 日期和签名先作为 inputType，不急于新增顶层组件。
 
-### 4.3 Table
+## 6. Table 业务语义
 
-Table 只用于规则明细，例如工作地点/工作内容：
+Table 用于规则明细，不用于整张表单排版。
 
-- columns 定义表头和列宽。
-- rowCount 定义设计态空白行数。
-- rowHeight 使用基础行高倍数。
-- repeatable 决定预览数据是否可以扩展行数。
-- 子 P 通过 `parentId=table.id`、`index=row*columnCount+column` 放入单元格。
+设计器必须支持：
 
-静态表单外框、签名布局和说明区域不使用 Table，统一使用 Grid。
+- 新增、删除和移动列。
+- 设置列 key、标题、宽度和对齐。
+- 设置表头高度、数据行高度和最小行数。
+- 设置 repeatable。
+- 编辑 rowTemplate 中每个列的子组件。
+- 将 P 或子 Grid 放入单元格模板。
+- 新建 Table 时，每个列模板默认包含一个 Field P，渲染结构为 `tbody > tr > td > p`；删除默认 P 后可以放置其他组件。
 
-### 4.4 HTML
+设计态根据 minRows 重复 rowTemplate。填写态如果 repeatable=true 且 data[field] 有数组，
+按数组长度生成数据行，但不少于业务要求的最小行数配置。
 
-HTML 是高级组件，用于暂时无法由 Grid/P/Table 表达的局部内容。
+## 7. HTML 与 Image
 
-- 仅高级用户或可信模板可编辑原始 HTML。
-- 必须经过安全过滤和 CSS 作用域处理。
-- HTML 内部数据绑定使用显式 bindings，不通过任意 DOM 扫描推断。
-- HTML 的外层尺寸仍由所属 Grid 格子约束。
+### 7.1 HTML
 
-### 4.5 Image
+- 只允许放在 GridCell 或 TableCellTemplate 中。
+- 普通用户使用预设 HTML 模板，高级用户才可编辑源码。
+- 保存前运行安全过滤。
+- CSS 使用组件 ID 做作用域。
+- bindings 必须显式配置。
+- 设计器显示 HTML 内容边界和尺寸溢出。
 
-Image 用于 Logo、二维码和图片签章：
+### 7.2 Image
 
-- 固定图片使用 src。
-- 动态图片使用 field 从 data 获取地址。
-- width/height 和 objectFit 由属性面板配置。
-- Image 与其他组件一样通过 parentId/index 放入 Grid。
+- 固定图片配置 src。
+- 动态图片配置 field。
+- 支持 width、height、objectFit 和对齐。
+- 图片加载失败时设计态显示占位和警告。
 
-## 5. 设计操作
+## 8. 拖拽规则
 
-### 5.1 新增
+允许的投放目标：
 
-从组件库拖入目标格子时：
+- Page.children
+- GridCell.children
+- TableCellTemplate.children
 
-1. 生成唯一 ID。
-2. 写入目标 Grid/Table 的 ID 作为 parentId。
-3. 写入目标格子 index。
-4. 如果格子已有组件，提示替换、交换或包装为子 Grid，禁止静默覆盖。
+投放行为：
 
-### 5.2 移动
+1. 新组件生成唯一 ID。
+2. 插入目标 children 的指定位置。
+3. 更新运行时索引。
+4. 触发结构校验和溢出测量。
+5. 自动选中新组件并打开配置面板。
 
-- 同父移动：交换两个组件的 index。
-- 跨父移动：更新组件 parentId/index，同时整理源父和目标父的 index。
-- 移动容器不修改后代；后代通过 parentId 链自然跟随。
-- 非法目标（P、Image、非容器 HTML）不接受投放。
+跨格移动从源 children 删除节点，再插入目标 children。移动容器时后代随嵌套对象整体移动。
 
-### 5.3 删除
+禁止：
 
-- 普通组件直接删除。
-- 删除 Grid/Table 前显示其后代数量。
-- 确认后级联删除全部后代。
-- 删除后重新编号父容器的直接子组件，避免无意义空洞。
+- 将节点移动到自身后代中。
+- 将普通组件作为容器投放目标。
+- 未确认时覆盖已有节点。
+- 通过 DOM 移动绕过 Schema 更新。
 
-### 5.4 拆分与合并
+## 9. 删除、复制和包装
 
-- 拆分 Grid 列时更新 columns，并为新增格子预留 index。
-- 合并相邻列通过第一个组件的 colspan 实现。
-- 合并范围内存在多个组件时，必须先包装为子 Grid或选择保留项。
-- 第一阶段不提供 rowspan；跨行视觉结构用嵌套 Grid 完成。
+### 删除
 
-## 6. 配置面板
+删除 Grid、Row、Cell、Table 时明确提示包含的后代数量。因为 Schema 是嵌套结构，删除父节点自然删除后代，
+但撤销记录必须保存完整子树。删除最后一个 Cell 或最后一个 Row 时，操作必须自动清理空的父 Row/Grid，
+不能把 `INVALID_GRID_ROWS` 或 `INVALID_GRID_CELLS` 留给后续操作。
 
-每种组件继续提供 UI Renderer 和 config 声明：
+### 复制
 
-```text
-src/components-v2/
-├─ grid/    GridRenderer.vue + config.ts
-├─ p/       PRenderer.vue + config.ts
-├─ table/   TableRenderer.vue + config.ts
-├─ html/    HtmlRenderer.vue + config.ts
-└─ image/   ImageRenderer.vue + config.ts
-```
+深复制节点时重新生成整个子树 ID，field 默认保留并产生可能重复的软警告，用户可批量重命名。
 
-配置项最小集合：
+### 包装
 
-| 组件 | 配置项 |
+当一个格子已有组件而用户需要并排放置第二个组件时，设计器提供“包装为 Grid”：
+
+1. 创建子 Grid。
+2. 将现有组件移入第一个 Cell。
+3. 创建第二个 Cell。
+4. 将新组件放入第二个 Cell。
+
+## 10. 配置面板
+
+配置面板根据节点类型切换：
+
+| 节点 | 配置 |
 |---|---|
-| Grid | columns、height、border、gap、padding |
-| P | text、editable、field、inputType、underline、文字样式 |
-| Table | field、columns、rowCount、rowHeight、repeatable |
+| Page | 纸张、方向、边距、fixed 模式 |
+| Grid | 行数、列数、边框、整体样式 |
+| P | mode、text/field、inputType、下划线、文字样式 |
+| Table | field、columns、表头/行高、minRows、repeatable |
 | HTML | html、css、trusted、bindings |
-| Image | src、field、width、height、objectFit |
+| Image | src/field、尺寸、objectFit |
 
-关系字段 parentId/index 不允许在普通文本输入框中直接修改，由画布结构操作维护。
+Grid 的 rows/cells 是内部布局数据，不作为节点链或独立配置节点；结构字段通过 Grid 的专用控件修改，不允许在普通 JSON 文本框里直接编辑 rows/cells/children。
 
-## 7. 数据和权限
-
-预览契约：
+## 11. 数据与权限
 
 ```ts
 interface FormPreviewProps {
-  schema: FormSchema
+  schema: FormSchemaV2
   data: Record<string, unknown>
   rules?: Record<string, {
     readonly?: boolean
@@ -195,37 +215,48 @@ interface FormPreviewProps {
 }
 ```
 
-- 可编辑 P：`data[field]` 填值，输入后回写。
-- 固定 P：只显示 text。
-- 动态 Image：`data[field]` 提供图片地址。
-- repeatable Table：`data[field]` 提供明细数组。
-- readonly：禁止编辑但保留显示。
-- hidden：隐藏字段内容，是否保留布局空间由规则明确配置。
-- required：显示标记并在提交时校验。
+- static P 不访问 data。
+- field P 读取和回写 data[field]。
+- repeatable Table 从 data[field] 读取数组。
+- readonly 禁止编辑但保留内容。
+- hidden 默认隐藏内容并保留固定版式空间，完全折叠需要显式 layoutHidden 规则。
+- required 在预览中标记，并在提交时校验。
 
-权限是流程运行配置，不写入模板 Schema。
+权限属于流程运行配置，不写入模板 Schema。
 
-## 8. 保存与加载
+## 12. 保存、加载和版本
 
-保存前必须：
+保存流程：
 
-1. 校验组件 ID 和父子关系。
-2. 检测父子循环。
-3. 校验 index、colspan 和 Table 单元格边界。
-4. 扫描重复 field 并生成软警告。
-5. 写入 Schema version。
+1. 运行 Schema 结构校验。
+2. 扫描空 field 和重复 field。
+3. 检测固定尺寸溢出。
+4. 清除设计器临时状态和运行时索引。
+5. 写入 version 并序列化嵌套 Schema。
 
-加载时按 version 选择 Renderer 和迁移器。未知版本不得静默按当前版本解析。
+加载流程：
 
-## 9. 第一条业务验收
+1. 读取 version。
+2. 执行版本迁移。
+3. 校验 Schema。
+4. 重建运行时节点索引。
+5. 渲染并恢复选择/缩放之外的模板状态。
 
-云铝电气第二种工作票前五行必须可以完全通过 Grid 设计器构造：
+## 13. 前五行验收场景
 
-- 标题固定 P。
-- 单位/编号为四列 Grid，标签 P + 输入 P。
-- 负责人/班组为无内部边框 Grid。
-- 成员行为五列 Grid。
-- 设备名称行为两列 Grid。
-- 工作任务为两列 Grid，左侧竖排 P，右侧 Table。
-- 工作任务外层高度等于表头加四行明细的高度。
-- 保存的 components 数组可以任意重排，不影响加载后的视觉结果。
+测试人员必须从空白 A4 页面操作：
+
+1. 添加标题 static P。
+2. 添加外层 Grid，并设置 all 边框。
+3. 添加单位/编号四格行。
+4. 添加负责人/班组无内部边框行。
+5. 添加成员五格行。
+6. 添加设备名称两格行。
+7. 添加工作任务两格行并设置高度 5。
+8. 左格放竖排 static P。
+9. 右格放两列表格，设置表头 1、行高 1、minRows 4。
+10. 为所有输入位置配置 field。
+11. 保存并重新加载。
+12. 填写测试数据并打印。
+
+只有全部步骤无需修改源码或手写 JSON 才视为设计器方案成立。

@@ -1,197 +1,469 @@
 # 开发计划
 
-> 本计划配套 [design.md](./design.md)。项目现有 v1 流式设计器已经完成基础分页、渲染和三栏交互，
-> 当前主线转为扁平组件数组驱动的 Grid 固定版式设计器。
+> 本计划配套 [design.md](./design.md)、[design-biz.md](./design-biz.md) 和 [engine.md](./engine.md)。
+> 当前唯一主线是嵌套 Grid Schema V2；旧流式实现只作为迁移参考，最终需要移除。
 
-## 1. 当前基线
+## 1. 最终目标
 
-以下能力已经存在，应保留作为回归基线，不在 Grid 重构初期删除：
+通过设计器 UI 实现云铝电气第二种工作票，而不是仅通过源码手写 Schema：
 
-- Vue 3 + TypeScript + Vite 工程骨架。
-- A3/A4、横向/纵向纸张显示及打印样式。
-- v1 `p / image / table` 渲染器。
-- off-screen 测量、普通组件分页、Table 按行切分。
-- 三栏设计器、组件选择、属性面板和状态栏。
-- FormPreview、字段填值和基础权限相关代码。
-- 云铝工作票 v1 近似 Schema，用于证明旧模型的表达上限。
-- 云铝第二种工作票前五行 Grid 原型，已验证固定行高和嵌套布局方向可行。
+```text
+空白 A4
+  → UI 创建标题和 Grid
+  → UI 创建行、格子、P 和 Table
+  → 保存 Schema
+  → 重新加载并继续编辑
+  → 填入 data
+  → 预览和打印
+  → 与参考 HTML/图片对比
+```
 
-现有测试中仍有一组 `PComponent.text` 与当前 v1 类型不一致的错误。该问题需要在 v2 类型迁移前
-单独清理，避免将历史契约错误混入 Grid 重构。
+任一环节需要修改源码或手写 JSON，都不能视为设计器能力完成。
 
-## 2. 已锁定的新架构决策
+## 2. 当前状态
 
-| 决策点 | 目标方案 |
+### 已完成的历史基础能力
+
+- [x] Vue 3 + TypeScript + Vite 工程
+- [x] A3/A4、横向/纵向纸张画布
+- [x] 早期 p/image/table Renderer
+- [x] 早期 off-screen 测量和流式分页探索
+- [x] 早期 Table 按行切分和表头重复探索
+- [x] 三栏设计器、组件库、配置面板和状态栏
+- [x] 基础预览、打印和字段相关代码
+
+### 已完成的 V2 探索
+
+- [x] 抽象 Grid/P/Table/HTML 原型节点
+- [x] 手写云铝工作票前五行嵌套 Schema
+- [x] 递归渲染前五行
+- [x] 验证 8mm 基础行高
+- [x] 验证工作任务 5 倍行高
+- [x] 验证竖排标签、下划线、嵌套 Table 和 A4 画布
+- [x] 修正 min-height + flex-grow 导致 Table 行被撑高的问题
+
+### 当前缺口
+
+- [x] 原型类型已提升为正式 Schema V2
+- [x] 已有通用节点索引和基础结构操作函数
+- [ ] Grid Renderer 仍是 dev 原型，待移入正式组件目录
+- [ ] 用户尚不能从空白页通过 UI 创建完整前五行；当前已支持空白页、Grid、行、拆分格子和基础节点插入
+- [ ] 右侧配置面板尚未绑定 V2 节点
+- [ ] 保存、加载、撤销、预览仍未接入 V2
+- [x] 旧测试、旧 Renderer 和旧依赖已清理
+
+## 3. 已锁定决策
+
+| 领域 | 决策 |
 |---|---|
-| Schema 关系 | 单一 `components[]`，通过 `id / parentId / index` 关联 |
-| 静态布局 | 可嵌套 Grid，不使用绝对定位 |
-| 固定文字与输入 | 统一为 P，通过 `editable` 区分 |
-| 规则明细 | Table，仅负责表头、固定/动态行和数组数据 |
-| 复杂扩展 | 受控 HTML 组件，限定作用域并做安全过滤 |
-| 图片 | 保留 Image，按扁平关系放入 Grid |
-| 行高 | `baseRowHeight × height`，使用确定 CSS height |
-| 边框 | 父 Grid 管理 `all / inner / none`，避免嵌套双边框 |
-| 页面模式 | 固定工作票优先 fixed，溢出警告；动态报表后续支持 flow |
-| 运行时数据 | Schema 与 data/rules 分离 |
-| 迁移方式 | v1/v2 暂时并存，v2 验收完成后切换默认设计器 |
+| 导出格式 | 嵌套 Schema，直接表达 pages/grid/rows/cells/children |
+| 节点身份 | 所有结构节点和组件使用稳定唯一 ID |
+| 编辑器查询 | 从嵌套树派生 `id → node/parent/path` 索引 |
+| 静态布局 | Grid，禁止绝对定位 |
+| 固定文字和字段 | P，通过 static/field mode 区分 |
+| 明细 | Table + rowTemplate |
+| 高级扩展 | 受控 HTML |
+| 图片 | 保留 Image |
+| 尺寸 | mm + baseRowHeight 整数倍 |
+| 页面 | 工作票使用 fixed，显式 pages[] |
+| 验收 | UI 构建、保存加载、填值打印完整闭环 |
 
-## 3. 阶段 G0：原型收口与基线清理
+## 4. 阶段 P0：基线修复与原型隔离
 
-**目标**：把当前实验代码整理成可继续演进的稳定起点。
+**目标**：清理旧入口，确保设计器只有 V2 状态和 V2 Renderer。
 
-- [x] G0.1 使用嵌套 Grid 原型渲染工作票前五行
-- [x] G0.2 验证基础行高为 8mm、工作任务行为 5 倍高度
-- [x] G0.3 验证竖排标签、输入 P、下划线和明细 Table
-- [ ] G0.4 将原型 Schema 改为扁平 `components[]`
-- [ ] G0.5 Renderer 只通过 `parentId/index` 解析关系
-- [ ] G0.6 增加前五行 Schema 结构单测和渲染快照
-- [ ] G0.7 修复现有测试仍使用旧 `PComponent.text` 的类型错误
-- [ ] G0.8 为原型增加开发模式切换，不再硬编码替换正式 CanvasPane
+- [x] P0.1 删除 DesignerApp 对旧 Toolbar/CanvasPane/ConfigPanel 的依赖
+- [x] P0.2 确认 `vue-tsc --noEmit` 全量通过
+- [x] P0.3 确认 V2 vitest 全量通过
+- [x] P0.4 删除旧默认 mock 和旧流式 Renderer 入口
+- [x] P0.5 保留前五行截图作为视觉基线
+- [ ] P0.6 为前五行 Schema 增加最小渲染测试
 
-**验收**：`vue-tsc --noEmit` 通过；前五行截图与嵌套对象版本一致；打乱 `components[]` 数组顺序后
-渲染结果不变。
+**完成门槛**：
 
-## 4. 阶段 G1：正式 Schema V2
+- 页面只有 V2 状态。
+- 页面中不存在旧 Toolbar、旧 ConfigPanel 或旧 FormRenderer 混合交互。
+- 类型检查和测试通过。
 
-**目标**：将已验证的关系模型从 `src/dev` 提升为正式公共类型。
+## 5. 阶段 P1：Schema V2 正式契约
 
-- [ ] G1.1 在 `FormSchema` 增加 `version: 2`
-- [ ] G1.2 定义 `ComponentBase { id, parentId, index, colspan?, padding? }`
-- [ ] G1.3 定义 Grid、P、Table、HTML、Image 联合类型
-- [ ] G1.4 定义 `baseRowHeight`、固定页面模式和纸张配置
-- [ ] G1.5 实现 `componentsById`、`childrenByParentId` 索引工具
-- [ ] G1.6 实现结构校验器：唯一 ID、父节点类型、循环、index、边界
-- [ ] G1.7 定义容器级联删除、同父重排和跨父移动纯函数
-- [ ] G1.8 定义 Schema JSON 版本迁移入口
+**目标**：将 dev 类型提升为可保存、可校验、可迁移的正式 Schema。
 
-**产出**：`src/types/schema-v2.ts`、索引工具、结构变更工具及单元测试。
+### P1.1 类型
 
-**验收**：非法 parentId、父子循环、重复 index、Grid/Table 越界都返回可定位到组件 ID 的错误。
+- [x] 定义 `FormSchemaV2 { version, paper, baseRowHeight, pages }`
+- [x] 定义 PageSchema 和 EdgeInsets
+- [x] 定义 GridNode/GridRow/GridCell
+- [x] 定义 PNode static/field 判别联合
+- [x] 定义 TableNode/TableColumn/TableCellTemplate
+- [x] 定义 HtmlNode/ImageNode
+- [x] 定义 FormNode/SchemaNode 联合类型
+- [x] 所有 Page/Grid/组件包含 ID；Row/Cell ID 仅作为 Grid 内部布局引用
 
-## 5. 阶段 G2：递归渲染器
+建议让 P 使用判别联合，阻止非法组合：
 
-**目标**：正式 Renderer 可以从扁平数组还原组件关系并稳定打印。
+```ts
+type PNode = StaticPNode | FieldPNode
+```
 
-- [ ] G2.1 实现 `GridFormRenderer`
-- [ ] G2.2 实现递归 `GridNodeRenderer`
-- [ ] G2.3 实现 Grid 的 mm/fr 列轨道、colspan、边框和内边距
-- [ ] G2.4 实现固定/输入两种 P 状态
-- [ ] G2.5 实现 Table 表头、固定行数、基础行高和单元格子组件
-- [ ] G2.6 实现受控 HTML 渲染与 CSS 作用域
-- [ ] G2.7 复用 Image 渲染能力
-- [ ] G2.8 实现 fixed 页面溢出检测和组件定位警告
-- [ ] G2.9 保证设计态、预览态、打印态 DOM 结构一致
+### P1.2 默认值
 
-**产出**：正式 Grid Renderer、渲染测试和打印样式。
+- [ ] A4 fixed Page 默认配置
+- [ ] 空 Grid 默认一行一格
+- [ ] static P 默认文本
+- [x] field P 默认 field 和 inputType
+- [x] field P 支持 prefix/suffix 复合标签
+- [ ] Table 默认两列、表头 1、行高 1、minRows 4
+- [x] Table 默认每个数据列生成一个 Field P，允许删除后替换为其他组件
+- [ ] HTML/Image 安全默认值
 
-**验收**：前五行在 Chrome/Edge 中尺寸一致；打印为 A4；所有行高误差不超过 0.5mm；无双边框。
+### P1.3 序列化
 
-## 6. 阶段 G3：Grid 设计器交互
+- [ ] 保存时写入 version=2
+- [x] 定义运行时校验入口
+- [ ] 加载未知版本时报错
+- [ ] 加载时补全可兼容的缺省字段
+- [ ] 不将 selectedId、缩放、索引等编辑器状态写入模板
 
-**目标**：用户可以通过格子操作构造前五行 Schema，而不是手写 JSON。
+**完成门槛**：前五行 Schema 使用正式类型；JSON 往返后深度等价；非法 P 模式不能通过 TypeScript 构造。
 
-### G3.1 画布选择
+## 6. 阶段 P2：节点索引和结构操作
 
-- [ ] 通过 `data-component-id` 选择任意组件
-- [ ] 显示当前 Grid 格子边界和投放位置
-- [ ] 面包屑显示当前组件的父级链
-- [ ] 点击空白回到纸张或根 Grid 配置
+**目标**：让设计器可以可靠修改嵌套 Schema，而不是在组件中散落路径操作。
 
-### G3.2 格子编辑
+### P2.1 节点索引
 
-- [ ] 新增/删除 Grid 直接子格子
-- [ ] 将一行拆分为 1～N 列
-- [ ] 编辑固定 mm 和 fr 列宽
-- [ ] 设置基础行高倍数
-- [ ] 设置 all/inner/none 边框
-- [ ] 设置 padding、文本对齐和垂直对齐
-- [ ] 通过 colspan 合并/拆分相邻列
-- [ ] 将格子包装成子 Grid
+- [x] 实现 `buildNodeIndex(schema)`
+- [x] 索引 Page/Grid/TableTemplate/组件；Row/Cell 不进入可选节点链
+- [x] 返回 node、parent、path 和 ownerCell
+- [x] 检测重复 ID
+- [ ] 提供 `getNodeById`、`getAncestors`、`getOwnerCell`
+- [ ] Schema 变化后重建或增量更新索引
 
-### G3.3 拖拽和移动
+### P2.2 结构操作纯函数
 
-- [ ] 从组件库拖入 Grid 格子
-- [ ] 写入目标 `parentId/index`
-- [ ] 同父拖动时交换 index
-- [ ] 跨父拖动时更新 parentId 并重排两侧 index
-- [ ] 删除容器时展示后代数量并级联删除
-- [ ] 所有结构操作接入撤销/重做历史
+- [ ] `insertRow`
+- [ ] `copyRow`
+- [ ] `removeRow`
+- [ ] `moveRow`
+- [ ] `splitCell`
+- [ ] `mergeCells`
+- [ ] `insertNode`
+- [ ] `moveNode`
+- [ ] `removeNode`
+- [ ] `wrapCellChildrenWithGrid`
+- [x] `updateNode`
 
-### G3.4 属性面板
+### P2.3 ID 策略
 
-- [ ] Grid：列轨道、高度倍数、边框、内边距
-- [ ] P：固定文字、editable、field、输入类型、下划线、文字样式
-- [ ] Table：field、列、rowCount、rowHeight、repeatable
-- [ ] HTML：HTML、局部 CSS、可信状态和 bindings
-- [ ] Image：src、field、宽高和适配方式
+- [ ] 统一 ID 生成器
+- [ ] 深复制子树时重建全部 ID
+- [ ] 保存加载后保留原 ID
+- [ ] DOM data-node-id 与 Schema ID 一致
 
-**验收**：从空白 A4 开始，仅通过 UI 能重新构造前五行工作票；保存后加载，ID 关系和视觉结果不变。
+### P2.4 单测
 
-## 7. 阶段 G4：预览、数据与打印
+- [ ] 行增删移动
+- [ ] 格子拆分合并
+- [ ] 跨格移动组件
+- [ ] 防止移动到自身后代
+- [ ] 删除和复制完整子树
+- [ ] 包装为子 Grid
+- [x] 操作后索引仍能定位正确 path（基础 update 操作）
 
-**目标**：Grid 模板可用于真实填写和打印。
+**完成门槛**：所有设计器结构变更都只能通过纯函数完成；测试覆盖嵌套三层以上结构。
 
-- [ ] G4.1 P 根据 editable 决定固定文字或 contenteditable/input
-- [ ] G4.2 按 field 从 data 填值并回写
-- [ ] G4.3 Table 使用 data[field] 替换设计态明细行
-- [ ] G4.4 应用 readonly/hidden/required 规则
-- [ ] G4.5 日期和签名先作为 P inputType 实现
-- [ ] G4.6 HTML bindings 显式填值，不扫描任意内部 DOM
-- [ ] G4.7 打印隐藏选择框和格子辅助线，但不改变业务尺寸
-- [ ] G4.8 fixed 模式溢出时禁止静默裁剪并给出组件 ID
+## 7. 阶段 P3：Schema 校验与警告
 
-**验收**：单位、负责人、班组、工作任务等字段可填写；打印输出与设计态位置一致；刷新前的数据可以回写宿主。
+**目标**：错误结构不能进入预览和打印，固定尺寸问题能定位到节点。
 
-## 8. 阶段 G5：完整工作票
+- [x] 唯一 ID 校验
+- [x] Page/Grid 内部 Row/Cell 空结构校验
+- [x] GridCell width/colspan 校验
+- [x] P mode/text/field 校验
+- [x] Table columnKey 和 rowTemplate 完整性校验
+- [x] HTML trusted/bindings 校验（基础 trusted 警告）
+- [x] 图片尺寸和资源警告
+- [x] 重复 field 软警告
+- [ ] 节点内容溢出警告
+- [ ] Page 溢出警告
+- [x] issue 包含 nodeId、path、code 和 message
+- [ ] 点击问题列表可选中对应节点
 
-**目标**：用同一模型实现云铝电气第二种工作票全部内容。
+**完成门槛**：构造错误 Schema 时能一次返回全部问题；预览/打印阻止结构 error，但普通 warning 可继续。
 
-- [ ] G5.1 计划工作时间和日期输入
-- [ ] G5.2 工作条件多行区
-- [ ] G5.3 注意事项和补充安全措施
-- [ ] G5.4 工作负责人、许可人和成员签名区
-- [ ] G5.5 工作票延期
-- [ ] G5.6 工作票终结和备注
-- [ ] G5.7 完整字段清单和重复 field 检查
-- [ ] G5.8 A4 单页/显式多页方案确认
-- [ ] G5.9 与参考 HTML 和图片进行截图对比
+## 8. 阶段 P4：正式递归 Renderer
 
-**验收**：主要边框、列宽、行高、标题、字段位置和签名区域与参考图一致；所有输入位置都有独立 field。
+**目标**：将前五行 dev Renderer 升级为生产目录中的通用 V2 Renderer。
 
-## 9. 阶段 G6：迁移与清理
+### P4.1 组件
 
-**目标**：正式切换默认设计器，处理旧模板和技术债务。
+- [ ] `GridFormRenderer`
+- [ ] `PageRenderer`
+- [ ] `GridRenderer`
+- [ ] `GridRowRenderer`
+- [ ] `GridCellRenderer`
+- [ ] `PNodeRenderer`
+- [ ] `TableNodeRenderer`
+- [ ] `HtmlNodeRenderer`
+- [ ] `ImageNodeRenderer`
 
-- [ ] G6.1 实现可转换部分的 v1 → v2 Schema 转换
-- [ ] G6.2 无法转换的布局输出明确迁移报告
-- [ ] G6.3 DesignerApp 默认切换到 v2
-- [ ] G6.4 保存/加载 JSON 加入 version 检查
-- [ ] G6.5 保留旧 Renderer 只读兼容期
-- [ ] G6.6 兼容期结束后移除旧默认 mock 和无效入口
-- [ ] G6.7 同步 `engine.md`、`design-biz.md` 和组件开发说明
+### P4.2 尺寸
 
-## 10. 风险与控制
+- [ ] mm/fr/auto 列轨道
+- [ ] baseRowHeight × height
+- [x] Table 表头/数据行最小高度，内容可撑开父 GridRow
+- [ ] box-sizing 统一
+- [ ] 固定字体、行高和 letter-spacing
+- [ ] fixed Page 可用区域计算
 
-| 风险 | 控制措施 |
+### P4.3 边框
+
+- [ ] all/outer/inner/none
+- [ ] 嵌套 Grid 无双边框
+- [ ] Table 外框和 GridCell 边界不重复
+- [ ] colspan 后格线正确
+
+### P4.4 模式
+
+- [x] designer：data-node-id、选中和结构警告
+- [ ] preview：字段数据填入和权限
+- [x] print：隐藏辅助 UI，业务尺寸不变
+
+### P4.5 测试
+
+- [ ] 组件单测
+- [ ] 前五行 DOM 结构快照
+- [ ] 8mm/40mm 尺寸测试
+- [ ] 长文本和 Table 增行撑高测试
+- [x] Chrome/Edge 截图验证
+
+**完成门槛**：正式 Renderer 输出与当前前五行截图基线一致；打印尺寸误差不超过 0.5mm。
+
+## 9. 阶段 P5：设计器基础框架 V2
+
+**目标**：V2 画布具备节点选择和配置更新能力。
+
+- [x] DesignerApp 持有 `FormSchemaV2`
+- [x] 提供 nodeIndex、selectedNodeId 和基础属性面板
+- [x] 点击 data-node-id 选中节点
+- [x] 显示 Page > Grid > Row > Cell > Node 面包屑
+- [ ] 节点树可展开和选择
+- [x] 点击空白取消选择；重复点击同一位置可逐级选择祖先
+- [x] 点击节点后缓存完整祖先路径，循环选择和面包屑切换只改变 active 节点
+- [x] 选择链只显示 Page/Grid/实际组件，GridRow/GridCell 改为布局引用
+- [x] 配置更新调用 `updateNode`
+- [x] 选中节点显示蓝色内描边和浅色背景，不改变布局尺寸
+- [x] 结构错误显示在节点检查面板和状态栏
+- [ ] v2 工具栏控制纸张、边距和基础行高
+- [x] 所有入口只接受 `version: 2` Schema
+
+**完成门槛**：手写前五行 Schema 中任意 Page/Grid/P/Table 都能被选中并修改属性，Row/Cell 只作为布局槽位使用。
+
+## 10. 阶段 P6：Grid 可视化编辑
+
+**目标**：用户可以从空白页创建前五行的所有 Grid 结构。
+
+### P6.1 行
+
+- [x] 新增行
+- [x] 设置行高倍数
+- [ ] 复制行
+- [x] 上下移动行
+- [x] 删除行
+
+### P6.2 格子
+
+- [x] 一行拆分为 N 格
+- [x] GridRow 行高按基础行高倍数作为最小行高，Table 增加 `minRows` 时可撑开父行
+- [x] 选中 Grid 后通过属性面板调整行数和列数
+- [x] GridCell 行列配置统一转换为嵌套 Grid，子格可独立插入组件
+- [x] Grid 的行列调整统一移入右侧属性面板；GridRow/GridCell 仅作为内部布局记录，组件库不提供结构快捷按钮
+- [ ] 设置 mm/fr/auto 宽度
+- [ ] 设置 padding 和对齐
+- [ ] 设置 colspan
+- [ ] 合并/拆分相邻格
+- [ ] 设置 Grid 边框模式
+
+### P6.3 投放
+
+- [x] Cell 显示投放点
+- [ ] 从组件库拖入 P/Grid/Table/HTML/Image（当前为按钮插入 P/Grid/Table）
+- [ ] 格子内排序
+- [ ] 跨格移动
+- [x] 已有内容时支持插入而非覆盖
+- [x] 删除选中节点并级联删除后代
+- [x] 删除最后一个 Cell/Row 时清理空父级，避免产生非法 Grid
+- [ ] 一键包装为子 Grid
+- [ ] 禁止移动到自身后代
+
+**当前进度**：已完成空白模板、根 Grid、添加行、拆分为 2/4 格、向格子插入 static/field P 和 Table；
+拖拽、复制行、格子内/跨格移动、合并格子和完整前五行 UI 构建仍待完成。
+
+**完成门槛**：不手写 JSON，可以创建外层 Grid 和五个目标行；保存 Schema 与手写基线结构等价。
+
+## 11. 阶段 P7：P、Table、HTML、Image 编辑
+
+### P7.1 P
+
+- [ ] static/field 分段控件
+- [ ] 固定文本编辑
+- [ ] field 和 inputType 编辑
+- [x] field P 空内容、data-field、下划线和打印下划线基础语义
+- [x] field P 前标签、输入器、后标签组合渲染
+- [ ] 字号、字重、对齐、竖排和不换行
+
+### P7.2 Table
+
+- [ ] 新增、删除、移动列
+- [ ] 编辑 key、标题、宽度和对齐
+- [ ] headerHeight、rowHeight、minRows
+- [ ] repeatable
+- [ ] 编辑 rowTemplate 的 Cell children
+- [ ] 单元格放 P 或子 Grid
+
+### P7.3 HTML
+
+- [ ] 预设模板选择
+- [ ] 高级源码编辑
+- [ ] sanitizer
+- [ ] CSS scope
+- [ ] bindings 编辑
+
+### P7.4 Image
+
+- [ ] src/field 模式
+- [ ] 尺寸和 objectFit
+- [ ] 加载失败占位
+
+**完成门槛**：通过属性面板完成标题、所有标签、输入字段、竖排“工作任务”和两列表格配置。
+
+## 12. 阶段 P8：保存、加载和历史
+
+**目标**：编辑结果可以稳定持久化并恢复。
+
+- [ ] 导出 Schema JSON
+- [ ] 导入 Schema JSON
+- [ ] version 检查和迁移入口
+- [ ] 保存前结构校验
+- [ ] 重新加载后重建 nodeIndex
+- [ ] 重新加载后所有节点仍可编辑
+- [ ] 撤销/重做栈
+- [ ] 属性连续输入合并历史记录
+- [ ] 结构操作保持原子性
+- [ ] 复制/删除保存完整子树历史
+- [ ] 提供未保存修改提示
+
+**完成门槛**：前五行保存、刷新、加载后视觉一致，节点 ID 稳定，撤销/重做至少覆盖 20 步。
+
+## 13. 阶段 P9：填写、权限和打印
+
+### P9.1 数据
+
+- [ ] static P 显示 text
+- [ ] field P 从 data 填值
+- [ ] 输入事件回写 data
+- [ ] number/date/signature 内部控件
+- [ ] repeatable Table 绑定数组
+- [ ] rowTemplate 字段使用行上下文
+
+### P9.2 权限
+
+- [ ] readonly
+- [ ] hidden 且默认保留固定空间
+- [ ] required 标记和提交校验
+- [ ] HTML bindings 权限边界
+
+### P9.3 打印
+
+- [ ] A3/A4 @page
+- [ ] 打印隐藏设计器 UI
+- [ ] 复用 Preview DOM
+- [ ] 不改变业务尺寸
+- [ ] fixed Page 溢出提示
+- [ ] Chrome/Edge 打印预览
+
+**完成门槛**：填写单位、负责人、班组和四行工作任务后，data 正确；打印与设计态位置一致。
+
+## 14. 阶段 P10：前五行闭环验收
+
+由非实现者按以下步骤验收：
+
+1. 新建 A4 fixed 模板，基础行高设为 8mm。
+2. 创建标题。
+3. 创建外层 Grid 和四个基本信息行。
+4. 创建工作任务 5 倍行高。
+5. 配置全部 static/field P。
+6. 创建两列表格和四个最小数据行。
+7. 保存并关闭模板。
+8. 重新加载并修改任意列宽和标签。
+9. 填写测试数据。
+10. 打印并与参考 HTML/图片比较。
+
+验收指标：
+
+- [ ] 不修改源码或 JSON
+- [ ] 无结构 error
+- [ ] 无意外溢出
+- [ ] 行高和边框稳定
+- [ ] 所有节点可再次编辑
+- [ ] 数据回写正确
+- [ ] 打印尺寸误差不超过 0.5mm
+- [ ] 主要结构与参考图一致
+
+前五行闭环未通过前，不扩展完整表单。
+
+## 15. 阶段 P11：完整工作票
+
+- [ ] 计划工作时间
+- [ ] 工作条件多行区
+- [ ] 注意事项和安全措施
+- [ ] 签发人和签发日期
+- [ ] 补充安全措施
+- [ ] 负责人/许可人确认
+- [ ] 工作班成员签名
+- [ ] 工作票延期
+- [ ] 工作票终结
+- [ ] 备注
+- [ ] 多页 fixed Page 方案
+- [ ] 完整字段清单
+- [ ] 与参考图片截图对比
+
+**完成门槛**：完整表单同样通过 UI 构建、保存加载、填值打印闭环，不能通过 HTML 整体替代。
+
+## 16. 阶段 P12：迁移和清理
+
+- [ ] 移除旧流式 Renderer 和硬编码旧 Schema
+- [ ] 清理所有旧实现残留
+- [ ] 更新组件开发文档和示例
+- [ ] 补充性能和大模板测试
+
+## 17. 风险控制
+
+| 风险 | 控制 |
 |---|---|
-| 扁平数组形成父子循环 | 保存和渲染前运行循环检测 |
-| index 重复导致格子重叠 | 结构操作集中在纯函数中并自动重排 |
-| colspan 越界 | 校验列边界，设计器禁止非法拖放 |
-| 固定高度被内容撑开 | 使用确定 height；设计态显示 overflow 警告 |
-| 嵌套边框变粗 | 外层 all、内层 inner，边框只由父 Grid 负责 |
-| HTML 污染页面 | sanitize、CSS scope、禁止 script 和事件属性 |
-| 设计态与打印态漂移 | 共用 DOM，仅隐藏辅助 UI，不重排业务内容 |
-| v1/v2 状态混用 | Schema version 分流，Designer 同一时刻只编辑一种版本 |
-| 大型模板查询变慢 | 保存 `childrenByParentId` 索引，结构变化时增量重建 |
+| Schema 嵌套修改复杂 | 统一节点索引和结构操作纯函数 |
+| ID 索引引用过期 | Schema 结构变化后重建/增量更新索引 |
+| 行高语义 | 使用 min-height；Table 内容可撑开父 GridRow，溢出检测另行提示 |
+| 嵌套边框变粗 | 单边归属规则 + 截图测试 |
+| Table 模板与数据行混淆 | rowTemplate 和运行时 rows 分离 |
+| HTML 破坏安全和布局 | sanitizer、scope、Cell overflow |
+| 设计态与打印态漂移 | 共用 DOM，只隐藏辅助 UI |
+| 只会手写 Schema、UI 不可构造 | P10 独立闭环验收 |
+| 旧代码残留 | V2 闭环后删除旧 Renderer、旧类型和旧入口 |
+| 开发范围过大 | 前五行闭环通过前禁止扩展完整表单 |
 
-## 11. 当前优先级
+## 18. 当前执行顺序
 
-当前只推进以下顺序，避免同时扩展完整工作票和设计器交互：
+严格按以下顺序推进：
 
-1. 完成 G0.4～G0.8，将前五行原型切换为扁平数组并恢复全量类型检查。
-2. 完成 G1 Schema V2 和结构操作纯函数。
-3. 完成 G2 正式 Renderer。
-4. 用 UI 重建前五行，完成 G3 最小闭环。
-5. 接入预览数据后再扩展完整工作票。
+1. P0：删除旧入口，恢复全量类型检查和测试。
+2. P1～P3：正式 Schema、节点索引、结构操作和校验。
+3. P4：正式 Renderer，保持前五行视觉基线。
+4. P5～P7：完成从空白页构建前五行所需的最小 UI。
+5. P8～P9：保存加载、填写和打印。
+6. P10：独立验收前五行闭环。
+7. P11：通过同一设计器扩展完整工作票。
+8. P12：清理旧实现和临时原型。
 
-在前五行能够“UI 构建 → 保存 → 加载 → 填写 → 打印”之前，不新增更多表单区块或复杂组件类型。
+任何阶段不得用“直接修改示例 Schema”替代该阶段要求的设计器能力。
