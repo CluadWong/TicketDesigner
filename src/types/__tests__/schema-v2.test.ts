@@ -151,6 +151,109 @@ describe("Schema V2 validation", () => {
     expect(issues.some(issue => issue.code === "EMPTY_FIELD")).toBe(true);
     expect(issues.some(issue => issue.code === "INVALID_TABLE_TEMPLATE")).toBe(true);
   });
+
+  it("warns when the page minimum content height exceeds the usable fixed height", () => {
+    const schema = makeSchema();
+    const grid = rootGrid(schema);
+    for (let index = 1; index < 40; index += 1) {
+      grid.rows.push({
+        id: `extra-row-${index}`,
+        type: "grid-row",
+        height: 1,
+        cells: [{ id: `extra-cell-${index}`, type: "grid-cell", children: [] }],
+      });
+    }
+    const overflow = validateFormSchemaV2(schema).find(issue => issue.code === "PAPER_OVERFLOW");
+    expect(overflow?.level).toBe("warning");
+    expect(overflow?.nodeId).toBe("page-1");
+    expect(overflow?.message).toContain("320");
+    expect(overflow?.message).toContain("277");
+  });
+
+  it("does not warn when the page minimum content height fits", () => {
+    // makeSchema() has one 8mm row inside a 277mm usable page.
+    expect(validateFormSchemaV2(makeSchema()).some(issue => issue.code === "PAPER_OVERFLOW")).toBe(false);
+  });
+
+  it("warns when static P text is estimated wider than its cell", () => {
+    const schema = makeSchema();
+    const cell = rootGrid(schema).rows[0].cells[0];
+    cell.width = 10;
+    cell.children = [
+      { id: "long-label", type: "p", mode: "static", text: "这是一段非常长的固定文本内容，用于触发溢出警告" },
+    ];
+    const overflow = validateFormSchemaV2(schema).find(issue => issue.code === "CONTENT_OVERFLOW");
+    expect(overflow?.level).toBe("warning");
+    expect(overflow?.nodeId).toBe("long-label");
+  });
+
+  it("does not warn when P text fits, the cell width is not numeric, or the P is a bare field", () => {
+    const schema = makeSchema();
+    const cell = rootGrid(schema).rows[0].cells[0];
+    cell.width = 18; // "单位" fits easily; the bare field P has no fixed labels
+    expect(validateFormSchemaV2(schema).some(issue => issue.code === "CONTENT_OVERFLOW")).toBe(false);
+
+    const frSchema = makeSchema();
+    const frCell = rootGrid(frSchema).rows[0].cells[0];
+    frCell.width = "1fr";
+    frCell.children = [
+      { id: "long-label", type: "p", mode: "static", text: "这是一段非常长的固定文本内容，用于触发溢出警告" },
+    ];
+    expect(validateFormSchemaV2(frSchema).some(issue => issue.code === "CONTENT_OVERFLOW")).toBe(false);
+  });
+
+  it("warns when composite field P labels plus input minimum width exceed the cell", () => {
+    const schema = makeSchema();
+    const cell = rootGrid(schema).rows[0].cells[1];
+    cell.width = 14;
+    cell.children = [
+      {
+        id: "composite-field",
+        type: "p",
+        mode: "field",
+        field: "负责人",
+        prefix: "工作负责人",
+        suffix: "确认",
+      },
+    ];
+    const overflow = validateFormSchemaV2(schema).find(issue => issue.code === "CONTENT_OVERFLOW");
+    expect(overflow?.level).toBe("warning");
+    expect(overflow?.nodeId).toBe("composite-field");
+  });
+
+  it("warns when a P inside a numeric-width table column template overflows", () => {
+    const schema = makeSchema();
+    const cell = rootGrid(schema).rows[0].cells[1];
+    cell.children = [
+      {
+        id: "table-1",
+        type: "table",
+        columns: [{ key: "location", title: "地点", width: 10 }],
+        headerHeight: 1,
+        rowHeight: 1,
+        minRows: 1,
+        repeatable: false,
+        rowTemplate: [
+          {
+            id: "template-1",
+            type: "table-cell-template",
+            columnKey: "location",
+            children: [
+              { id: "long-field", type: "p", mode: "field", field: "x", prefix: "很长很长的标签文本" },
+            ],
+          },
+        ],
+      },
+    ];
+    const overflow = validateFormSchemaV2(schema).find(issue => issue.code === "CONTENT_OVERFLOW");
+    expect(overflow?.level).toBe("warning");
+    expect(overflow?.nodeId).toBe("long-field");
+  });
+
+  it("keeps the Yunlv sample free of overflow warnings", () => {
+    const issues = validateFormSchemaV2(makeYunlvSecondTicketFirstFiveRowsSchema());
+    expect(issues.some(issue => issue.code === "CONTENT_OVERFLOW" || issue.code === "PAPER_OVERFLOW")).toBe(false);
+  });
 });
 
 describe("Yunlv sample schema layout", () => {

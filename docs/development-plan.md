@@ -10,7 +10,7 @@
 ```text
 空白 A4
   → UI 创建标题和 Grid
-  → UI 创建行、格子、P 和 Table
+  → UI 配置 Grid 行列，并向格子放入 P 和 Table
   → 保存 Schema
   → 重新加载并继续编辑
   → 填入 data
@@ -46,8 +46,8 @@
 
 - [x] 原型类型已提升为正式 Schema V2
 - [x] 已有通用节点索引和基础结构操作函数
-- [ ] Grid Renderer 仍是 dev 原型，待移入正式组件目录
-- [ ] 用户尚不能从空白页通过 UI 创建完整前五行；当前已支持空白页、Grid、行、拆分格子和基础节点插入
+- [x] Grid Renderer 已移入 `src/components/renderer-v2` 正式组件目录
+- [ ] 用户尚不能从空白页通过 UI 创建完整前五行；当前已支持空白页、Grid 行列配置和基础节点插入
 - [ ] 右侧配置面板尚未绑定 V2 节点
 - [ ] 保存、加载、撤销、预览仍未接入 V2
 - [x] 旧测试、旧 Renderer 和旧依赖已清理
@@ -57,7 +57,7 @@
 | 领域 | 决策 |
 |---|---|
 | 导出格式 | 嵌套 Schema，直接表达 pages/grid/rows/cells/children |
-| 节点身份 | 所有结构节点和组件使用稳定唯一 ID |
+| 节点身份 | Page、Grid 和实际组件使用稳定组件 ID；GridRow/GridCell/TableCellTemplate 仅使用内部布局引用 ID |
 | 编辑器查询 | 从嵌套树派生 `id → node/parent/path` 索引 |
 | 静态布局 | Grid，禁止绝对定位 |
 | 固定文字和字段 | P，通过 static/field mode 区分 |
@@ -93,12 +93,12 @@
 
 - [x] 定义 `FormSchemaV2 { version, paper, baseRowHeight, pages }`
 - [x] 定义 PageSchema 和 EdgeInsets
-- [x] 定义 GridNode/GridRow/GridCell
+- [x] 定义 GridNode 及其内部 GridRow/GridCell 布局记录
 - [x] 定义 PNode static/field 判别联合
-- [x] 定义 TableNode/TableColumn/TableCellTemplate
+- [x] 定义 TableNode/TableColumn 及内部 TableCellTemplate 布局记录
 - [x] 定义 HtmlNode/ImageNode
 - [x] 定义 FormNode/SchemaNode 联合类型
-- [x] 所有 Page/Grid/组件包含 ID；Row/Cell ID 仅作为 Grid 内部布局引用
+- [x] Page/Grid/实际组件包含稳定 ID；Row/Cell ID 仅作为 Grid 内部布局引用
 
 建议让 P 使用判别联合，阻止非法组合：
 
@@ -134,7 +134,7 @@ type PNode = StaticPNode | FieldPNode
 ### P2.1 节点索引
 
 - [x] 实现 `buildNodeIndex(schema)`
-- [x] 索引 Page/Grid/TableTemplate/组件；Row/Cell 不进入可选节点链
+- [x] 索引 Page/Grid/实际组件，并保留 TableCellTemplate 的内部定位信息；Row/Cell 不进入可选节点链
 - [x] 返回 node、parent、path 和 ownerCell
 - [x] 检测重复 ID
 - [x] 提供 `getNodeById`、`getAncestors`、`getOwnerCell`
@@ -185,10 +185,10 @@ type PNode = StaticPNode | FieldPNode
 - [x] HTML trusted/bindings 校验（基础 trusted 警告）
 - [x] 图片尺寸和资源警告
 - [x] 重复 field 软警告
-- [ ] 节点内容溢出警告
-- [ ] Page 溢出警告
+- [x] 节点内容溢出警告（P 文本估算宽度 vs 所在格子宽度，仅固定 mm 宽度可估算时）
+- [x] Page 溢出警告（最小内容高度 vs 固定可用高度）
 - [x] issue 包含 nodeId、path、code 和 message
-- [ ] 点击问题列表可选中对应节点
+- [x] 点击问题列表可选中对应节点（布局问题回退到最近的 Page/Grid 祖先）
 
 **完成门槛**：构造错误 Schema 时能一次返回全部问题；预览/打印阻止结构 error，但普通 warning 可继续。
 
@@ -196,17 +196,18 @@ type PNode = StaticPNode | FieldPNode
 
 **目标**：将前五行 dev Renderer 升级为生产目录中的通用 V2 Renderer。
 
-### P4.1 组件
+### P4.1 Renderer 职责
 
-- [ ] `GridFormRenderer`
-- [ ] `PageRenderer`
-- [ ] `GridRenderer`
-- [ ] `GridRowRenderer`
-- [ ] `GridCellRenderer`
-- [ ] `PNodeRenderer`
-- [ ] `TableNodeRenderer`
-- [ ] `HtmlNodeRenderer`
-- [ ] `ImageNodeRenderer`
+- [x] `GridFormRenderer`：Page 和画布渲染入口
+- [x] Page 纸张渲染入口（由 `GridFormRenderer` 承担）
+- [x] Grid/Node 递归分发入口（由 `GridSchemaNode` 承担）
+- [ ] Grid 内部 rows/cells 的布局渲染逻辑（仅为内部实现，不属于 Schema 组件）
+- [ ] P 节点渲染逻辑
+- [ ] Table 节点渲染逻辑
+- [ ] HTML 节点渲染逻辑
+- [ ] Image 节点渲染逻辑
+
+> GridRow、GridCell 和 TableCellTemplate 是 Grid/Table 内部布局记录。它们不进入组件库、节点选择链或 `SchemaNodeV2`，Renderer 中如需拆分实现也只能作为内部布局函数或子实现。
 
 ### P4.2 尺寸
 
@@ -247,7 +248,7 @@ type PNode = StaticPNode | FieldPNode
 - [x] DesignerApp 持有 `FormSchemaV2`
 - [x] 提供 nodeIndex、selectedNodeId 和基础属性面板
 - [x] 点击 data-node-id 选中节点
-- [x] 显示 Page > Grid > Row > Cell > Node 面包屑
+- [x] 显示 Page > Grid > 实际组件面包屑
 - [ ] 节点树可展开和选择
 - [x] 点击空白取消选择；重复点击同一位置可逐级选择祖先
 - [x] 点击节点后缓存完整祖先路径，循环选择和面包屑切换只改变 active 节点
@@ -262,9 +263,9 @@ type PNode = StaticPNode | FieldPNode
 
 ## 10. 阶段 P6：Grid 可视化编辑
 
-**目标**：用户可以从空白页创建前五行的所有 Grid 结构。
+**目标**：用户可以从空白页配置出前五行所需的 Grid 结构，并在 Grid 格子中放置实际组件。Row/Cell 只作为 Grid 的内部布局记录，不作为独立组件创建或选择。
 
-### P6.1 行
+### P6.1 Grid 行配置（内部布局操作）
 
 - [x] 新增行
 - [x] 设置行高倍数
@@ -272,12 +273,12 @@ type PNode = StaticPNode | FieldPNode
 - [x] 上下移动行
 - [x] 删除行
 
-### P6.2 格子
+### P6.2 Grid 列/格子配置（内部布局操作）
 
 - [x] 一行拆分为 N 格
 - [x] GridRow 行高按基础行高倍数作为最小行高，Table 增加 `minRows` 时可撑开父行
 - [x] 选中 Grid 后通过属性面板调整行数和列数
-- [x] GridCell 行列配置统一转换为嵌套 Grid，子格可独立插入组件
+- [x] Grid 内部行列配置支持嵌套 Grid，子格可独立插入组件
 - [x] Grid 的行列调整统一移入右侧属性面板；GridRow/GridCell 仅作为内部布局记录，组件库不提供结构快捷按钮
 - [ ] 设置 mm/fr/auto 宽度
 - [ ] 设置 padding 和对齐
@@ -297,10 +298,10 @@ type PNode = StaticPNode | FieldPNode
 - [x] 一键包装为子 Grid
 - [x] 禁止移动到自身后代
 
-**当前进度**：基础结构纯函数已覆盖空白模板、根 Grid、行增删移动、复制行、格子拆分合并、跨格移动、子 Grid 包装和节点插入；
-组件库拖拽、格子内排序及完整前五行 UI 构建仍待完成。
+**当前进度**：基础结构纯函数已覆盖空白模板、根 Grid、Grid 行列配置、内部行增删移动、格子拆分合并、跨格移动、子 Grid 包装和节点插入；
+组件库拖拽、格子内排序及完整前五行 UI 构建仍待完成。内部行/格子操作不改变其不可选、不可作为独立组件持久化的约束。
 
-**完成门槛**：不手写 JSON，可以创建外层 Grid 和五个目标行；保存 Schema 与手写基线结构等价。
+**完成门槛**：不手写 JSON，可以创建外层 Grid 并配置五个目标内部行；保存 Schema 与手写基线结构等价。
 
 ## 11. 阶段 P7：P、Table、HTML、Image 编辑
 
@@ -391,8 +392,8 @@ type PNode = StaticPNode | FieldPNode
 
 1. 新建 A4 fixed 模板，基础行高设为 8mm。
 2. 创建标题。
-3. 创建外层 Grid 和四个基本信息行。
-4. 创建工作任务 5 倍行高。
+3. 创建外层 Grid，并配置五个内部行及各行列数。
+4. 将工作任务所在内部行设置为 5 倍最小行高。
 5. 配置全部 static/field P。
 6. 创建两列表格和四个最小数据行。
 7. 保存并关闭模板。

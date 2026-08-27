@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import GridSchemaRenderer from "@/dev/GridSchemaRenderer.vue";
+import { GridFormRenderer as GridSchemaRenderer } from "@/components/renderer-v2";
 import { makeYunlvSecondTicketFirstFiveRowsSchema } from "@/dev/yunlv-second-ticket-first-five-rows";
 import {
   buildEditorNodeIndexV2,
@@ -18,7 +18,7 @@ import {
   updateTableMinRowsV2,
   validateFormSchemaV2,
 } from "@/types";
-import type { BorderModeV2, SchemaNodeV2, EditorNodeV2 } from "@/types";
+import type { BorderModeV2, SchemaNodeV2, EditorNodeV2, SchemaIssueV2 } from "@/types";
 import { isSelectableSchemaNodeV2 } from "@/types";
 import StatusBar from "./StatusBar.vue";
 
@@ -150,6 +150,30 @@ function selectFromPath(id: string): void {
   selectionPathIndex.value = index;
   selectedNodeId.value = id;
   selectionDepth = index;
+}
+
+function selectIssue(issue: SchemaIssueV2): void {
+  const index = nodeIndex.value;
+  // Walk from the issue node up through the index, keeping only selectable
+  // nodes (innermost first) so Row/Cell/Template never become active.
+  const selectableIds: string[] = [];
+  let cursor = issue.nodeId ? index.get(issue.nodeId)?.node : undefined;
+  while (cursor) {
+    if (isSelectableSchemaNodeV2(cursor)) selectableIds.push(cursor.id);
+    cursor = index.get(cursor.id)?.parent ?? undefined;
+  }
+  // Schema-level issues without a nodeId fall back to the first Page.
+  if (selectableIds.length === 0) {
+    const pageId = schema.value.pages[0]?.id;
+    if (!pageId) return;
+    selectableIds.push(pageId);
+  }
+  selectedNodeId.value = selectableIds[0];
+  selectedInsertionSlotId.value = null;
+  selectionPathIds.value = selectableIds;
+  selectionPathIndex.value = 0;
+  selectionDepth = 0;
+  lastClickedLeafId = selectableIds[0];
 }
 
 function updateSelectedNode(
@@ -433,7 +457,8 @@ function updateTableRows(event: Event): void {
           <div
             v-for="issue in issues"
             :key="issue.code + '-' + (issue.nodeId || 'schema')"
-            class="v2-issue"
+            class="v2-issue v2-issue--selectable"
+            @click="selectIssue(issue)"
           >
             {{ issue.code }}：{{ issue.message }}
           </div>
@@ -676,6 +701,15 @@ function updateTableRows(event: Event): void {
 .v2-issue {
   margin-top: 6px;
   line-height: 1.45;
+}
+
+.v2-issue--selectable {
+  cursor: pointer;
+}
+
+.v2-issue--selectable:hover {
+  color: #1d4ed8;
+  text-decoration: underline;
 }
 
 @media print {

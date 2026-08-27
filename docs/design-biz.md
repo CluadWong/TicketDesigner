@@ -36,6 +36,7 @@
 Page、Grid、TableCellTemplate 和组件都有唯一 ID；GridRow/GridCell 的 ID 仅用于布局引用。设计器运行时建立节点索引：
 
 选择链只包含 Page、Grid 和实际组件。点击 Cell 空白区域时，选择其所属 Grid；Row/Cell 不会成为 active 节点。
+问题列表条目可点击定位：有 nodeId 的选中对应节点，Row/Cell/Template 布局问题或 schema 级问题自动回退选中最近的 Page/Grid 祖先。
 
 节点索引提供按 ID 查询节点、祖先链和所属插槽的 API；Schema 更新后通过计算索引重新派生，避免保留旧对象引用。
 
@@ -232,7 +233,7 @@ interface FormPreviewProps {
 
 1. 运行 Schema 结构校验。
 2. 扫描空 field 和重复 field。
-3. 检测固定尺寸溢出。
+3. 检测固定尺寸溢出：P 文本估算宽度超过所在格子宽度、Page 最小内容高度超过可用高度时给出警告。
 4. 清除设计器临时状态和运行时索引。
 5. 写入 version 并序列化嵌套 Schema；加载时只接受 V2，并补全兼容默认字段。
 

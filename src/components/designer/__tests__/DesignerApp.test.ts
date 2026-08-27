@@ -1,6 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { mount } from "@vue/test-utils";
+import { nextTick } from "vue";
+import { mount, type VueWrapper } from "@vue/test-utils";
 import DesignerApp from "@/components/designer/DesignerApp.vue";
+import type { FormSchemaV2 } from "@/types";
+
+function schemaOf(wrapper: VueWrapper): FormSchemaV2 {
+  return (wrapper.vm as unknown as { schema: FormSchemaV2 }).schema;
+}
+
+function gridById(schema: FormSchemaV2, id: string) {
+  const node = schema.pages[0].children.find(child => child.id === id);
+  if (node?.type !== "grid") throw new Error(`fixture grid missing: ${id}`);
+  return node;
+}
 
 describe("DesignerApp V2 selection and deletion", () => {
   it("cycles from a filled cell component to its ancestors", async () => {
@@ -82,5 +94,51 @@ describe("DesignerApp V2 selection and deletion", () => {
 
     expect(wrapper.find("tbody .layout-p").exists()).toBe(true);
     expect(wrapper.find("tbody .layout-p").text()).toBe("固定文本");
+  });
+
+  it("selects the overflowing P when its issue entry is clicked", async () => {
+    const wrapper = mount(DesignerApp);
+    const schema = schemaOf(wrapper);
+    const basic = gridById(schema, "ticket-basic-layout");
+    const unitLabel = basic.rows[0].cells[0].children[0];
+    if (unitLabel.type !== "p" || unitLabel.mode !== "static") throw new Error("unit label fixture");
+    unitLabel.text = "这是一个非常长的固定文本内容，用于触发内容溢出警告";
+    await nextTick();
+
+    const issueEntry = wrapper.findAll(".v2-issue").find(entry => entry.text().includes("CONTENT_OVERFLOW"));
+    expect(issueEntry).toBeDefined();
+    await issueEntry!.trigger("click");
+
+    expect(wrapper.findAll(".v2-inspector-row")[0]?.text()).toContain("unit-label");
+    expect(wrapper.findAll(".v2-inspector-row")[1]?.text()).toContain("p");
+  });
+
+  it("falls back to the nearest selectable Grid for a row-level issue", async () => {
+    const wrapper = mount(DesignerApp);
+    const schema = schemaOf(wrapper);
+    gridById(schema, "ticket-basic-layout").rows[0].cells = [];
+    await nextTick();
+
+    const issueEntry = wrapper.findAll(".v2-issue").find(entry => entry.text().includes("INVALID_GRID_CELLS"));
+    expect(issueEntry).toBeDefined();
+    await issueEntry!.trigger("click");
+
+    expect(wrapper.findAll(".v2-inspector-row")[0]?.text()).toContain("ticket-basic-layout");
+    expect(wrapper.findAll(".v2-inspector-row")[1]?.text()).toContain("grid");
+    expect(wrapper.findAll(".v2-breadcrumb__item")).toHaveLength(2);
+  });
+
+  it("falls back to the first Page for a schema-level issue without nodeId", async () => {
+    const wrapper = mount(DesignerApp);
+    const schema = schemaOf(wrapper);
+    schema.baseRowHeight = 0;
+    await nextTick();
+
+    const issueEntry = wrapper.findAll(".v2-issue").find(entry => entry.text().includes("INVALID_BASE_ROW_HEIGHT"));
+    expect(issueEntry).toBeDefined();
+    await issueEntry!.trigger("click");
+
+    expect(wrapper.findAll(".v2-inspector-row")[0]?.text()).toContain("ticket-page-1");
+    expect(wrapper.findAll(".v2-inspector-row")[1]?.text()).toContain("page");
   });
 });
