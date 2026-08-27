@@ -62,7 +62,7 @@
 | 3. 创建外层 Grid 并配置行列 | P6.2 / P6.3 | 行列增删、行列数调整、边框已可做；列宽 mm/fr/auto、colspan、合并拆分、拖拽投放未做 |
 | 5. 配置全部 static/field P | P7.1 | 文本/字段名/前后标签可编辑；字号/字重/对齐/竖排未做 |
 | 6. 创建两列表格和四个数据行 | P7.2 | 仅最小行数可调；列编辑（key/标题/宽度）、rowTemplate 编辑未做 |
-| 7-8. 保存并关闭 / 重新加载修改 | P8 | 全部未做（无导出/导入 JSON、无版本迁移、无加载后重建 nodeIndex） |
+| 7-8. 保存并关闭 / 重新加载修改 | P8 | 序列化/反序列化函数已存在（`schema-v2-serialization.ts`，含往返测试）但未接入 UI 与持久化；加载重建 nodeIndex、保存前校验、撤销栈均未做 |
 | 9. 填写测试数据 | P9.1 | 未做（无 data 绑定与回写） |
 | 10. 打印并对比 | P9.3 | 仅设计态 `@media print` 隐藏 UI；无独立 Preview、无 A3/A4 `@page`、无溢出提示 |
 
@@ -98,7 +98,7 @@
 **第一版明确推迟（不在 MVP 范围）**
 
 - 深撤销栈（≥20 步之外的历史 / 多分支）、版本迁移兼容。
-- HTML / Image 受控节点的富编辑（P7.3，安全与布局双重风险，留待后续独立排期）。
+- HTML / Image 富编辑（模板库、sanitize 报告增强）〔推迟〕；其基础版（Shadow DOM 隔离 + 固定 DOMPurify 清洗 + `{{field}}` 绑定、Image URL/base64）已前移为第一版 MVP，见 P7.3/P7.4。
 - 填写权限 / 字段级校验规则（P9.2 之外）。
 - 完整工作票其余区块（计划工作时间、工作条件、注意事项、签发，P11）与多页 / 大模板渲染性能（P12）。
 - 跨浏览器打印引擎兜底（Safari / Firefox / 系统打印）：第一版以 Chrome / Edge 为验收目标引擎并注明即可，PDF 导出兜底延后。
@@ -173,7 +173,7 @@ type PNode = StaticPNode | FieldPNode
 - [x] field P 支持 prefix/suffix 复合标签
 - [x] Table 默认两列、表头 1、行高 1、minRows 4
 - [x] Table 默认每个数据列生成一个 Field P，允许删除后替换为其他组件
-- [x] HTML/Image 安全默认值
+- [x] HTML/Image 安全策略：渲染前始终 DOMPurify 清洗 + Shadow DOM 隔离（无信任开关，见 engine.md §11）
 
 ### P1.3 序列化
 
@@ -240,7 +240,7 @@ type PNode = StaticPNode | FieldPNode
 - [x] GridCell width/colspan 校验
 - [x] P mode/text/field 校验
 - [x] Table columnKey 和 rowTemplate 完整性校验
-- [x] HTML trusted/bindings 校验（基础 trusted 警告）
+- [x] HTML/Image 结构校验入口（JS 剥离改由引擎固定 sanitize 负责，无 trusted/bindings 字段）
 - [x] 图片尺寸和资源警告
 - [x] 重复 field 软警告
 - [x] 节点内容溢出警告（P 文本估算宽度 vs 所在格子宽度，仅固定 mm 宽度可估算时）
@@ -331,30 +331,25 @@ type PNode = StaticPNode | FieldPNode
 - [x] 上下移动行
 - [x] 删除行
 
+> 经代码核对（2026-08-27）：列宽 `mm/fr/auto` 渲染层 `track()` 已支持，但设计器无列宽编辑 UI；`colspan`/合并拆分在 schema 与渲染层均无字段/分支（零实现）；`drag/drop` 全仓库无命中，仅有按钮插入；`Grid 边框模式` schema 已有 `BorderModeV2 = "all"|"outer"|"inner"|"none"` 且 `DesignerApp.vue` 配置面板已有“边框”项（已可设，与 §2.1 / 规格表“外层 Grid 设 all 边框”一致）。下方按 MVP / 推迟 拆分。
+
 ### P6.2 Grid 列/格子配置（内部布局操作）
 
-- [x] 一行拆分为 N 格
-- [x] GridRow 行高按基础行高倍数作为最小行高，Table 增加 `minRows` 时可撑开父行
-- [x] 选中 Grid 后通过属性面板调整行数和列数
-- [x] Grid 内部行列配置支持嵌套 Grid，子格可独立插入组件
-- [x] Grid 的行列调整统一移入右侧属性面板；GridRow/GridCell 仅作为内部布局记录，组件库不提供结构快捷按钮
-- [ ] 设置 mm/fr/auto 宽度
-- [ ] 设置 padding 和对齐
-- [ ] 设置 colspan
-- [ ] 合并/拆分相邻格
-- [ ] 设置 Grid 边框模式
+已完成（结构纯函数 + 配置面板）：一行拆分 N 格、行高倍数、属性面板调整行列数、嵌套 Grid、行列调整统一移入属性面板。待办：
+
+- [ ] **P6.2a 列宽 mm/fr/auto 编辑**〔MVP·渲染已支持，设计器未暴露〕：选中 Grid 可为每列设 `mm` 数值 / `fr` / `auto`。DoD：列宽编辑后渲染即时反映（复用 `track()`）。（覆盖 P10 步骤 3 各行列数配置）
+- [ ] **P6.2b 单元格 padding 与对齐**〔MVP·部分〕：补充 schema 字段与设计器 UI，设水平对齐与 padding；渲染层已有 `verticalAlign`（top/bottom）。DoD：可设单元格水平对齐与内边距并即时渲染。
+- [ ] **P6.2c colspan（跨列合并）**〔推迟〕：前五行“合并整行”可由单列 Grid 行实现，非必须；schema/渲染均无 colspan 字段。第一版不做，后续补。
+- [ ] **P6.2d 合并/拆分相邻格**〔推迟〕：依赖 P6.2c，第一版不做。
+- [ ] **P6.2e Grid 边框模式**〔MVP·已部分具备〕：schema `BorderModeV2` 已定义、`DesignerApp` 已有“边框”配置项；补全 all/outer/inner/none 枚举选择 UI。DoD：可选四种模式并即时渲染（覆盖 P10 步骤 3 外层 Grid 设 all 边框）。
 
 ### P6.3 投放
 
-- [x] Cell 显示投放点
-- [ ] 从组件库拖入 P/Grid/Table/HTML/Image（当前为按钮插入 P/Grid/Table）
-- [ ] 格子内排序
-- [ ] 跨格移动
-- [x] 已有内容时支持插入而非覆盖
-- [x] 删除选中节点并级联删除后代
-- [x] 删除最后一个 Cell/Row 时清理空父级，避免产生非法 Grid
-- [x] 一键包装为子 Grid
-- [x] 禁止移动到自身后代
+已完成（结构能力）：Cell 投放点显示、插入而非覆盖、级联删除、删末位清理空父级、一键包装子 Grid、禁止移入自身后代。跨格移动的结构纯函数已具备（见“当前进度”），但 UI 拖拽未做。待办：
+
+- [ ] **P6.3a 组件库插入（拖拽增强）**〔MVP·按钮插入已具备〕：当前 P/Grid/Table 由按钮插入，第一版维持按钮插入即可；HTML/Image 拖入推迟。DoD：按钮可插入 P/Grid/Table 到目标格。
+- [ ] **P6.3b 格子内排序**〔推迟〕：拖动调整子节点顺序；第一版靠插入顺序构建即可。
+- [ ] **P6.3c 跨格移动（UI 拖拽）**〔推迟〕：结构操作已支持，UI 拖拽移动第一版不做，可用删除+重插或配置面板移动替代。
 
 **当前进度**：基础结构纯函数已覆盖空白模板、根 Grid、Grid 行列配置、内部行增删移动、格子拆分合并、跨格移动、子 Grid 包装和节点插入；
 组件库拖拽、格子内排序及完整前五行 UI 构建仍待完成。内部行/格子操作不改变其不可选、不可作为独立组件持久化的约束。
@@ -363,37 +358,40 @@ type PNode = StaticPNode | FieldPNode
 
 ## 11. 阶段 P7：P、Table、HTML、Image 编辑
 
+> 经代码核对（2026-08-27）：`DesignerApp.vue` 配置面板仅覆盖子集（Grid 行列/边框、P 文本/字段名/前后标签、Table 最小行数）；字号/字重/对齐/竖排、Table 列编辑、HTML/Image 编辑均未接。schema 已定义 `HtmlNodeV2`/`ImageNodeV2` 及 `createHtmlNodeV2`/`createImageNodeV2`，但渲染层尚未渲染 html/image 节点，P7.3/P7.4 的编辑与安全风险（sanitizer/CSS scope/{{field}} 自动绑定）全未做。下方按 MVP / 推迟 拆分。
+
 ### P7.1 P
 
-- [ ] static/field 分段控件
-- [ ] 固定文本编辑
-- [ ] field 和 inputType 编辑
+- [ ] **P7.1a static/field 分段控件**〔MVP〕：在属性面板切换 static/field 模式。DoD：选中 P 可切模式并即时渲染。
+- [ ] **P7.1b 固定文本编辑**〔MVP〕：编辑 static 文本。DoD：改文本后渲染同步。
+- [ ] **P7.1c field 与 inputType 编辑**〔MVP〕：编辑 field 名与输入类型。DoD：field 名编辑后 `data-field` 同步（与 P9.1 数据键一致）。
 - [x] field P 空内容、data-field、下划线和打印下划线基础语义
 - [x] field P 前标签、输入器、后标签组合渲染
-- [ ] 字号、字重、对齐、竖排和不换行
+- [ ] **P7.1d 字号、字重、对齐、竖排、不换行**〔MVP·子集〕：**竖排为第一版必需**（P10 工作任务标签）；字号/字重/水平对齐/不换行为打印美观最小支持。DoD：可设竖排与基本字号字重对齐，渲染即时反映（竖排覆盖 P10 步骤 5 左格“工作任务”标签）。
 
 ### P7.2 Table
 
-- [ ] 新增、删除、移动列
-- [ ] 编辑 key、标题、宽度和对齐
-- [ ] headerHeight、rowHeight、minRows
-- [ ] repeatable
-- [ ] 编辑 rowTemplate 的 Cell children
-- [ ] 单元格放 P 或子 Grid
+- [ ] **P7.2a 新增/删除/移动列**〔推迟〕：前五行用默认 2 列即可；完整列增删移动推迟到 P11。
+- [ ] **P7.2b 编辑 key、标题、宽度、对齐**〔MVP·最小 / 部分推迟〕：第一版保证“创建指定列数表格 + 设列宽”（列宽见 P6.2a）；列 key/标题/对齐完整编辑推迟。DoD：可创建 2 列表格并设列宽。
+- [ ] **P7.2c headerHeight、rowHeight、minRows**〔MVP·部分〕：`minRows` 已可通过配置面板设置；`headerHeight`/`rowHeight` 补 schema 字段与 UI。DoD：可设表头高/行高/minRows（覆盖 P10 步骤 6 表头1·行高1·minRows4）。
+- [ ] **P7.2d repeatable**〔推迟〕：动态增删行，第一版固定 minRows 即可（与 P9.1d 一致）。
+- [ ] **P7.2e 编辑 rowTemplate 的 Cell children**〔推迟〕：依赖 P9.1d 动态绑定，第一版不做。
+- [ ] **P7.2f 单元格放 P 或子 Grid**〔MVP〕：工作任务表格 cell 内为 field P（已可插入 P）。DoD：表格 cell 可插入 P/子 Grid。
 
-### P7.3 HTML
+### P7.3 HTML〔第一版 MVP 基础版，见 engine.md §11〕
 
-- [ ] 预设模板选择
-- [ ] 高级源码编辑
-- [ ] sanitizer
-- [ ] CSS scope
-- [ ] bindings 编辑
+- [ ] **P7.3a 渲染隔离（Shadow DOM）**〔MVP〕：`host.attachShadow({ mode: 'open' })` 写入 `<style>${css}</style>${html}`，CSS 仅作用本块。DoD：开发者 HTML/CSS 不污染表单样式。
+- [ ] **P7.3b 固定清洗（DOMPurify）**〔MVP〕：引擎级固定 sanitize，剥离 `script/iframe/object/embed`、`on*`、`javascript:`/`data:text/html`，禁 `@import`；始终执行、无 per-node 信任开关。DoD：含 `<script>`/onclick 的片段被剥离，普通结构/样式保留。
+- [ ] **P7.3c 字段绑定 `{{field}}`**〔MVP〕：挂载解析为 shadow 内 `<span data-bind="field">`，填值时经 `shadowRoot` 对 `[data-bind]` 原地 `textContent = data[field]`，与 field P / Image 同 in-place 模型。DoD：配置 `单位：{{单位}}` 后填值显示对应 data（覆盖 P10 步骤 9 的 HTML 区块）。
+- [ ] **P7.3d 预设模板选择**〔推迟〕
+- [ ] **P7.3e 高级源码编辑增强**〔推迟〕
+- [ ] **P7.3f sanitize 报告（剥离项回显）**〔推迟〕
 
-### P7.4 Image
+### P7.4 Image〔第一版 MVP 基础版〕
 
-- [ ] src/field 模式
-- [ ] 尺寸和 objectFit
-- [ ] 加载失败占位
+- [ ] **P7.4a src/field 模式 + base64**〔MVP〕：`src` 接收 URL 与 base64（`data:image/...;base64,...`）；field 模式填值 `imgEl.src = data[field] ?? src`，原样透传。DoD：静态 base64 签名图与 URL 图均可渲染（见 engine.md §11）。
+- [ ] **P7.4b 尺寸和 objectFit**〔MVP，部分〕：`ImageNodeV2.objectFit` 已定义默认 contain；补宽度/高度 mm 配置 UI。DoD：可设 width/height mm 与 objectFit。
+- [ ] **P7.4c 加载失败占位**〔MVP〕：URL 模式 `onerror` 占位。DoD：坏链显示占位而非破图。
 
 **完成门槛**：通过属性面板完成标题、所有标签、输入字段、竖排“工作任务”和两列表格配置。
 
@@ -401,46 +399,77 @@ type PNode = StaticPNode | FieldPNode
 
 **目标**：编辑结果可以稳定持久化并恢复。
 
-- [ ] 导出 Schema JSON
-- [ ] 导入 Schema JSON
-- [ ] version 检查和迁移入口
-- [ ] 保存前结构校验
-- [ ] 重新加载后重建 nodeIndex
-- [ ] 重新加载后所有节点仍可编辑
-- [ ] 撤销/重做栈
-- [ ] 属性连续输入合并历史记录
-- [ ] 结构操作保持原子性
-- [ ] 复制/删除保存完整子树历史
-- [ ] 提供未保存修改提示
+> 范围与现状：第一版 MVP 只需「保存 / 加载 / 基础撤销」闭环（见 §2.2），深撤销栈、版本迁移为推迟项。**节点 ID 稳定依赖 P2.3**，不在本阶段独立完成。
+> 关键事实（2026-08-27 核对）：序列化/反序列化函数 `serializeFormSchemaV2` / `parseFormSchemaV2` 已实现于 `src/types/schema-v2-serialization.ts`，并有往返测试（`types/__tests__/schema-v2.test.ts`）；`buildEditorNodeIndexV2` 已实现于 `src/types/schema-v2-index.ts`。因此 P8.1 主要是**接线到设计器 UI 与持久化**，而非从零实现算法。
+
+### P8.1 序列化 / 反序列化接线　[引擎已具备·接线]
+- [ ] 设计器「保存」调用 `serializeFormSchemaV2(schema, true)`，输出含 `version=2` 的合法 V2 JSON
+- [ ] 「载入 / 导入」调用 `parseFormSchemaV2(json)`，非法输入抛 `SchemaV2SerializationError` 并提示
+- **DoD**：前五行 V2 Schema 经 export→import 后深度等价（结构、字段、ID 一致）；非法 JSON 被拦截。往返测试扩展覆盖前五行样例。
+
+### P8.2 持久化通道　[MVP]
+- [ ] 接入 localStorage 键值（推荐）与/或文件下载·上传，提供「保存 / 载入 / 新建空白」入口
+- [ ] 加载后恢复完整设计器状态（schema、selectedNodeId 若有效）
+- **DoD**：保存后刷新页面或「重新加载模板」，前五行视觉与编辑状态一致，可继续编辑（覆盖 P10 步骤 7–8）。
+
+### P8.3 加载后重建 nodeIndex 与可选状态　[MVP]
+- [ ] 载入后调用 `buildEditorNodeIndexV2(schema)` 重建索引
+- [ ] 恢复 selectedNodeId 并校验有效性；DOM `data-node-id` 与 Schema ID 一致（依赖 P2.3）
+- **DoD**：加载后所有节点可被选中、移动、配置（P10 指标“所有节点可再次编辑”）；索引覆盖 Page/Grid/实际组件，不含 Row/Cell 布局节点（与 design.md §3.2 一致）。
+
+### P8.4 保存前结构校验　[MVP]
+- [ ] 复用 P3 校验器（`src/types/schema-v2-validation.ts`），保存/导出前跑一次，一次返回全部问题
+- **DoD**：结构非法时阻止保存并提示具体错误；合法时通过；与 P3 单测共用校验函数。
+
+### P8.5 基础撤销 / 重做栈（≥20 步）　[MVP]
+- [ ] 实现命令栈或快照栈，覆盖属性修改、节点增删、结构操作
+- [ ] 提供触发入口（按钮 / Ctrl+Z、Ctrl+Y）
+- **DoD**：连续 20 次属性或结构操作后逐步撤销可逐帧还原，重做可恢复（满足完成门槛）。MVP 可用简单快照栈，性能优化后做。
+
+### P8.6 未保存修改提示　[MVP]
+- [ ] 比对当前状态与最近保存快照，关闭 / 切换模板前确认
+- **DoD**：修改未保存时尝试关闭或切换，弹出“有未保存修改”确认。
+
+### P8.7 连续输入合并历史　[推迟]
+- [ ] 同属性连续输入（打字、拖动）合并为单条历史
+- **DoD**：文本框连输 10 字符 = 1 步撤销；拖动列宽过程仅 1 条记录。依赖 P8.5。
+
+### P8.8 结构操作原子性与子树历史　[推迟]
+- [ ] 复制 / 删除节点保存完整子树，撤销整体还原；增删行列、合并拆分作为单条原子历史
+- **DoD**：删除含 Table 的行，撤销后 Table 与 4 行数据完整恢复；合并单元格可还原。依赖 P8.5、P6。
+
+### P8.9 版本迁移入口　[推迟]
+- [ ] 提供旧版本 Schema → V2 的迁移函数与注册入口
+- **DoD**：低版本样例可一键迁移为 V2 并加载。注：version 基础检查（写入 / 未知版本报错 / 缺省补全）已在 P1 完成。
 
 **完成门槛**：前五行保存、刷新、加载后视觉一致，节点 ID 稳定，撤销/重做至少覆盖 20 步。
 
 ## 13. 阶段 P9：填写、权限和打印
 
+> 经代码核对（2026-08-27）：`GridSchemaNode.vue` 已为 field P 渲染 `contenteditable` 编辑区并带 `data-field`，但**尚无“从 data 初始化填值”与“输入回写 data”**；打印侧已有多处 `@media print` 隐藏设计器 UI，但无独立 Preview、无 A3/A4 `@page`、无溢出提示；权限侧仅有工具栏按钮 `disabled`，无字段级 readonly/hidden/required 机制。下方按 MVP / 推迟 拆分。
+
 ### P9.1 数据
 
-- [ ] static P 显示 text
-- [ ] field P 从 data 填值
-- [ ] 输入事件回写 data
-- [ ] number/date/signature 内部控件
-- [ ] repeatable Table 绑定数组
-- [ ] rowTemplate 字段使用行上下文
+- [ ] **P9.1a 从 data 初始化填值**〔MVP〕：加载 Schema + data 后，field P 显示 `data[field]`；Table 固定行内 field 同步 data。DoD：载入带 data 的样例，所有 field 显示对应值。（覆盖 P10 步骤 1–8 构建后进入填值的前提；样例 data 见 `src/dev/demoData.ts`，当前孤立未接、仅作渲染验证 demo，待 P9.1a 实现时再接为“载入样例”的 data）
+- [ ] **P9.1b 输入事件回写 data**〔MVP〕：field P 的 `contenteditable` 输入经事件更新 `data[field]`；Table 行内 field 回写对应数组项。DoD：编辑后 `data[field]` 实时更新，保存并重加载值不变。（覆盖 P10 步骤 9、指标“数据回写正确”）
+- [ ] **P9.1c number/date/signature 内部控件**〔推迟〕：第一版前五行均为文本/数字文本，用 contenteditable 文本即可；日期选择器、签名板等专用控件后续补。
+- [ ] **P9.1d repeatable Table 动态绑定数组 + rowTemplate 行上下文**〔推迟〕：运行时增删行的动态绑定；MVP 固定 minRows 4 行已由 P9.1a/b 的 cell 级绑定覆盖。
 
-### P9.2 权限
+### P9.2 权限〔整体推迟，见 §2.2 MVP 范围〕
 
-- [ ] readonly
-- [ ] hidden 且默认保留固定空间
-- [ ] required 标记和提交校验
-- [ ] HTML bindings 权限边界
+- [ ] **P9.2a readonly**（字段级）：推迟
+- [ ] **P9.2b hidden 且默认保留固定空间**：推迟
+- [ ] **P9.2c required 标记和提交校验**：推迟
+- [ ] **P9.2d HTML 权限边界**：推迟（开发者专用 + 无 JS，无字段级权限需求；sanitizer 已固定为引擎级策略，见 engine.md §11）
 
 ### P9.3 打印
 
-- [ ] A3/A4 @page
-- [ ] 打印隐藏设计器 UI
-- [ ] 复用 Preview DOM
-- [ ] 不改变业务尺寸
-- [ ] fixed Page 溢出提示
-- [ ] Chrome/Edge 打印预览
+- [ ] **P9.3a A3/A4 `@page`**〔MVP〕：CSS `@page { size: A4; margin: ... }`，默认 A4，A3 可配置。DoD：打印预览纸张尺寸 = A4，无边距漂移。
+- [ ] **P9.3b 打印隐藏设计器 UI**〔MVP，已有基础〕：核对骨架、状态栏、选区高亮、设计器工具层在 `@media print` 下全部隐藏，仅保留业务 DOM。
+- [ ] **P9.3c 独立 Preview（复用 Preview DOM）**〔MVP〕：新增预览态切换，渲染同打印 DOM，不进入打印即可核对位置/尺寸。DoD：预览所见 ≈ 打印所得。
+- [ ] **P9.3d 不改变业务尺寸（共用 DOM，仅隐藏辅助 UI）**〔MVP〕：与 P9.3b 共用同一份 DOM，禁止打印态重新布局/缩放。DoD：设计态与打印态业务坐标一致。（覆盖完成门槛“打印与设计态位置一致”）
+- [ ] **P9.3e fixed Page 溢出提示**〔MVP，依赖 P3 校验器 + P4.2 fixed Page 可用区〕：内容超出可用区时提示节点与超量。DoD：构造超长文本触发警告并定位到节点。
+- [ ] **P9.3f Chrome/Edge 打印预览验证**〔MVP〕：DoD：两引擎打印预览中 A4 尺寸误差 ≤0.5mm（兼容 §2.2 注明目标引擎）。
 
 **完成门槛**：填写单位、负责人、班组和四行工作任务后，data 正确；打印与设计态位置一致。
 
@@ -499,6 +528,7 @@ type PNode = StaticPNode | FieldPNode
 
 - [ ] 移除旧流式 Renderer 和硬编码旧 Schema
 - [ ] 清理所有旧实现残留
+- [ ] 清理 `src/dev` 旧渲染器副本与孤立文件（`GridSchemaNode.vue`、`GridSchemaRenderer.vue`、`demoData.ts` 等；`yunlv-second-ticket-first-five-rows.ts` 若已迁入正式目录则同步移除 dev 副本）
 - [ ] 更新组件开发文档和示例
 - [ ] 补充性能和大模板测试
 

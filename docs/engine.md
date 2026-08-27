@@ -95,7 +95,6 @@ function buildNodeIndex(schema: FormSchemaV2): Map<string, EditorNodeRef>
 - UNUSED_PROPERTY：当前 mode 下存在无效属性。
 - CONTENT_OVERFLOW：内容超过固定节点尺寸。
 - PAPER_OVERFLOW：Page 内容超过可用纸张。
-- UNTRUSTED_HTML：HTML 未通过安全过滤。
 - IMAGE_LOAD_FAILED：图片资源加载失败。
 
 ### 4.3 校验时机
@@ -255,17 +254,20 @@ const rowCount = Math.max(table.minRows, dataRows.length)
 
 重复行字段不能简单生成相同 DOM ID。VNode/DOM 标识应组合 template node ID 和 row key；模板 Schema ID 保持不变。
 
-## 11. HTML 安全
+## 11. HTML 安全与隔离
 
-HTML 渲染流程：
+HTML 组件定位：仅用于复杂小模块，由开发人员配置一段 HTML + CSS，**不涉及 JS**。
 
-1. 按 trusted 决定过滤策略。
-2. 删除 script、iframe、事件属性和危险 URL。
-3. 给 CSS 选择器添加 `[data-node-id="..."]` 作用域。
-4. 应用显式 bindings。
-5. 放入限制 overflow 的 Cell 容器。
+**渲染与隔离流程**：
 
-HTML 内部 DOM 不参与普通节点索引，bindings 之外的 contenteditable 不回写 FormData。
+1. 渲染时 `host.attachShadow({ mode: 'open' })`，将 `<style>${css}</style>${html}` 一次性写入 shadow root。CSS 仅作用本块、不污染表单样式（不采用选择器前缀化方案）。
+2. 写入前用 **DOMPurify** 做引擎级固定清洗：`FORBID_TAGS` 含 `script/iframe/object/embed`，`FORBID_ATTR` 含全部 `on*`，并剥离 `href/src/xlink:href` 中的 `javascript:` 与 `data:text/html`；v1 禁 `@import`。**清洗始终执行，无 per-node 信任开关。**
+3. 字段绑定：`{{field}}` 在挂载时解析为 shadow 内 `<span data-bind="field">` 占位；填值时引擎经 `host.shadowRoot` 对 `[data-bind]` 逐个 `textContent = data[field]` 原地更新，与 field P / Image 共用 in-place 填值模型（不重建节点）。
+4. 放入限制 overflow 的 Cell 容器，由 §12 做溢出检测。
+
+HTML 内部 DOM 不参与普通节点索引；其内部 contenteditable 不回写 FormData（`{{field}}` 绑定由引擎在原地更新）。
+
+**Image**：`src` 同时接收 URL 与 base64（`data:image/...;base64,...`）；field 模式填值时 `imgEl.src = data[field] ?? src`，URL/base64 原样透传；保留 onerror 占位（见 §4.2 `IMAGE_LOAD_FAILED`）。
 
 ## 12. 溢出检测
 

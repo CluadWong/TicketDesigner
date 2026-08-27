@@ -276,8 +276,6 @@ function scanNode(
     if ((node.width !== undefined && !isPositiveNumber(node.width)) || (node.height !== undefined && !isPositiveNumber(node.height))) {
       issue(issues, "error", "INVALID_IMAGE_DIMENSION", node, path, "Image dimensions must be positive");
     }
-  } else if (node.type === "html" && !node.trusted) {
-    issue(issues, "warning", "UNTRUSTED_HTML", node, path, "HTML will be sanitized before rendering");
   }
 }
 

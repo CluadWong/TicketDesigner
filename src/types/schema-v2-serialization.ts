@@ -61,7 +61,7 @@ function normalizeNode(value: unknown): RecordValue {
     if (node.mode === "field") return { ...node, field: node.field ?? "" };
     throw new SchemaV2SerializationError(`P node ${node.id} has invalid mode`);
   }
-  if (node.type === "html") return { ...node, html: node.html ?? "", trusted: node.trusted ?? false };
+  if (node.type === "html") return { ...node, html: node.html ?? "" };
   if (node.type === "image") return { ...node, objectFit: node.objectFit ?? "contain" };
   throw new SchemaV2SerializationError(`Unknown Schema node type: ${node.type}`);
 }

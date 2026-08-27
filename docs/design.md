@@ -256,15 +256,13 @@ interface HtmlNode {
   type: 'html'
   html: string
   css?: string
-  trusted: boolean
-  bindings?: Record<string, string>
 }
 ```
 
 - HTML 被限制在所属 GridCell 内。
-- CSS 必须加组件级作用域。
-- 非可信内容过滤 script、事件属性和危险 URL。
-- 内部字段只能通过 bindings 显式声明。
+- CSS 经 Shadow DOM 隔离，仅作用本块，不污染表单样式。
+- 渲染前由引擎统一用 DOMPurify 清洗，始终剥离 script/事件属性/危险 URL，无信任开关。
+- 内部字段用 `{{field}}` 自动绑定 data，无需显式声明。
 - 不允许将整张表单放进一个 HTML 节点。
 
 ### 8.2 Image

@@ -59,7 +59,7 @@ describe("Schema V2 operations", () => {
   });
 
   it("creates safe HTML and image defaults", () => {
-    expect(createHtmlNodeV2()).toMatchObject({ type: "html", html: "", trusted: false });
+    expect(createHtmlNodeV2()).toMatchObject({ type: "html", html: "" });
     expect(createImageNodeV2()).toMatchObject({ type: "image", objectFit: "contain" });
   });
 

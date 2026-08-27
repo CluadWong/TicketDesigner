@@ -117,10 +117,10 @@ export interface TableNodeV2 extends SchemaNodeBaseV2 {
 
 export interface HtmlNodeV2 extends SchemaNodeBaseV2 {
   type: "html";
+  /** HTML 片段，配置期即要求不含 <script>/on* 等脚本；渲染前仍由引擎统一清洗（见 engine.md §11） */
   html: string;
+  /** 仅在 Shadow DOM 内生效，不污染表单样式 */
   css?: string;
-  trusted: boolean;
-  bindings?: Record<string, string>;
 }
 
 export interface ImageNodeV2 extends SchemaNodeBaseV2 {

@@ -718,7 +718,6 @@ export function createHtmlNodeV2(html = ""): HtmlNodeV2 {
     id: createSchemaNodeIdV2("html"),
     type: "html",
     html,
-    trusted: false,
   };
 }
 

@@ -134,10 +134,9 @@ Table 用于规则明细，不用于整张表单排版。
 ### 7.1 HTML
 
 - 只允许放在 GridCell 或 TableCellTemplate 中。
-- 普通用户使用预设 HTML 模板，高级用户才可编辑源码。
-- 保存前运行安全过滤。
-- CSS 使用组件 ID 做作用域。
-- bindings 必须显式配置。
+- 仅由开发人员在配置面板编辑 HTML + CSS，不涉及 JS。
+- 渲染前用 DOMPurify 做引擎级固定清洗（始终执行、无信任开关）；CSS 经 Shadow DOM 隔离，不污染表单。
+- 字段用 `{{field}}` 自动绑定 data，无需显式声明。
 - 设计器显示 HTML 内容边界和尺寸溢出。
 
 ### 7.2 Image
@@ -203,7 +202,7 @@ Table 用于规则明细，不用于整张表单排版。
 | Grid | 行数、列数、边框、整体样式 |
 | P | mode、text/field、inputType、下划线、文字样式 |
 | Table | field、columns、表头/行高、minRows、repeatable |
-| HTML | html、css、trusted、bindings |
+| HTML | html、css（Shadow DOM 隔离，{{field}} 绑定） |
 | Image | src/field、尺寸、objectFit |
 
 Grid 的 rows/cells 是内部布局数据，不作为节点链或独立配置节点；结构字段通过 Grid 的专用控件修改，不允许在普通 JSON 文本框里直接编辑 rows/cells/children。
