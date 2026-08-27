@@ -1,6 +1,8 @@
 # 嵌套 Grid Schema V2 渲染引擎设计
 
 > 本文定义唯一正式 Schema V2 的索引、校验、递归渲染、尺寸、溢出和打印契约。
+>
+> 本文为渲染引擎契约（spec）；实现进度与缺口见 [development-plan.md](./development-plan.md) §2.1 与阶段 P4 / P8 / P9。
 
 ## 1. 引擎职责
 
@@ -153,6 +155,8 @@ cellStyle = {
 ```
 
 Cell.children 按数组顺序渲染。多个子节点默认纵向流；需要横向排列时使用子 Grid，不增加隐式 flex 规则。
+
+注：渲染层已支持 mm/fr/auto 列宽（`track()` 已实现 number→`${n}mm`、`fr`、`auto` 转换）；设计器侧列宽编辑尚未暴露给用户（development-plan P6.2）。
 
 ## 7. 固定尺寸
 
@@ -359,6 +363,4 @@ updateNode(schema, nodeId, patch)
 
 ## 17. 旧代码清理
 
-现有 `src/engine/paginate.ts`、`FormRenderer` 和 `FormSchema.body[]` 是迁移前遗留实现，
-不属于正式产品契约。V2 Renderer 完成前五行 UI 闭环后，应删除或隔离这些旧入口，避免出现两套
-Schema、分页和设计器状态。
+`src/engine/paginate.ts`、`FormRenderer` 与 `FormSchema.body[]` 等迁移前遗留实现已在 P0 阶段移除（目前 `src/engine`、`src/components/renderer` 仅剩旧测试目录）。剩余清理工作——旧测试文件、可能的 import 残留与旧类型——归入 [development-plan.md](./development-plan.md) P12。清理目标仍是避免出现两套 Schema、分页和设计器状态。
