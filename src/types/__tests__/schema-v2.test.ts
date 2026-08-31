@@ -42,7 +42,7 @@ function makeSchema(overrides: Partial<FormSchemaV2> = {}): FormSchemaV2 {
                     id: "cell-1",
                     type: "grid-cell",
                     children: [
-                      { id: "label-1", type: "p", mode: "static", text: "单位" },
+                      { id: "label-1", type: "text", text: "单位" },
                     ],
                   },
                   {
@@ -97,12 +97,12 @@ describe("Schema V2 index", () => {
   it("provides node, owner slot, and ancestor queries", () => {
     const schema = makeYunlvSecondTicketFirstFiveRowsSchema();
     expect(getNodeByIdV2(schema, "work-task-table")?.type).toBe("table");
-    expect(getOwnerCellV2(schema, "work-task-table")?.id).toBe("work-task-table-cell");
+    expect(getOwnerCellV2(schema, "work-task-table")?.id).toBe("cell-wt-r1");
     expect(getAncestorsV2(schema, "work-task-table").map(node => node.id)).toEqual([
       "ticket-page-1",
-      "ticket-work-task-layout",
-      "work-task",
-      "work-task-table-cell",
+      "ticket-layout",
+      "row-work-task",
+      "cell-wt-r1",
     ]);
     expect(getNodeByIdV2(schema, "missing")).toBeUndefined();
     expect(getAncestorsV2(schema, "missing")).toEqual([]);
@@ -180,7 +180,7 @@ describe("Schema V2 validation", () => {
     const cell = rootGrid(schema).rows[0].cells[0];
     cell.width = 10;
     cell.children = [
-      { id: "long-label", type: "p", mode: "static", text: "这是一段非常长的固定文本内容，用于触发溢出警告" },
+      { id: "long-label", type: "text", text: "这是一段非常长的固定文本内容，用于触发溢出警告" },
     ];
     const overflow = validateFormSchemaV2(schema).find(issue => issue.code === "CONTENT_OVERFLOW");
     expect(overflow?.level).toBe("warning");
@@ -197,7 +197,7 @@ describe("Schema V2 validation", () => {
     const frCell = rootGrid(frSchema).rows[0].cells[0];
     frCell.width = "1fr";
     frCell.children = [
-      { id: "long-label", type: "p", mode: "static", text: "这是一段非常长的固定文本内容，用于触发溢出警告" },
+      { id: "long-label", type: "text", text: "这是一段非常长的固定文本内容，用于触发溢出警告" },
     ];
     expect(validateFormSchemaV2(frSchema).some(issue => issue.code === "CONTENT_OVERFLOW")).toBe(false);
   });
@@ -257,16 +257,19 @@ describe("Schema V2 validation", () => {
 });
 
 describe("Yunlv sample schema layout", () => {
-  it("keeps the page as four sibling Grid components", () => {
+  it("keeps the page as a title Grid plus one outer five-row Grid", () => {
     const schema = makeYunlvSecondTicketFirstFiveRowsSchema();
     const children = schema.pages[0].children;
-    expect(children).toHaveLength(4);
+    expect(children).toHaveLength(2);
     expect(children.every(node => node.type === "grid")).toBe(true);
 
-    const workGrid = children[3];
-    if (workGrid.type !== "grid") throw new Error("work grid missing");
-    const workCellChildren = workGrid.rows[0].cells.flatMap(cell => cell.children);
-    expect(workCellChildren.map(node => node.type)).toEqual(["p", "table"]);
+    const outer = children.find(node => node.id === "ticket-layout");
+    if (!outer || outer.type !== "grid") throw new Error("outer grid missing");
+    expect(outer.rows).toHaveLength(5);
+    const workTaskRow = outer.rows.find(row => row.id === "row-work-task");
+    if (!workTaskRow) throw new Error("work task row missing");
+    const workCellChildren = workTaskRow.cells[1].children;
+    expect(workCellChildren.map(node => node.type)).toEqual(["table"]);
   });
 });
 
@@ -293,5 +296,21 @@ describe("Schema V2 serialization", () => {
     expect(() => serializeFormSchemaV2({ ...makeSchema(), baseRowHeight: 0 })).toThrow(SchemaV2SerializationError);
     expect(() => normalizeFormSchemaV2({ version: 2, pages: "invalid" })).toThrow(SchemaV2SerializationError);
     expect(() => parseFormSchemaV2({ ...makeSchema(), pages: [{ ...makeSchema().pages[0], children: [{ id: "unknown", type: "unknown" }] }] })).toThrow(SchemaV2SerializationError);
+  });
+
+  it("serializes HTML and image nodes and never emits trusted/bindings flags", () => {
+    const schema = makeSchema();
+    schema.pages[0].children.push(
+      { id: "html-1", type: "html", html: "<b>hi</b>", css: "b{color:red}" } as never,
+      { id: "img-1", type: "image", src: "data:image/png;base64,AAAA", field: "photo", width: 30, objectFit: "cover" } as never,
+    );
+    const restored = parseFormSchemaV2(serializeFormSchemaV2(schema));
+    const children = restored.pages[0].children;
+    const htmlNode = children.find(node => node.id === "html-1");
+    const imageNode = children.find(node => node.id === "img-1");
+    expect(htmlNode).toMatchObject({ type: "html", html: "<b>hi</b>", css: "b{color:red}" });
+    expect((htmlNode as unknown as Record<string, unknown>).trusted).toBeUndefined();
+    expect((htmlNode as unknown as Record<string, unknown>).bindings).toBeUndefined();
+    expect(imageNode).toMatchObject({ type: "image", src: "data:image/png;base64,AAAA", field: "photo", width: 30, objectFit: "cover" });
   });
 });

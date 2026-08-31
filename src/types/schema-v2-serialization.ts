@@ -56,10 +56,11 @@ function normalizeNode(value: unknown): RecordValue {
         : [],
     };
   }
+  if (node.type === "text") return { ...node, text: node.text ?? "" };
   if (node.type === "p") {
-    if (node.mode === "static") return { ...node, text: node.text ?? "" };
     if (node.mode === "field") return { ...node, field: node.field ?? "" };
-    throw new SchemaV2SerializationError(`P node ${node.id} has invalid mode`);
+    // 兼容旧版：static P 归一化为 text 节点
+    return { ...node, type: "text", text: node.text ?? "" };
   }
   if (node.type === "html") return { ...node, html: node.html ?? "" };
   if (node.type === "image") return { ...node, objectFit: node.objectFit ?? "contain" };

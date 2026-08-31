@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { mount } from "@vue/test-utils";
-import GridSchemaNode from "@/dev/GridSchemaNode.vue";
-import GridSchemaRenderer from "@/dev/GridSchemaRenderer.vue";
+import GridSchemaNode from "@/components/renderer-v2/GridSchemaNode.vue";
+import GridSchemaRenderer from "@/components/renderer-v2/GridFormRenderer.vue";
 import { makeYunlvSecondTicketFirstFiveRowsSchema } from "@/dev/yunlv-second-ticket-first-five-rows";
 
 describe("GridSchemaNode selection state", () => {
   it("adds a visible selected class without changing the node type", () => {
     const wrapper = mount(GridSchemaNode, {
       props: {
-        node: { id: "label", type: "p", mode: "static", text: "单位" },
+        node: { id: "label", type: "text", text: "单位" },
         baseRowHeight: 8,
         selectedNodeId: "label",
       },
@@ -61,13 +61,13 @@ describe("GridSchemaNode selection state", () => {
       },
     });
 
-    const grids = wrapper.findAll(":scope > .grid-schema-paper > .layout-grid");
-    expect(grids).toHaveLength(4);
+    const grids = wrapper.findAll(":scope > .grid-form-paper > .layout-grid");
+    expect(grids).toHaveLength(2);
 
-    const workTaskGrid = grids[3];
-    expect(workTaskGrid?.find(".layout-p").exists()).toBe(true);
-    expect(workTaskGrid?.find("table").exists()).toBe(true);
-    expect(workTaskGrid?.find("thead > tr > th").exists()).toBe(true);
-    expect(workTaskGrid?.find("tbody > tr > td").exists()).toBe(true);
+    const outer = grids[1];
+    const table = outer.find("table");
+    expect(table.exists()).toBe(true);
+    expect(outer.find("thead > tr > th").exists()).toBe(true);
+    expect(outer.find("tbody > tr > td").exists()).toBe(true);
   });
 });

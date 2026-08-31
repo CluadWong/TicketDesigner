@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import type { CSSProperties } from "vue";
-import type { FormSchemaV2 } from "@/types";
+import type { FormSchemaV2, FormDataV2 } from "@/types";
 import GridSchemaNode from "./GridSchemaNode.vue";
 
 defineOptions({ name: "GridFormRenderer" });
@@ -9,13 +9,23 @@ defineOptions({ name: "GridFormRenderer" });
 const props = defineProps<{
   schema: FormSchemaV2;
   selectedNodeId?: string | null;
+  /** 填充态数据；为空时进入设计态（字段可编辑）。 */
+  data?: FormDataV2 | null;
+  /**
+   * 只读预览：带数据渲染但字段不可输入（预览态）。
+   * 与 `data` 同时传入时用于「预览」而非「填充」——两者都显示数据，
+   * 区别只在于是否允许编辑。
+   */
+  readonly?: boolean;
 }>();
 
 const paperSize = computed(() => {
   const isA4 = props.schema.paper.size === "A4";
   const shortSide = isA4 ? 210 : 297;
   const longSide = isA4 ? 297 : 420;
-  return props.schema.paper.orientation === "portrait"
+  // 方向由纸张尺寸派生（去掉方向选择）：A4 → 纵向，A3 → 横向。
+  const orientation = isA4 ? "portrait" : "landscape";
+  return orientation === "portrait"
     ? { width: shortSide, height: longSide }
     : { width: longSide, height: shortSide };
 });
@@ -46,6 +56,8 @@ function paperStyle(page: FormSchemaV2["pages"][number]): CSSProperties {
         :node="node"
         :base-row-height="schema.baseRowHeight"
         :selected-node-id="selectedNodeId"
+        :data="data"
+        :readonly="props.readonly"
       />
     </main>
   </div>

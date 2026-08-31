@@ -1,0 +1,125 @@
+<script setup lang="ts">
+import { ref } from "vue";
+
+export interface TreeNode {
+  id: string;
+  type: string;
+  label: string;
+  children: TreeNode[];
+}
+
+defineOptions({ name: "NodeTreeItem" });
+
+const props = defineProps<{
+  node: TreeNode;
+  selectedId: string | null;
+  depth: number;
+}>();
+
+const emit = defineEmits<{ (event: "select", id: string): void }>();
+
+const expanded = ref(true);
+
+function onRowClick(): void {
+  emit("select", props.node.id);
+}
+
+function onToggle(): void {
+  expanded.value = !expanded.value;
+}
+</script>
+
+<template>
+  <div class="v2-tree-node">
+    <div
+      class="v2-tree-row"
+      :class="{ 'v2-tree-row--selected': node.id === selectedId }"
+      :style="{ paddingLeft: `${depth * 14 + 6}px` }"
+      @click="onRowClick"
+    >
+      <button
+        v-if="node.children.length"
+        class="v2-tree-toggle"
+        type="button"
+        @click.stop="onToggle"
+      >
+        {{ expanded ? "▾" : "▸" }}
+      </button>
+      <span v-else class="v2-tree-dot">·</span>
+      <span class="v2-tree-label">{{ node.label }}</span>
+      <span class="v2-tree-type">{{ node.type }}</span>
+    </div>
+    <div v-if="expanded && node.children.length" class="v2-tree-children">
+      <NodeTreeItem
+        v-for="child in node.children"
+        :key="child.id"
+        :node="child"
+        :selected-id="selectedId"
+        :depth="depth + 1"
+        @select="emit('select', $event)"
+      />
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.v2-tree-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px 3px 6px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #334155;
+  cursor: pointer;
+  border-radius: 3px;
+  user-select: none;
+}
+
+.v2-tree-row:hover {
+  background: #f1f5f9;
+}
+
+.v2-tree-row--selected {
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.v2-tree-toggle {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 10px;
+  line-height: 16px;
+  cursor: pointer;
+}
+
+.v2-tree-dot {
+  flex: 0 0 auto;
+  width: 16px;
+  text-align: center;
+  color: #cbd5e1;
+}
+
+.v2-tree-label {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.v2-tree-type {
+  flex: 0 0 auto;
+  font-size: 10px;
+  color: #94a3b8;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 3px;
+  padding: 0 4px;
+}
+</style>

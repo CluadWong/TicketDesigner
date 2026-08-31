@@ -36,16 +36,24 @@ export interface TextStyleV2 {
   lineHeight?: number;
   fontWeight?: "normal" | "bold";
   writingMode?: "horizontal-tb" | "vertical-rl";
-  whiteSpace?: "normal" | "nowrap";
+  whiteSpace?: "normal" | "nowrap" | "pre-wrap";
+  /** 文字颜色（CSS color）。仅用于渲染，不影响字段语义。 */
+  color?: string;
+  /** 字体族（CSS font-family）。 */
+  fontFamily?: string;
 }
 
 export interface SchemaNodeBaseV2 {
   id: string;
 }
 
-export interface StaticPNodeV2 extends SchemaNodeBaseV2 {
-  type: "p";
-  mode: "static";
+/**
+ * 固定文字节点（text 类型，标题 / 标签 / 说明等）。
+ * 与可输入字段的 `p` 节点彻底分离：text 不进入字段数据、不参与填写回写，
+ * 仅用于静态展示，可在设计器配置多行文本与文本样式。
+ */
+export interface TextNodeV2 extends SchemaNodeBaseV2 {
+  type: "text";
   text: string;
   style?: TextStyleV2;
 }
@@ -59,19 +67,36 @@ export interface FieldPNodeV2 extends SchemaNodeBaseV2 {
   /** Optional inline label rendered after the input area. */
   suffix?: string;
   inputType?: "text" | "number" | "date" | "signature";
+  /** External component trigger: date picker, signature pad, file upload, etc.
+   *  The renderer shows a visual hint (icon/placeholder); actual component is
+   *  invoked by the host application via a registered action handler. */
+  action?: "text" | "date" | "signature" | "upload";
   underline?: boolean;
   webUnderline?: boolean;
   printUnderline?: boolean;
   style?: TextStyleV2;
+  /** 是否多行：填充态渲染 `<textarea>`（默认，支持换行/预设多行）；false 渲染单行 `<input>`。 */
+  multiline?: boolean;
+  /** 预设默认值：data 中该字段为空时回退展示（设计/预览/打印/填充均生效），支持 `\n` 多行。 */
+  default?: string;
 }
 
-export type PNodeV2 = StaticPNodeV2 | FieldPNodeV2;
+export type PNodeV2 = FieldPNodeV2;
 
 export interface GridNodeV2 extends SchemaNodeBaseV2 {
   type: "grid";
   border: BorderModeV2;
   rows: GridRowV2[];
   style?: BoxStyleV2;
+  /** 列宽规范（按逻辑列顺序）。渲染时所有行共用同一组列轨，使跨列合并（colspan）
+   *  在任意列宽下都能正确对齐。缺省时渲染器回退到逐格 cell.width（旧数据兼容）。 */
+  columns?: GridTrackV2[];
+  /** 单元格默认内边距（mm）。子 cell 未单独设置 padding 时继承此值，缺省为 0。 */
+  cellPadding?: number;
+  /** 单元格默认水平对齐。子 cell 未单独设置 align 时继承此值。 */
+  cellAlign?: "left" | "center" | "right";
+  /** 单元格默认垂直对齐。子 cell 未单独设置 verticalAlign 时继承此值。 */
+  cellVerticalAlign?: "top" | "middle" | "bottom";
 }
 
 export interface GridRowV2 extends SchemaNodeBaseV2 {
@@ -113,6 +138,8 @@ export interface TableNodeV2 extends SchemaNodeBaseV2 {
   minRows: number;
   repeatable: boolean;
   rowTemplate: TableCellTemplateV2[];
+  /** 边框模式（与 Grid 一致）：all=外框+内部线（默认）、inner=仅内部线、outer=仅外框、none=无。 */
+  border?: BorderModeV2;
 }
 
 export interface HtmlNodeV2 extends SchemaNodeBaseV2 {
@@ -135,9 +162,13 @@ export interface ImageNodeV2 extends SchemaNodeBaseV2 {
 export type FormNodeV2 =
   | GridNodeV2
   | PNodeV2
+  | TextNodeV2
   | TableNodeV2
   | HtmlNodeV2
   | ImageNodeV2;
+
+/** 表单数据：字段名 -> 值。渲染时用于原地填充字段节点（见 engine.md §11）。 */
+export type FormDataV2 = Record<string, string | number | boolean | null>;
 
 /** Persisted component nodes. Rows/cells/templates are owned layout records. */
 export type SchemaNodeV2 = PageSchemaV2 | FormNodeV2;

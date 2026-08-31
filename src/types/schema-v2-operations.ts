@@ -8,7 +8,9 @@ import type {
   PageSchemaV2,
   EditorNodeV2,
   TableCellTemplateV2,
+  TableColumnV2,
   TableNodeV2,
+  BorderModeV2,
   HtmlNodeV2,
   ImageNodeV2,
 } from "./schema-v2";
@@ -179,6 +181,16 @@ export function updateGridBorderV2(
   );
 }
 
+export function updateTableBorderV2(
+  schema: FormSchemaV2,
+  tableId: string,
+  border: BorderModeV2,
+): FormSchemaV2 {
+  return updateSchemaNodeV2(schema, tableId, node =>
+    node.type === "table" ? { ...node, border } : node,
+  );
+}
+
 export function updateGridRowHeightV2(
   schema: FormSchemaV2,
   rowId: string,
@@ -199,6 +211,79 @@ export function updateCellWidthV2(
   );
 }
 
+/**
+ * 单元格样式级联解析：cell 自身设置优先，否则继承 Grid 默认，再否则取常量默认。
+ * 渲染层与检查器共用，保证「实际生效值」一致。
+ */
+export interface ResolvedCellBoxV2 {
+  padding: number;
+  align: "left" | "center" | "right";
+  verticalAlign: "top" | "middle" | "bottom";
+}
+
+const DEFAULT_CELL_PADDING = 0;
+const DEFAULT_CELL_ALIGN: "left" | "center" | "right" = "left";
+const DEFAULT_CELL_VERTICAL_ALIGN: "top" | "middle" | "bottom" = "middle";
+
+export function resolveCellBoxV2(
+  cell: GridCellV2,
+  grid: GridNodeV2,
+): ResolvedCellBoxV2 {
+  return {
+    padding: cell.padding ?? grid.cellPadding ?? DEFAULT_CELL_PADDING,
+    align: cell.align ?? grid.cellAlign ?? DEFAULT_CELL_ALIGN,
+    verticalAlign:
+      cell.verticalAlign ?? grid.cellVerticalAlign ?? DEFAULT_CELL_VERTICAL_ALIGN,
+  };
+}
+
+/** 设置单元格内边距（mm，非负）。用于「单元格仅覆盖」模式。 */
+export function updateCellPaddingV2(
+  schema: FormSchemaV2,
+  cellId: string,
+  padding: number,
+): FormSchemaV2 {
+  const value = Number.isFinite(padding) && padding > 0 ? padding : 0;
+  return updateSchemaNodeV2(schema, cellId, node =>
+    node.type === "grid-cell" ? { ...node, padding: value } : node,
+  );
+}
+
+/** 设置单元格水平对齐（或传 undefined 清除覆盖，回归 Grid 默认）。 */
+export function updateCellAlignV2(
+  schema: FormSchemaV2,
+  cellId: string,
+  align: "left" | "center" | "right" | undefined,
+): FormSchemaV2 {
+  return updateSchemaNodeV2(schema, cellId, node =>
+    node.type === "grid-cell" ? { ...node, align } : node,
+  );
+}
+
+/** 设置单元格垂直对齐（或传 undefined 清除覆盖，回归 Grid 默认）。 */
+export function updateCellVerticalAlignV2(
+  schema: FormSchemaV2,
+  cellId: string,
+  verticalAlign: "top" | "middle" | "bottom" | undefined,
+): FormSchemaV2 {
+  return updateSchemaNodeV2(schema, cellId, node =>
+    node.type === "grid-cell" ? { ...node, verticalAlign } : node,
+  );
+}
+
+/** 设置 Grid 级单元格默认（padding / 对齐），供所有未单独覆盖的 cell 继承。 */
+export function updateGridCellDefaultsV2(
+  schema: FormSchemaV2,
+  gridId: string,
+  patch: Partial<
+    Pick<GridNodeV2, "cellPadding" | "cellAlign" | "cellVerticalAlign">
+  >,
+): FormSchemaV2 {
+  return updateSchemaNodeV2(schema, gridId, node =>
+    node.type === "grid" ? { ...node, ...patch } : node,
+  );
+}
+
 export function updateTableMinRowsV2(
   schema: FormSchemaV2,
   tableId: string,
@@ -207,6 +292,150 @@ export function updateTableMinRowsV2(
   return updateSchemaNodeV2(schema, tableId, node =>
     node.type === "table" ? { ...node, minRows: Math.max(0, Math.floor(minRows)) } : node,
   );
+}
+
+export function updateTableHeaderHeightV2(
+  schema: FormSchemaV2,
+  tableId: string,
+  headerHeight: number,
+): FormSchemaV2 {
+  return updateSchemaNodeV2(schema, tableId, node =>
+    node.type === "table" ? { ...node, headerHeight: Math.max(0, Math.floor(headerHeight)) } : node,
+  );
+}
+
+export function updateTableRowHeightV2(
+  schema: FormSchemaV2,
+  tableId: string,
+  rowHeight: number,
+): FormSchemaV2 {
+  return updateSchemaNodeV2(schema, tableId, node =>
+    node.type === "table" ? { ...node, rowHeight: Math.max(0, Math.floor(rowHeight)) } : node,
+  );
+}
+
+/**
+ * 新增一列：同时向 columns 追加列定义，并向 rowTemplate 追加一个对应的单元格模板
+ * （默认放入一个字段 P），保证渲染层 tableTemplate() 能按 columnKey 命中。
+ * 列 key 自动避免与现有 key 冲突。
+ */
+export function addTableColumnV2(
+  schema: FormSchemaV2,
+  tableId: string,
+  column?: Partial<TableColumnV2>,
+): FormSchemaV2 {
+  return updateSchemaNodeV2(schema, tableId, node => {
+    if (node.type !== "table") return node;
+    const existingKeys = new Set(node.columns.map(col => col.key));
+    let index = node.columns.length + 1;
+    let key = `col${index}`;
+    while (existingKeys.has(key)) {
+      index += 1;
+      key = `col${index}`;
+    }
+    const newColumn: TableColumnV2 = {
+      key,
+      title: column?.title ?? "新列",
+      width: column?.width ?? "1fr",
+      align: column?.align,
+    };
+    const template: TableCellTemplateV2 = {
+      id: createSchemaNodeIdV2(`${node.id}-${key}`),
+      type: "table-cell-template",
+      columnKey: key,
+      children: [
+        {
+          id: createSchemaNodeIdV2(`${node.id}-${key}-p`),
+          type: "p",
+          mode: "field",
+          field: key,
+          underline: true,
+        },
+      ],
+    };
+    return {
+      ...node,
+      columns: [...node.columns, newColumn],
+      rowTemplate: [...node.rowTemplate, template],
+    };
+  });
+}
+
+/** 删除一列：同步移除 columns 定义与对应 rowTemplate。至少保留 1 列，避免退化表格。 */
+export function removeTableColumnV2(
+  schema: FormSchemaV2,
+  tableId: string,
+  columnKey: string,
+): FormSchemaV2 {
+  return updateSchemaNodeV2(schema, tableId, node => {
+    if (node.type !== "table" || node.columns.length <= 1) return node;
+    return {
+      ...node,
+      columns: node.columns.filter(col => col.key !== columnKey),
+      rowTemplate: node.rowTemplate.filter(template => template.columnKey !== columnKey),
+    };
+  });
+}
+
+/** 重命名列 key（同步更新 columns 与 rowTemplate）。 */
+export function renameTableColumnKeyV2(
+  schema: FormSchemaV2,
+  tableId: string,
+  oldKey: string,
+  newKey: string,
+): FormSchemaV2 {
+  const trimmed = newKey.trim();
+  if (!trimmed || trimmed === oldKey) return schema;
+  return updateSchemaNodeV2(schema, tableId, node => {
+    if (node.type !== "table") return node;
+    // 防止与已有 key 冲突
+    if (node.columns.some(c => c.key === trimmed)) return node;
+    return {
+      ...node,
+      columns: node.columns.map(col =>
+        col.key === oldKey ? { ...col, key: trimmed } : col,
+      ),
+      rowTemplate: node.rowTemplate.map(tpl =>
+        tpl.columnKey === oldKey
+          ? { ...tpl, columnKey: trimmed, id: `${tableId}-${trimmed}` }
+          : tpl,
+      ),
+    };
+  });
+}
+
+/** 编辑列属性（标题 / 宽度 / 对齐）。 */
+export function updateTableColumnV2(
+  schema: FormSchemaV2,
+  tableId: string,
+  columnKey: string,
+  patch: Partial<TableColumnV2>,
+): FormSchemaV2 {
+  return updateSchemaNodeV2(schema, tableId, node => {
+    if (node.type !== "table") return node;
+    return {
+      ...node,
+      columns: node.columns.map(col =>
+        col.key === columnKey ? { ...col, ...patch } : col,
+      ),
+    };
+  });
+}
+
+/** Updates the global base row height (mm). Clamped to 1–99. */
+export function updateBaseRowHeightV2(
+  schema: FormSchemaV2,
+  baseRowHeight: number,
+): FormSchemaV2 {
+  return { ...schema, baseRowHeight: Math.max(1, Math.min(99, Math.floor(baseRowHeight))) };
+}
+
+/** Updates the paper size / orientation. */
+export function updatePaperConfigV2(
+  schema: FormSchemaV2,
+  paper: FormSchemaV2["paper"],
+): FormSchemaV2 {
+  return { ...schema, paper };
 }
 
 export function createEmptyFormSchemaV2(): FormSchemaV2 {
@@ -288,6 +517,43 @@ export function mergeGridCellsV2(
   });
 }
 
+/** Splits a horizontally merged cell (colspan > 1) back into `colspan` cells.
+ *  All original children are kept in the first split cell; the remaining cells
+ *  are empty. Column alignment is preserved by the shared `grid.columns` track. */
+export function splitGridCellV2(
+  schema: FormSchemaV2,
+  cellId: string,
+): FormSchemaV2 {
+  const index = buildEditorNodeIndexV2(schema);
+  const entry = index.get(cellId);
+  if (entry?.node.type !== "grid-cell") return schema;
+  const span = entry.node.colspan ?? 1;
+  if (span <= 1) return schema;
+  const row = entry.parent;
+  if (!row || row.type !== "grid-row") return schema;
+  return updateSchemaNodeV2(schema, row.id, node => {
+    if (node.type !== "grid-row") return node;
+    const targetIndex = node.cells.findIndex(cell => cell.id === cellId);
+    if (targetIndex < 0) return node;
+    const original = node.cells[targetIndex];
+    const { colspan: _omit, ...first } = original;
+    const rest: GridCellV2[] = Array.from({ length: span - 1 }, () => ({
+      id: createSchemaNodeIdV2("cell"),
+      type: "grid-cell",
+      children: [],
+    }));
+    return {
+      ...node,
+      cells: [
+        ...node.cells.slice(0, targetIndex),
+        first,
+        ...rest,
+        ...node.cells.slice(targetIndex + 1),
+      ],
+    };
+  });
+}
+
 export function wrapCellChildrenWithGridV2(schema: FormSchemaV2, cellId: string): FormSchemaV2 {
   return updateSchemaNodeV2(schema, cellId, node => {
     if (node.type !== "grid-cell" || node.children.length === 0) return node;
@@ -307,6 +573,9 @@ export function moveNodeV2(
   const target = index.get(targetCellId);
   if (!source || !target || (target.node.type !== "grid-cell" && target.node.type !== "table-cell-template")) return schema;
   if (source.node.type === "page" || source.node.type === "grid-row" || source.node.type === "grid-cell" || source.node.type === "table-cell-template") return schema;
+  // 目标就是自身当前所在格：无实际位移，直接原样返回，避免「拆下再追加」把节点
+  // 挪到同格末尾、反复操作后在原格堆积空位（见 P6.3c 验收反馈）。
+  if (source.parent?.id === targetCellId) return schema;
   let ancestor = target.parent;
   while (ancestor) {
     if (ancestor.id === nodeId) return schema;
@@ -351,6 +620,110 @@ export function moveNodeV2(
     }).map(detach) })),
   };
   return moved ? appendNodeToCellV2(detached, targetCellId, moved) : schema;
+}
+
+/**
+ * P6.3b 格内排序：在同一父容器（grid-cell / table-cell-template / page）的子节点列表中
+ * 把节点上移或下移一位，用于替代「拖动调整子节点顺序」。
+ *
+ * 已在边界、或父容器不属于上述三类时原样返回 schema（不产生新对象），
+ * 便于 UI 侧据此判断按钮是否可点。
+ */
+export function moveNodeWithinParentV2(
+  schema: FormSchemaV2,
+  nodeId: string,
+  direction: "up" | "down",
+): FormSchemaV2 {
+  const index = buildEditorNodeIndexV2(schema);
+  const parent = index.get(nodeId)?.parent;
+  if (!parent) return schema;
+
+  /** 返回重排后的新数组；无法移动时返回 null（调用方据此保持 schema 原引用）。 */
+  const reorder = (children: FormNodeV2[]): FormNodeV2[] | null => {
+    const from = children.findIndex(child => child.id === nodeId);
+    if (from < 0) return null;
+    const to = direction === "up" ? from - 1 : from + 1;
+    if (to < 0 || to >= children.length) return null;
+    const moved = children[from];
+    const swapped = children[to];
+    if (!moved || !swapped) return null;
+    const next = [...children];
+    next[from] = swapped;
+    next[to] = moved;
+    return next;
+  };
+
+  let reordered: FormNodeV2[] | null = null;
+  const updated = updateSchemaNodeV2(schema, parent.id, node => {
+    const children =
+      node.type === "grid-cell" || node.type === "table-cell-template" || node.type === "page"
+        ? node.children
+        : null;
+    if (!children) return node;
+    const result = reorder(children);
+    if (!result) return node;
+    reordered = result;
+    return { ...node, children: result } as EditorNodeV2;
+  });
+  // 未实际重排（边界/父容器不支持）时返回原 schema，避免产生无意义的撤销记录。
+  return reordered ? updated : schema;
+}
+
+/**
+ * 列出可作为跨格移动目标的所有投放点（grid-cell / table-cell-template），供配置面板下拉选择。
+ *
+ * 传入 `moveNodeId` 时会过滤掉两类无意义/非法的目标：
+ * 1. **节点当前所在格** —— 移到自身格不产生位移，却会让节点被拆下再追加到同格末尾，
+ *    反复操作会在原格堆积空位（P6.3c 验收反馈）；
+ * 2. **节点自身及其后代容器** —— `moveNodeV2` 本就拒绝移入自身后代，列出来只会静默失败。
+ */
+export function listDropTargetsV2(
+  schema: FormSchemaV2,
+  moveNodeId?: string,
+): Array<{ id: string; label: string }> {
+  const index = buildEditorNodeIndexV2(schema);
+  const currentParentId = moveNodeId ? index.get(moveNodeId)?.parent?.id : undefined;
+  /** 沿父链上溯，判断该投放点是否位于被移动节点自身或其内部。 */
+  const isSelfOrDescendant = (id: string): boolean => {
+    let cursor: string | undefined = id;
+    while (cursor) {
+      if (cursor === moveNodeId) return true;
+      cursor = index.get(cursor)?.parent?.id;
+    }
+    return false;
+  };
+  const accepted = (id: string): boolean =>
+    id !== currentParentId && !(moveNodeId !== undefined && isSelfOrDescendant(id));
+
+  const targets: Array<{ id: string; label: string }> = [];
+
+  const walk = (children: FormNodeV2[], prefix: string): void => {
+    children.forEach(child => {
+      if (child.type === "grid") {
+        const gridLabel = `${prefix}${child.id}`;
+        child.rows.forEach((row, rowIndex) => {
+          row.cells.forEach((cell, cellIndex) => {
+            const cellLabel = `${gridLabel} · 第${rowIndex + 1}行第${cellIndex + 1}格`;
+            if (accepted(cell.id)) targets.push({ id: cell.id, label: cellLabel });
+            // 嵌套 Grid：递归其格内子节点
+            walk(cell.children, `${cellLabel} › `);
+          });
+        });
+      } else if (child.type === "table") {
+        child.rowTemplate.forEach(template => {
+          if (!accepted(template.id)) return;
+          const column = child.columns.find(c => c.key === template.columnKey);
+          targets.push({
+            id: template.id,
+            label: `${prefix}${child.id} · ${column?.title ?? template.columnKey}列`,
+          });
+        });
+      }
+    });
+  };
+
+  schema.pages.forEach(page => walk(page.children, ""));
+  return targets;
 }
 
 export function insertRootGridV2(
@@ -590,6 +963,50 @@ export function resizeGridV2(
   });
 }
 
+/** Derives a canonical column-width array from a Grid's first row (expanding
+ *  each cell by its colspan). Used to bootstrap `grid.columns` on legacy
+ *  schemas that only store per-cell widths. */
+function deriveGridColumnsV2(grid: GridNodeV2): GridTrackV2[] {
+  const source = grid.rows.find(row => row.cells.length > 0) ?? grid.rows[0];
+  const columns: GridTrackV2[] = [];
+  if (!source) return columns;
+  for (const cell of source.cells) {
+    const span = cell.colspan ?? 1;
+    for (let i = 0; i < span; i += 1) columns.push(cell.width ?? "1fr");
+  }
+  return columns;
+}
+
+/** Sets the track width for a column index across every row of a Grid.
+ *  Maintains both the canonical `grid.columns` (source of truth for rendering,
+ *  enables correct colspan alignment) and the legacy per-cell `cell.width`
+ *  (kept in sync for backward compatibility). */
+export function setGridColumnWidthV2(
+  schema: FormSchemaV2,
+  gridId: string,
+  columnIndex: number,
+  width: GridTrackV2,
+): FormSchemaV2 {
+  return updateSchemaNodeV2(schema, gridId, node => {
+    if (node.type !== "grid") return node;
+    const columns = node.columns ?? deriveGridColumnsV2(node);
+    const nextColumns = columns.slice();
+    if (columnIndex >= 0 && columnIndex < nextColumns.length) {
+      nextColumns[columnIndex] = width;
+    }
+    return {
+      ...node,
+      columns: nextColumns,
+      rows: node.rows.map(row => ({
+        ...row,
+        cells: row.cells.map((cell, index) =>
+          index === columnIndex ? { ...cell, width } : cell,
+        ),
+      })),
+    };
+  });
+}
+
 /** Configures a Cell's internal layout through a nested Grid. */
 export function resizeGridCellLayoutV2(
   schema: FormSchemaV2,
@@ -666,6 +1083,7 @@ export function createGridBySizeV2(options: GridSizeOptionsV2 = {}): GridNodeV2 
     id: createSchemaNodeIdV2("grid"),
     type: "grid",
     border: options.border ?? "all",
+    columns: Array.from({ length: columnCount }, () => cellWidth),
     rows: Array.from({ length: rowCount }, () => {
       const row = createGridRowV2(columnCount, rowHeight);
       return {
@@ -676,8 +1094,8 @@ export function createGridBySizeV2(options: GridSizeOptionsV2 = {}): GridNodeV2 
   };
 }
 
-export function createStaticPNodeV2(text = "固定文本"): FormNodeV2 {
-  return { id: createSchemaNodeIdV2("p-static"), type: "p", mode: "static", text };
+export function createTextNodeV2(text = "固定文本"): FormNodeV2 {
+  return { id: createSchemaNodeIdV2("text"), type: "text", text };
 }
 
 export function createFieldPNodeV2(field = "字段"): FormNodeV2 {
@@ -710,6 +1128,7 @@ export function createTableNodeV2(): TableNodeV2 {
         underline: true,
       }],
     })),
+    border: "all",
   };
 }
 

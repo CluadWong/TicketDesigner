@@ -11,6 +11,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "dompurify": "^3.4.14",
     "vue": "^3.5.0"
   },
   "devDependencies": {

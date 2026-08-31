@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { mount } from "@vue/test-utils";
-import GridSchemaNode from "@/dev/GridSchemaNode.vue";
+import GridSchemaNode from "@/components/renderer-v2/GridSchemaNode.vue";
 
 describe("GridSchemaNode row sizing", () => {
   it("renders GridRow and Table row heights as minimum heights", () => {

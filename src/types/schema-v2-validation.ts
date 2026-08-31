@@ -5,6 +5,7 @@ import type {
   GridCellV2,
   GridNodeV2,
   GridRowV2,
+  GridTrackV2,
   PageSchemaV2,
   PaperSizeV2,
   PNodeV2,
@@ -79,9 +80,7 @@ function validatePWidthOverflow(
   if (!context || node.style?.writingMode === "vertical-rl") return;
   const fontSizePx = node.style?.fontSize ?? DEFAULT_P_FONT_SIZE_PX;
   let estimatedWidthMm: number | undefined;
-  if (node.mode === "static") {
-    estimatedWidthMm = estimateTextWidthMm(node.text, fontSizePx);
-  } else if (node.prefix || node.suffix) {
+  if (node.prefix || node.suffix) {
     // Composite field P renders prefix + minimum-width input area + suffix; labels do not wrap.
     estimatedWidthMm =
       estimateTextWidthMm(`${node.prefix ?? ""}${node.suffix ?? ""}`, fontSizePx) +
@@ -115,7 +114,9 @@ function minNodeHeightMm(node: FormNodeV2, baseRowHeight: number): number {
 
 function pageUsableHeightMm(schema: FormSchemaV2, page: PageSchemaV2): number {
   const sides = PAPER_SIDE_MM[schema.paper.size];
-  const paperHeightMm = schema.paper.orientation === "portrait" ? sides.long : sides.short;
+  // 方向由纸张尺寸派生（去掉方向选择）：A4 → 纵向，A3 → 横向。
+  const orientation = schema.paper.size === "A3" ? "landscape" : "portrait";
+  const paperHeightMm = orientation === "portrait" ? sides.long : sides.short;
   return paperHeightMm - page.margin.top - page.margin.bottom;
 }
 
@@ -140,6 +141,26 @@ function validatePageOverflow(
       `Page minimum content height ${formatMm(contentMinHeightMm)}mm exceeds usable height ${formatMm(usableHeightMm)}mm`,
     );
   }
+}
+
+/** Sums numeric mm tracks across [start, start+count); returns undefined if any
+ *  track is fr/auto (cannot be estimated in mm) so overflow check is skipped. */
+function effectiveColumnWidthMm(
+  columns: GridTrackV2[] | undefined,
+  start: number,
+  count: number,
+): number | undefined {
+  if (!columns) return undefined;
+  let total: number | undefined = 0;
+  for (let i = start; i < start + count; i += 1) {
+    const track = columns[i];
+    if (typeof track === "number" && isPositiveNumber(track)) {
+      total = (total ?? 0) + track;
+    } else {
+      return undefined;
+    }
+  }
+  return total;
 }
 
 function validateGrid(
@@ -234,11 +255,27 @@ function scanNode(
   fields: Map<string, string>,
   cellContext: CellWidthContextV2 | undefined,
 ): void {
-  if (node.type === "p") {
-    validatePWidthOverflow(node, cellContext, path, issues);
-    if (node.mode === "static" && !node.text.trim()) {
-      issue(issues, "warning", "EMPTY_STATIC_TEXT", node, path, "Static P has empty text");
+  if (node.type === "text") {
+    if (cellContext && node.style?.writingMode !== "vertical-rl") {
+      const fontSizePx = node.style?.fontSize ?? DEFAULT_P_FONT_SIZE_PX;
+      const estimatedWidthMm = estimateTextWidthMm(node.text, fontSizePx);
+      const availableMm = cellContext.widthMm - 2 * cellContext.paddingMm;
+      if (estimatedWidthMm > availableMm) {
+        issue(
+          issues,
+          "warning",
+          "CONTENT_OVERFLOW",
+          node,
+          path,
+          `Text estimated width ${formatMm(estimatedWidthMm)}mm exceeds cell width ${formatMm(availableMm)}mm`,
+        );
+      }
     }
+    if (!node.text.trim()) {
+      issue(issues, "warning", "EMPTY_STATIC_TEXT", node, path, "Text node has empty text");
+    }
+  } else if (node.type === "p") {
+    validatePWidthOverflow(node, cellContext, path, issues);
     if (node.mode === "field") {
       if (!node.field.trim()) {
         issue(issues, "warning", "EMPTY_FIELD", node, path, "Field P has an empty field name");
@@ -250,15 +287,25 @@ function scanNode(
     }
   } else if (node.type === "grid") {
     validateGrid(node, path, issues);
-    node.rows.forEach((row, rowIndex) => row.cells.forEach((cell, cellIndex) => {
-      const context: CellWidthContextV2 | undefined =
-        typeof cell.width === "number" && isPositiveNumber(cell.width) && (cell.colspan ?? 1) === 1
-          ? { widthMm: cell.width, paddingMm: cell.padding ?? 0 }
-          : undefined;
-      cell.children.forEach((child, childIndex) =>
-        scanNode(child, [...path, "rows", rowIndex, "cells", cellIndex, "children", childIndex], issues, fields, context),
-      );
-    }));
+    node.rows.forEach((row, rowIndex) => {
+      let startColumn = 0;
+      row.cells.forEach((cell, cellIndex) => {
+        const span = cell.colspan ?? 1;
+        const widthMm =
+          span === 1
+            ? effectiveColumnWidthMm(node.columns, startColumn, 1) ??
+              (typeof cell.width === "number" && isPositiveNumber(cell.width) ? cell.width : undefined)
+            : undefined;
+        const context: CellWidthContextV2 | undefined =
+          widthMm !== undefined
+            ? { widthMm, paddingMm: cell.padding ?? node.cellPadding ?? 0 }
+            : undefined;
+        cell.children.forEach((child, childIndex) =>
+          scanNode(child, [...path, "rows", rowIndex, "cells", cellIndex, "children", childIndex], issues, fields, context),
+        );
+        startColumn += span;
+      });
+    });
   } else if (node.type === "table") {
     validateTable(node, path, issues);
     node.rowTemplate.forEach((template, templateIndex) => {

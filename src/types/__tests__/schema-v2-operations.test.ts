@@ -5,7 +5,7 @@ import {
   createEmptyFormSchemaV2,
   createGridNodeV2,
   createGridRowV2,
-  createStaticPNodeV2,
+  createTextNodeV2,
   createTableNodeV2,
   createHtmlNodeV2,
   createImageNodeV2,
@@ -13,19 +13,35 @@ import {
   moveGridRowV2,
   removeNodeV2,
   resizeGridV2,
+  setGridColumnWidthV2,
   resizeGridRowV2,
   resizeGridCellLayoutV2,
   splitGridCellRowsV2,
   splitGridRowV2,
   updateGridRowHeightV2,
   updateTableMinRowsV2,
+  updateTableHeaderHeightV2,
+  updateTableRowHeightV2,
+  addTableColumnV2,
+  removeTableColumnV2,
+  updateTableColumnV2,
   updateSchemaNodeV2,
+  resolveCellBoxV2,
+  updateCellPaddingV2,
+  updateCellAlignV2,
+  updateCellVerticalAlignV2,
+  updateGridCellDefaultsV2,
   cloneNodeWithFreshIdsV2,
   copyGridRowV2,
   mergeGridCellsV2,
   moveNodeV2,
+  moveNodeWithinParentV2,
+  listDropTargetsV2,
+  splitGridCellV2,
   wrapCellChildrenWithGridV2,
 } from "@/types/schema-v2-operations";
+import type { GridCellV2, GridNodeV2 } from "@/types/schema-v2";
+import { buildEditorNodeIndexV2 } from "@/types/schema-v2-index";
 import { validateFormSchemaV2 } from "@/types/schema-v2-validation";
 
 describe("Schema V2 operations", () => {
@@ -63,34 +79,51 @@ describe("Schema V2 operations", () => {
     expect(createImageNodeV2()).toMatchObject({ type: "image", objectFit: "contain" });
   });
 
+  it("sets a column width across every row of a grid", () => {
+    const source = createEmptyFormSchemaV2();
+    const grid = createGridNodeV2({ rows: 2, columns: 3, cellWidth: 24 });
+    const withGrid = insertRootGridV2(source, grid);
+    const resized = setGridColumnWidthV2(withGrid, grid.id, 1, "1fr");
+    const nextGrid = resized.pages[0].children[0];
+    if (nextGrid.type !== "grid") throw new Error("grid missing");
+    expect(nextGrid.rows.every(row => row.cells[1].width === "1fr")).toBe(true);
+    expect(nextGrid.rows[0].cells[0].width).toBe(24);
+    expect(nextGrid.rows[1].cells[2].width).toBe(24);
+  });
+
   it("clones a nested subtree with fresh IDs and unchanged content", () => {
     const schema = makeYunlvSecondTicketFirstFiveRowsSchema();
-    const source = schema.pages[0].children[3];
-    if (source.type !== "grid") throw new Error("grid missing");
+    const source = sampleGrid(schema, "ticket-layout");
+    const sourceTable = source.rows.find(r => r.id === "row-work-task")!.cells[1].children[0];
     const clone = cloneNodeWithFreshIdsV2(source);
     expect(clone.type).toBe("grid");
     expect(clone.id).not.toBe(source.id);
-    expect(clone.rows[0].cells[1].children[0]).toMatchObject({ type: "table" });
-    expect(clone.rows[0].cells[1].children[0].id).not.toBe(source.rows[0].cells[1].children[0].id);
+    const cloneTable = clone.rows.flatMap(r => r.cells).flatMap(c => c.children).find(c => c.type === "table");
+    expect(cloneTable).toBeDefined();
+    expect(cloneTable).toMatchObject({ type: "table" });
+    expect(cloneTable!.id).not.toBe(sourceTable.id);
   });
 
   it("copies a row next to the source with fresh nested IDs", () => {
     const schema = makeYunlvSecondTicketFirstFiveRowsSchema();
-    const next = copyGridRowV2(schema, "basic-station");
-    const grid = next.pages[0].children.find(node => node.id === "ticket-member-layout");
-    if (!grid || grid.type !== "grid") throw new Error("grid missing");
-    expect(grid.rows).toHaveLength(3);
-    expect(grid.rows[0].id).toBe("basic-members");
-    expect(grid.rows[1].id).toBe("basic-station");
-    expect(grid.rows[2].id).not.toBe("basic-station");
-    expect(grid.rows[2].cells[1].children[0].id).not.toBe("station-field");
+    const next = copyGridRowV2(schema, "row-station");
+    const grid = sampleGrid(next, "ticket-layout");
+    expect(grid.rows).toHaveLength(6);
+    expect(grid.rows[0].id).toBe("row-unit-number");
+    expect(grid.rows[3].id).toBe("row-station");
+    const copyRow = grid.rows[4];
+    expect(copyRow.id).not.toBe("row-station");
+    expect(copyRow.cells).toHaveLength(1);
+    const field = copyRow.cells[0].children.find(c => c.type === "p");
+    expect(field).toBeDefined();
+    expect(field!.id).not.toBe("station-field");
   });
 
   it("moves a component across cells and rejects moves into descendants", () => {
     const source = createEmptyFormSchemaV2();
     const grid = createGridNodeV2({ rows: 1, columns: 2 });
     const withGrid = insertRootGridV2(source, grid);
-    const p = createStaticPNodeV2("移动");
+    const p = createTextNodeV2("移动");
     const withP = appendNodeToCellV2(withGrid, grid.rows[0].cells[0].id, p);
     const nodeId = p.id;
     const moved = moveNodeV2(withP, nodeId, grid.rows[0].cells[1].id);
@@ -105,8 +138,8 @@ describe("Schema V2 operations", () => {
     const source = createEmptyFormSchemaV2();
     const grid = createGridNodeV2({ rows: 1, columns: 2 });
     const withGrid = insertRootGridV2(source, grid);
-    const withP = appendNodeToCellV2(withGrid, grid.rows[0].cells[0].id, createStaticPNodeV2("左"));
-    const withQ = appendNodeToCellV2(withP, grid.rows[0].cells[1].id, createStaticPNodeV2("右"));
+    const withP = appendNodeToCellV2(withGrid, grid.rows[0].cells[0].id, createTextNodeV2("左"));
+    const withQ = appendNodeToCellV2(withP, grid.rows[0].cells[1].id, createTextNodeV2("右"));
     const merged = mergeGridCellsV2(withQ, grid.rows[0].cells[0].id, grid.rows[0].cells[1].id);
     const mergedGrid = merged.pages[0].children[0];
     if (mergedGrid.type !== "grid") throw new Error("grid missing");
@@ -130,35 +163,35 @@ describe("Schema V2 operations", () => {
     const templateId = table.rowTemplate[0].id;
     const defaultPId = table.rowTemplate[0].children[0].id;
     const withoutDefault = removeNodeV2(withTable, defaultPId);
-    const withReplacement = appendNodeToCellV2(withoutDefault, templateId, createStaticPNodeV2("特殊内容"));
+    const withReplacement = appendNodeToCellV2(withoutDefault, templateId, createTextNodeV2("特殊内容"));
     const resultGrid = withReplacement.pages[0].children[0];
     if (resultGrid.type !== "grid") throw new Error("grid missing");
     const resultTable = resultGrid.rows[0].cells[0].children[0];
     if (resultTable.type !== "table") throw new Error("table missing");
     expect(resultTable.rowTemplate[0].children).toEqual([
-      expect.objectContaining({ type: "p", text: "特殊内容" }),
+      expect.objectContaining({ type: "text", text: "特殊内容" }),
     ]);
   });
 
   it("updates a nested row without mutating the source schema", () => {
     const schema = makeYunlvSecondTicketFirstFiveRowsSchema();
-    const next = updateGridRowHeightV2(schema, "work-task", 6);
-    expect(sampleGrid(next, "ticket-work-task-layout").rows[0].height).toBe(6);
-    expect(sampleGrid(schema, "ticket-work-task-layout").rows[0].height).toBe(5);
+    const next = updateGridRowHeightV2(schema, "row-work-task", 6);
+    expect(sampleGrid(next, "ticket-layout").rows.find(r => r.id === "row-work-task")!.height).toBe(6);
+    expect(sampleGrid(schema, "ticket-layout").rows.find(r => r.id === "row-work-task")!.height).toBe(5);
   });
 
   it("resizes a selected grid while preserving existing cells and children", () => {
     const source = createEmptyFormSchemaV2();
     const grid = createGridNodeV2({ rows: 2, columns: 2 });
     const withGrid = insertRootGridV2(source, grid);
-    const withP = appendNodeToCellV2(withGrid, grid.rows[0].cells[1].id, createStaticPNodeV2("keep"));
+    const withP = appendNodeToCellV2(withGrid, grid.rows[0].cells[1].id, createTextNodeV2("keep"));
     const resized = resizeGridV2(withP, grid.id, 3, 3);
     const resizedGrid = resized.pages[0].children[0];
 
     if (resizedGrid.type !== "grid") throw new Error("grid missing");
     expect(resizedGrid.rows).toHaveLength(3);
     expect(resizedGrid.rows[0].cells).toHaveLength(3);
-    expect(resizedGrid.rows[0].cells[1].children[0]).toMatchObject({ type: "p", text: "keep" });
+    expect(resizedGrid.rows[0].cells[1].children[0]).toMatchObject({ type: "text", text: "keep" });
     expect(resizedGrid.rows[2].cells).toHaveLength(3);
   });
 
@@ -179,7 +212,7 @@ describe("Schema V2 operations", () => {
     const source = createEmptyFormSchemaV2();
     const grid = createGridNodeV2({ rows: 1, columns: 2 });
     const withGrid = insertRootGridV2(source, grid);
-    const withTable = appendNodeToCellV2(withGrid, grid.rows[0].cells[1].id, createStaticPNodeV2("table"));
+    const withTable = appendNodeToCellV2(withGrid, grid.rows[0].cells[1].id, createTextNodeV2("table"));
     const split = splitGridCellRowsV2(withTable, grid.rows[0].cells[1].id, 3);
     const parent = split.pages[0].children[0];
 
@@ -188,7 +221,7 @@ describe("Schema V2 operations", () => {
     expect(nested.type).toBe("grid");
     if (nested.type !== "grid") throw new Error("nested grid missing");
     expect(nested.rows).toHaveLength(3);
-    expect(nested.rows[0].cells[0].children[0]).toMatchObject({ type: "p", text: "table" });
+    expect(nested.rows[0].cells[0].children[0]).toMatchObject({ type: "text", text: "table" });
   });
 
   it("configures both rows and columns inside a Cell", () => {
@@ -207,10 +240,78 @@ describe("Schema V2 operations", () => {
   it("updates table minimum rows through the nested tree", () => {
     const schema = makeYunlvSecondTicketFirstFiveRowsSchema();
     const next = updateTableMinRowsV2(schema, "work-task-table", 6);
-    const grid = sampleGrid(next, "ticket-work-task-layout");
-    const table = grid.rows[0].cells[1].children[0];
+    const grid = sampleGrid(next, "ticket-layout");
+    const table = grid.rows.find(r => r.id === "row-work-task")!.cells[1].children[0];
     if (table.type !== "table") throw new Error("fixture table missing");
     expect(table.minRows).toBe(6);
+  });
+
+  it("updates table header height and row height through the nested tree", () => {
+    const schema = makeYunlvSecondTicketFirstFiveRowsSchema();
+    const headerNext = updateTableHeaderHeightV2(schema, "work-task-table", 2);
+    const rowNext = updateTableRowHeightV2(schema, "work-task-table", 3);
+    const headerGrid = sampleGrid(headerNext, "ticket-layout");
+    const rowGrid = sampleGrid(rowNext, "ticket-layout");
+    const headerTable = headerGrid.rows.find(r => r.id === "row-work-task")!.cells[1].children[0];
+    const rowTable = rowGrid.rows.find(r => r.id === "row-work-task")!.cells[1].children[0];
+    if (headerTable.type !== "table" || rowTable.type !== "table") throw new Error("fixture table missing");
+    expect(headerTable.headerHeight).toBe(2);
+    expect(rowTable.rowHeight).toBe(3);
+    // 源 schema 不被修改
+    const sourceTable = sampleGrid(schema, "ticket-layout").rows.find(r => r.id === "row-work-task")!.cells[1].children[0];
+    if (sourceTable.type !== "table") throw new Error("fixture table missing");
+    expect(sourceTable.headerHeight).toBe(1);
+    expect(sourceTable.rowHeight).toBe(1);
+  });
+
+  it("adds a table column with matching template without mutating the source", () => {
+    const schema = makeYunlvSecondTicketFirstFiveRowsSchema();
+    const next = addTableColumnV2(schema, "work-task-table");
+    const sourceTable = sampleGrid(schema, "ticket-layout").rows.find(r => r.id === "row-work-task")!.cells[1].children[0];
+    const table = sampleGrid(next, "ticket-layout").rows.find(r => r.id === "row-work-task")!.cells[1].children[0];
+    if (table.type !== "table") throw new Error("table missing");
+    expect(sourceTable.type === "table" ? sourceTable.columns.length : 0).toBe(2);
+    expect(table.columns).toHaveLength(3);
+    const added = table.columns[2];
+    expect(added.key).toMatch(/^col\d+$/);
+    expect(added.title).toBe("新列");
+    expect(added.width).toBe("1fr");
+    expect(table.rowTemplate).toHaveLength(3);
+    expect(table.rowTemplate[2]).toMatchObject({ type: "table-cell-template", columnKey: added.key });
+    // 源 schema 不被修改
+    expect(sourceTable.type === "table" ? sourceTable.columns.length : 0).toBe(2);
+  });
+
+  it("removes a table column and its template, keeping at least one column", () => {
+    const schema = makeYunlvSecondTicketFirstFiveRowsSchema();
+    const table = sampleGrid(schema, "ticket-layout").rows.find(r => r.id === "row-work-task")!.cells[1].children[0];
+    if (table.type !== "table") throw new Error("fixture table missing");
+    const key = table.columns[0].key;
+    const next = removeTableColumnV2(schema, "work-task-table", key);
+    const resultTable = sampleGrid(next, "ticket-layout").rows.find(r => r.id === "row-work-task")!.cells[1].children[0];
+    if (resultTable.type !== "table") throw new Error("table missing");
+    expect(resultTable.columns).toHaveLength(1);
+    expect(resultTable.columns[0].key).not.toBe(key);
+    expect(resultTable.rowTemplate.every(t => t.columnKey !== key)).toBe(true);
+
+    // 仅剩 1 列时不再删除
+    const blocked = removeTableColumnV2(next, "work-task-table", resultTable.columns[0].key);
+    const blockedTable = sampleGrid(blocked, "ticket-layout").rows.find(r => r.id === "row-work-task")!.cells[1].children[0];
+    if (blockedTable.type !== "table") throw new Error("table missing");
+    expect(blockedTable.columns).toHaveLength(1);
+  });
+
+  it("updates a table column's meta fields", () => {
+    const schema = makeYunlvSecondTicketFirstFiveRowsSchema();
+    const table = sampleGrid(schema, "ticket-layout").rows.find(r => r.id === "row-work-task")!.cells[1].children[0];
+    if (table.type !== "table") throw new Error("fixture table missing");
+    const key = table.columns[0].key;
+    const next = updateTableColumnV2(schema, "work-task-table", key, { title: "序号", align: "center" });
+    const resultTable = sampleGrid(next, "ticket-layout").rows.find(r => r.id === "row-work-task")!.cells[1].children[0];
+    if (resultTable.type !== "table") throw new Error("table missing");
+    const col = resultTable.columns[0];
+    expect(col.title).toBe("序号");
+    expect(col.align).toBe("center");
   });
 
   it("creates a blank page, adds a grid, splits a row, and inserts a static P", () => {
@@ -221,36 +322,37 @@ describe("Schema V2 operations", () => {
     const split = splitGridRowV2(withGrid, rowId, 2);
     const gridAfterSplit = split.pages[0].children[0];
     if (gridAfterSplit.type !== "grid") throw new Error("grid missing");
-    const withP = appendNodeToCellV2(split, gridAfterSplit.rows[0].cells[0].id, createStaticPNodeV2("单位"));
+    const withP = appendNodeToCellV2(split, gridAfterSplit.rows[0].cells[0].id, createTextNodeV2("单位"));
     const finalGrid = withP.pages[0].children[0];
     if (finalGrid.type !== "grid") throw new Error("grid missing");
     expect(finalGrid.rows[0].cells).toHaveLength(2);
-    expect(finalGrid.rows[0].cells[0].children[0]).toMatchObject({ type: "p", mode: "static", text: "单位" });
+    expect(finalGrid.rows[0].cells[0].children[0]).toMatchObject({ type: "text", text: "单位" });
   });
 
   it("moves rows and removes a nested node without mutating the source", () => {
     const schema = makeYunlvSecondTicketFirstFiveRowsSchema();
-    const moved = moveGridRowV2(schema, "basic-station", "up");
-    const movedGrid = sampleGrid(moved, "ticket-member-layout");
-    expect(movedGrid.rows[0].id).toBe("basic-station");
+    const moved = moveGridRowV2(schema, "row-station", "up");
+    const movedGrid = sampleGrid(moved, "ticket-layout");
+    expect(movedGrid.rows[2].id).toBe("row-station");
     const removed = removeNodeV2(schema, "station-field");
-    expect(sampleGrid(schema, "ticket-member-layout").rows[1].cells[1].children).toHaveLength(1);
-    expect(sampleGrid(removed, "ticket-member-layout").rows[1].cells[1].children).toHaveLength(0);
+    const stationRow = sampleGrid(removed, "ticket-layout").rows.find(r => r.id === "row-station")!;
+    expect(stationRow.cells[0].children.find(c => c.id === "station-field")).toBeUndefined();
   });
 
   it("removes grid, row, and cell structure nodes", () => {
     const schema = makeYunlvSecondTicketFirstFiveRowsSchema();
 
-    const withoutCell = removeNodeV2(schema, "station-field-cell");
-    const cellGrid = sampleGrid(withoutCell, "ticket-member-layout");
-    expect(cellGrid.rows[1].cells).toHaveLength(1);
+    const withoutCell = removeNodeV2(schema, "cell-u-f");
+    const cellGrid = sampleGrid(withoutCell, "ticket-layout");
+    const unitRow = cellGrid.rows.find(r => r.id === "row-unit-number")!;
+    expect(unitRow.cells).toHaveLength(3);
 
-    const withoutRow = removeNodeV2(schema, "basic-station");
-    const rowGrid = sampleGrid(withoutRow, "ticket-member-layout");
-    expect(rowGrid.rows.some(row => row.id === "basic-station")).toBe(false);
+    const withoutRow = removeNodeV2(schema, "row-station");
+    const rowGrid = sampleGrid(withoutRow, "ticket-layout");
+    expect(rowGrid.rows.some(row => row.id === "row-station")).toBe(false);
 
-    const withoutGrid = removeNodeV2(schema, "ticket-basic-layout");
-    expect(withoutGrid.pages[0].children.some(node => node.id === "ticket-basic-layout")).toBe(false);
+    const withoutGrid = removeNodeV2(schema, "ticket-layout");
+    expect(withoutGrid.pages[0].children.some(node => node.id === "ticket-layout")).toBe(false);
   });
 
   it("prunes empty rows and grids after deleting the last cell", () => {
@@ -261,5 +363,292 @@ describe("Schema V2 operations", () => {
 
     expect(withoutCell.pages[0].children).toHaveLength(0);
     expect(validateFormSchemaV2(withoutCell).some(issue => issue.code === "INVALID_GRID_ROWS")).toBe(false);
+  });
+});
+
+describe("P6.2b cell padding/align cascade", () => {
+  const makeGrid = (overrides: Partial<GridNodeV2> = {}): GridNodeV2 => ({
+    id: "g",
+    type: "grid",
+    border: "all",
+    rows: [],
+    ...overrides,
+  });
+  const makeCell = (overrides: Partial<GridCellV2> = {}): GridCellV2 => ({
+    id: "c",
+    type: "grid-cell",
+    children: [],
+    ...overrides,
+  });
+
+  it("resolves cell box with cascade: cell > grid default > constant", () => {
+    const gridDefaults = makeGrid({ cellPadding: 4, cellAlign: "center", cellVerticalAlign: "top" });
+    expect(resolveCellBoxV2(makeCell(), gridDefaults)).toEqual({
+      padding: 4,
+      align: "center",
+      verticalAlign: "top",
+    });
+    const cellOverride = makeCell({ padding: 2, align: "right", verticalAlign: "bottom" });
+    expect(resolveCellBoxV2(cellOverride, gridDefaults)).toEqual({
+      padding: 2,
+      align: "right",
+      verticalAlign: "bottom",
+    });
+    // 无 Grid 默认时回退常量（padding 0 / 左 / 居中）
+    expect(resolveCellBoxV2(makeCell(), makeGrid())).toEqual({
+      padding: 0,
+      align: "left",
+      verticalAlign: "middle",
+    });
+  });
+
+  it("updates a single cell's padding without mutating the source", () => {
+    const source = createEmptyFormSchemaV2();
+    const grid = createGridNodeV2({ rows: 1, columns: 1 });
+    const withGrid = insertRootGridV2(source, grid);
+    const cellId = grid.rows[0].cells[0].id;
+
+    const next = updateCellPaddingV2(withGrid, cellId, 3);
+    const nextGrid = next.pages[0].children[0];
+    if (nextGrid.type !== "grid") throw new Error("grid missing");
+    expect(nextGrid.rows[0].cells[0].padding).toBe(3);
+    // 源不被修改
+    const srcGrid = withGrid.pages[0].children[0];
+    if (srcGrid.type !== "grid") throw new Error("grid missing");
+    expect(srcGrid.rows[0].cells[0].padding).toBeUndefined();
+    // 负数归零
+    const clamped = updateCellPaddingV2(withGrid, cellId, -5);
+    const clampedGrid = clamped.pages[0].children[0];
+    if (clampedGrid.type !== "grid") throw new Error("grid missing");
+    expect(clampedGrid.rows[0].cells[0].padding).toBe(0);
+  });
+
+  it("updates a cell's align / verticalAlign and can clear overrides", () => {
+    const source = createEmptyFormSchemaV2();
+    const grid = createGridNodeV2({ rows: 1, columns: 1 });
+    const withGrid = insertRootGridV2(source, grid);
+    const cellId = grid.rows[0].cells[0].id;
+
+    const aligned = updateCellAlignV2(withGrid, cellId, "center");
+    const aGrid = aligned.pages[0].children[0];
+    if (aGrid.type !== "grid") throw new Error("grid missing");
+    expect(aGrid.rows[0].cells[0].align).toBe("center");
+
+    const valign = updateCellVerticalAlignV2(aligned, cellId, "top");
+    const vGrid = valign.pages[0].children[0];
+    if (vGrid.type !== "grid") throw new Error("grid missing");
+    expect(vGrid.rows[0].cells[0].verticalAlign).toBe("top");
+
+    const cleared = updateCellAlignV2(valign, cellId, undefined);
+    const cGrid = cleared.pages[0].children[0];
+    if (cGrid.type !== "grid") throw new Error("grid missing");
+    expect(cGrid.rows[0].cells[0].align).toBeUndefined();
+  });
+
+  it("sets Grid-level cell defaults without mutating the source", () => {
+    const source = createEmptyFormSchemaV2();
+    const grid = createGridNodeV2({ rows: 1, columns: 1 });
+    const withGrid = insertRootGridV2(source, grid);
+
+    const next = updateGridCellDefaultsV2(withGrid, grid.id, {
+      cellPadding: 5,
+      cellAlign: "right",
+      cellVerticalAlign: "bottom",
+    });
+    const nextGrid = next.pages[0].children[0];
+    if (nextGrid.type !== "grid") throw new Error("grid missing");
+    expect(nextGrid.cellPadding).toBe(5);
+    expect(nextGrid.cellAlign).toBe("right");
+    expect(nextGrid.cellVerticalAlign).toBe("bottom");
+    // 级联：无覆盖的 cell 继承 Grid 默认
+    expect(resolveCellBoxV2(nextGrid.rows[0].cells[0], nextGrid)).toEqual({
+      padding: 5,
+      align: "right",
+      verticalAlign: "bottom",
+    });
+    // 源不被修改
+    const srcGrid = withGrid.pages[0].children[0];
+    if (srcGrid.type !== "grid") throw new Error("grid missing");
+    expect(srcGrid.cellPadding).toBeUndefined();
+  });
+});
+
+describe("P6.2c/P6.2d 共享列轨 + 合并/拆分", () => {
+  const buildThreeColGrid = () => {
+    const blank = createEmptyFormSchemaV2();
+    const grid = createGridNodeV2({ rows: 1, columns: 3, cellWidth: 30 });
+    const schema = insertRootGridV2(blank, grid);
+    const g = schema.pages[0].children[0];
+    if (g.type !== "grid") throw new Error("grid missing");
+    return { schema, grid: g };
+  };
+
+  it("createGridNodeV2 sets a canonical columns array matching cell count", () => {
+    const { grid } = buildThreeColGrid();
+    expect(grid.columns).toEqual([30, 30, 30]);
+  });
+
+  it("setGridColumnWidthV2 maintains both grid.columns and per-cell widths", () => {
+    const { schema, grid } = buildThreeColGrid();
+    const next = setGridColumnWidthV2(schema, grid.id, 1, 50);
+    const g = next.pages[0].children[0];
+    if (g.type !== "grid") throw new Error("grid missing");
+    expect(g.columns).toEqual([30, 50, 30]);
+    expect(g.rows.every(row => row.cells[1].width === 50)).toBe(true);
+  });
+
+  it("mergeGridCellsV2 sums colspan and concatenates children", () => {
+    const { schema, grid } = buildThreeColGrid();
+    const first = grid.rows[0].cells[0].id;
+    const second = grid.rows[0].cells[1].id;
+    const merged = mergeGridCellsV2(schema, first, second);
+    const g = merged.pages[0].children[0];
+    if (g.type !== "grid") throw new Error("grid missing");
+    expect(g.rows[0].cells).toHaveLength(2);
+    expect(g.rows[0].cells[0].colspan).toBe(2);
+  });
+
+  it("splitGridCellV2 restores column count and keeps children in the first cell", () => {
+    const { schema, grid } = buildThreeColGrid();
+    const first = grid.rows[0].cells[0].id;
+    const second = grid.rows[0].cells[1].id;
+    const merged = mergeGridCellsV2(schema, first, second);
+    const mergedGrid = merged.pages[0].children[0];
+    if (mergedGrid.type !== "grid") throw new Error("grid missing");
+    const child = createTextNodeV2("合并内容");
+    const withChild = appendNodeToCellV2(merged, mergedGrid.rows[0].cells[0].id, child);
+    const wg = withChild.pages[0].children[0];
+    if (wg.type !== "grid") throw new Error("grid missing");
+    const split = splitGridCellV2(withChild, wg.rows[0].cells[0].id);
+    const g = split.pages[0].children[0];
+    if (g.type !== "grid") throw new Error("grid missing");
+    expect(g.rows[0].cells).toHaveLength(3);
+    expect(g.rows[0].cells[0].colspan).toBeUndefined();
+    expect(g.rows[0].cells[0].children).toHaveLength(1);
+    expect(g.rows[0].cells[1].children).toHaveLength(0);
+  });
+
+  it("merge then split round-trips the cell count", () => {
+    const { schema, grid } = buildThreeColGrid();
+    const first = grid.rows[0].cells[0].id;
+    const second = grid.rows[0].cells[1].id;
+    const merged = mergeGridCellsV2(schema, first, second);
+    const mg = merged.pages[0].children[0];
+    if (mg.type !== "grid") throw new Error("grid missing");
+    const split = splitGridCellV2(merged, mg.rows[0].cells[0].id);
+    const g = split.pages[0].children[0];
+    if (g.type !== "grid") throw new Error("grid missing");
+    expect(g.rows[0].cells).toHaveLength(3);
+  });
+});
+
+describe("P6.3b 格内排序 / P6.3c 跨格移动目标", () => {
+  /** 规范样例「工作负责人（监护人）/班组」合并格内的 4 个子节点顺序。 */
+  const ownerCellChildren = (schema: ReturnType<typeof makeYunlvSecondTicketFirstFiveRowsSchema>) => {
+    const grid = schema.pages[0].children.find(node => node.id === "ticket-layout");
+    if (grid?.type !== "grid") throw new Error("ticket-layout missing");
+    const row = grid.rows.find(r => r.id === "row-owner-team");
+    if (!row) throw new Error("row-owner-team missing");
+    return row.cells[0].children.map(child => child.id);
+  };
+
+  it("moveNodeWithinParentV2 上移与下移交换兄弟顺序", () => {
+    const schema = makeYunlvSecondTicketFirstFiveRowsSchema();
+    expect(ownerCellChildren(schema)).toEqual([
+      "owner-label",
+      "owner-field",
+      "team-label",
+      "team-field",
+    ]);
+
+    const up = moveNodeWithinParentV2(schema, "owner-field", "up");
+    expect(ownerCellChildren(up)).toEqual([
+      "owner-field",
+      "owner-label",
+      "team-label",
+      "team-field",
+    ]);
+
+    const down = moveNodeWithinParentV2(up, "owner-field", "down");
+    expect(ownerCellChildren(down)).toEqual([
+      "owner-label",
+      "owner-field",
+      "team-label",
+      "team-field",
+    ]);
+
+    // 源 schema 不被修改
+    expect(ownerCellChildren(schema)).toEqual([
+      "owner-label",
+      "owner-field",
+      "team-label",
+      "team-field",
+    ]);
+  });
+
+  it("moveNodeWithinParentV2 在边界或父容器不支持时原样返回", () => {
+    const schema = makeYunlvSecondTicketFirstFiveRowsSchema();
+    expect(moveNodeWithinParentV2(schema, "owner-label", "up")).toBe(schema);
+    expect(moveNodeWithinParentV2(schema, "team-field", "down")).toBe(schema);
+    // grid-row 不是可排序的父容器（行顺序请用 moveGridRowV2）
+    expect(moveNodeWithinParentV2(schema, "row-unit-number", "up")).toBe(schema);
+  });
+
+  it("listDropTargetsV2 列出全部单元格与表格列模板", () => {
+    const schema = makeYunlvSecondTicketFirstFiveRowsSchema();
+    const targets = listDropTargetsV2(schema);
+    const ids = targets.map(target => target.id);
+    expect(new Set(ids).size).toBe(ids.length); // id 唯一
+    expect(ids).toEqual(expect.arrayContaining([
+      "cell-title",
+      "cell-u-l",
+      "cell-o-l",
+      "cell-m-l",
+      "cell-s-l",
+      "cell-wt-r1",
+      "wt-loc-tpl",
+      "wt-con-tpl",
+    ]));
+    expect(targets.find(t => t.id === "cell-wt-r1")?.label).toContain("第5行第2格");
+    expect(targets.find(t => t.id === "wt-con-tpl")?.label).toContain("工作内容");
+  });
+
+  it("listDropTargetsV2 传入节点时排除其所在格与自身内部容器", () => {
+    const schema = makeYunlvSecondTicketFirstFiveRowsSchema();
+    // 不传节点：包含自身所在格
+    expect(listDropTargetsV2(schema).map(t => t.id)).toContain("cell-o-l");
+
+    // owner-field 当前位于 cell-o-l：该格不应再作为移动目标
+    const forField = listDropTargetsV2(schema, "owner-field").map(t => t.id);
+    expect(forField).not.toContain("cell-o-l");
+    expect(forField).toContain("cell-s-l");
+
+    // 移动整个外层 Grid 时，其内部所有格与表格列模板都不是合法目标
+    const forGrid = listDropTargetsV2(schema, "ticket-layout").map(t => t.id);
+    expect(forGrid).not.toContain("cell-o-l");
+    expect(forGrid).not.toContain("cell-wt-r1");
+    expect(forGrid).not.toContain("wt-loc-tpl");
+    expect(forGrid).toContain("cell-title");
+  });
+
+  it("moveNodeV2 目标为自身所在格时原样返回，不产生位移也不重复", () => {
+    const schema = makeYunlvSecondTicketFirstFiveRowsSchema();
+    const childrenOf = (target: typeof schema, parentId: string): string[] => {
+      const parent = buildEditorNodeIndexV2(target).get(parentId)?.node as
+        | { children?: Array<{ id: string }> }
+        | undefined;
+      return (parent?.children ?? []).map(child => child.id);
+    };
+    const before = childrenOf(schema, "cell-o-l");
+    expect(before).toContain("owner-field");
+
+    const sameCell = moveNodeV2(schema, "owner-field", "cell-o-l");
+    expect(sameCell).toBe(schema); // 原引用，不产生撤销记录
+    expect(childrenOf(sameCell, "cell-o-l")).toEqual(before);
+
+    // 正常跨格移动仍然生效
+    const moved = moveNodeV2(schema, "owner-field", "cell-s-l");
+    expect(childrenOf(moved, "cell-o-l")).not.toContain("owner-field");
+    expect(childrenOf(moved, "cell-s-l")).toContain("owner-field");
   });
 });

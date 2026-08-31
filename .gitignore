@@ -21,3 +21,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Vite / Vitest 临时配置缓存（esbuild 转译 *.config.ts 的副产物，运行中断会残留，可安全忽略/删除）
+*.timestamp-*.mjs

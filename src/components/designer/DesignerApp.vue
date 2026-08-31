@@ -1,26 +1,73 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import {
+  computed,
+  ref,
+  watch,
+  onMounted,
+  onUnmounted,
+  reactive,
+  provide,
+} from "vue";
 import { GridFormRenderer as GridSchemaRenderer } from "@/components/renderer-v2";
 import { makeYunlvSecondTicketFirstFiveRowsSchema } from "@/dev/yunlv-second-ticket-first-five-rows";
+import { makeYunlvSecondTicketFullSchema } from "@/dev/yunlv-second-ticket-full";
+import demoData from "@/dev/demoData";
 import {
   buildEditorNodeIndexV2,
+  resolveCellBoxV2,
   appendNodeToCellV2,
   createEmptyFormSchemaV2,
   createFieldPNodeV2,
   createGridNodeV2,
-  createStaticPNodeV2,
+  createHtmlNodeV2,
+  createImageNodeV2,
+  createTextNodeV2,
   createTableNodeV2,
   insertRootGridV2,
   removeNodeV2,
   resizeGridV2,
+  setGridColumnWidthV2,
+  mergeGridCellsV2,
+  splitGridCellV2,
+  moveNodeV2,
+  moveNodeWithinParentV2,
+  listDropTargetsV2,
   updateGridBorderV2,
+  updateTableBorderV2,
+  updateGridCellDefaultsV2,
   updateSchemaNodeV2,
   updateTableMinRowsV2,
+  updateTableHeaderHeightV2,
+  updateTableRowHeightV2,
+  addTableColumnV2,
+  removeTableColumnV2,
+  renameTableColumnKeyV2,
+  updateTableColumnV2,
+  updateBaseRowHeightV2,
+  updatePaperConfigV2,
   validateFormSchemaV2,
+  serializeFormSchemaV2,
+  parseFormSchemaV2,
 } from "@/types";
-import type { BorderModeV2, SchemaNodeV2, EditorNodeV2, SchemaIssueV2 } from "@/types";
+import type {
+  BorderModeV2,
+  FieldPNodeV2,
+  FormNodeV2,
+  GridCellV2,
+  GridNodeV2,
+  GridRowV2,
+  GridTrackV2,
+  EditorNodeV2,
+  SchemaIssueV2,
+  FormSchemaV2,
+  FormDataV2,
+  TextStyleV2,
+  TextNodeV2,
+  TableColumnV2,
+} from "@/types";
 import { isSelectableSchemaNodeV2 } from "@/types";
 import StatusBar from "./StatusBar.vue";
+import NodeTreeItem, { type TreeNode } from "./NodeTreeItem.vue";
 
 const schema = ref(makeYunlvSecondTicketFirstFiveRowsSchema());
 const selectedNodeId = ref<string | null>(null);
@@ -31,18 +78,112 @@ const selectionPathIndex = ref(0);
 const issues = computed(() => validateFormSchemaV2(schema.value));
 const warningCount = computed(() => issues.value.length);
 const nodeIndex = computed(() => buildEditorNodeIndexV2(schema.value));
+// 单元格（grid-cell）作为「仅样式可编辑」实体可被选中，但不可删除、不进入节点树。
+function isStyleEditableNode(node: EditorNodeV2 | undefined): node is EditorNodeV2 {
+  return node !== undefined && (isSelectableSchemaNodeV2(node) || node.type === "grid-cell");
+}
 const selectedNode = computed<EditorNodeV2 | null>(() => {
   const id = selectedNodeId.value;
   const node = id ? nodeIndex.value.get(id)?.node : undefined;
-  return isSelectableSchemaNodeV2(node) ? node : null;
+  return isStyleEditableNode(node) ? node : null;
 });
-const selectedPath = computed<SchemaNodeV2[]>(() => {
+const selectedPath = computed<EditorNodeV2[]>(() => {
   return selectionPathIds.value
     .map((id) => nodeIndex.value.get(id)?.node)
-    .filter(isSelectableSchemaNodeV2);
+    .filter(isStyleEditableNode);
 });
 const selectedNodeType = computed(() => selectedNode.value?.type ?? "未选择");
-const selectedOwnerCell = computed(() => selectedNodeId.value ? nodeIndex.value.get(selectedNodeId.value)?.ownerCell ?? null : null);
+const selectedOwnerCell = computed(() =>
+  selectedNodeId.value
+    ? (nodeIndex.value.get(selectedNodeId.value)?.ownerCell ?? null)
+    : null,
+);
+// 选中单元格（grid-cell）时，取其所属 Grid 以计算生效值与「清除覆盖」。
+const selectedCell = computed(() =>
+  selectedNode.value?.type === "grid-cell" ? (selectedNode.value as GridCellV2) : null,
+);
+const selectedOwnerGridOfCell = computed<GridNodeV2 | null>(() => {
+  const id = selectedNodeId.value;
+  if (!id) return null;
+  let cursor = nodeIndex.value.get(id)?.parent ?? null;
+  while (cursor && cursor.type !== "grid") {
+    cursor = nodeIndex.value.get(cursor.id)?.parent ?? null;
+  }
+  return cursor?.type === "grid" ? (cursor as GridNodeV2) : null;
+});
+const selectedCellBox = computed(() => {
+  const cell = selectedCell.value;
+  const grid = selectedOwnerGridOfCell.value;
+  if (!cell || !grid) return null;
+  return resolveCellBoxV2(cell, grid);
+});
+/** 选中 grid-cell 时的上下文：所在行、列索引、是否可合并右侧、是否可拆分。 */
+const selectedCellContext = computed<{
+  rowIndex: number;
+  columnIndex: number;
+  hasNextSibling: boolean;
+  canSplit: boolean;
+} | null>(() => {
+  const id = selectedNodeId.value;
+  if (!id) return null;
+  const entry = nodeIndex.value.get(id);
+  if (entry?.node.type !== "grid-cell" || entry.parent?.type !== "grid-row") return null;
+  const row = entry.parent as GridRowV2;
+  const rowIndex = (nodeIndex.value.get(row.id)?.node as GridRowV2 | undefined)
+    ? (selectedOwnerGridOfCell.value?.rows ?? []).findIndex(r => r.id === row.id)
+    : -1;
+  const columnIndex = row.cells.findIndex(cell => cell.id === id);
+  if (columnIndex < 0) return null;
+  return {
+    rowIndex,
+    columnIndex,
+    hasNextSibling: columnIndex < row.cells.length - 1,
+    canSplit: (entry.node.colspan ?? 1) > 1,
+  };
+});
+/** 选中节点是否位于某个 Table 的行模板内（行模板内可用 `{row}` 行号占位符）。 */
+const selectedInTableRowTemplate = computed(() => {
+  const id = selectedNodeId.value;
+  if (!id) return false;
+  let cursor = nodeIndex.value.get(id)?.parent ?? null;
+  while (cursor) {
+    if (cursor.type === "table") return true;
+    cursor = nodeIndex.value.get(cursor.id)?.parent ?? null;
+  }
+  return false;
+});
+/** 选中组件在父容器（格 / 行模板 / 页）中的位置，用于「格内排序」（P6.3b）。 */
+const selectedPosition = computed<{ canMoveUp: boolean; canMoveDown: boolean } | null>(() => {
+  const id = selectedNodeId.value;
+  if (!id) return null;
+  const parent = nodeIndex.value.get(id)?.parent;
+  if (!parent) return null;
+  const children =
+    parent.type === "grid-cell" || parent.type === "table-cell-template" || parent.type === "page"
+      ? parent.children
+      : null;
+  if (!children) return null;
+  const at = children.findIndex(child => child.id === id);
+  if (at < 0) return null;
+  return { canMoveUp: at > 0, canMoveDown: at < children.length - 1 };
+});
+/**
+ * 跨格移动（P6.3c）的目标投放点与当前选择。
+ * 目标列表排除「选中节点当前所在格」与「其自身后代容器」——选自身格不产生位移，
+ * 却会把节点拆下再追加到同格末尾，反复操作会在原格堆积空位。
+ */
+const dropTargets = computed(() =>
+  listDropTargetsV2(schema.value, selectedNodeId.value ?? undefined),
+);
+const moveTargetId = ref("");
+// 切换选中节点后清空目标，避免沿用上一个节点的目标格。
+watch(
+  () => selectedNodeId.value,
+  () => {
+    moveTargetId.value = "";
+  },
+);
+
 const insertionSlot = computed(() => {
   const slotId = selectedInsertionSlotId.value;
   const slot = slotId ? nodeIndex.value.get(slotId)?.node : undefined;
@@ -50,65 +191,454 @@ const insertionSlot = computed(() => {
     ? slot
     : selectedOwnerCell.value;
 });
+
+// 结构树：仅展示可选节点（Page / Grid / 实际组件），跳过 Row/Cell 布局记录。
+function selectableChildrenOf(node: EditorNodeV2): EditorNodeV2[] {
+  if (node.type === "page") return node.children;
+  if (node.type === "grid") {
+    const out: EditorNodeV2[] = [];
+    for (const row of node.rows) for (const cell of row.cells) out.push(...cell.children);
+    return out;
+  }
+  if (node.type === "table") return node.rowTemplate.flatMap(template => template.children);
+  return [];
+}
+
+function nodeLabel(node: EditorNodeV2): string {
+  switch (node.type) {
+    case "page": return "页面";
+    case "grid": return node.id;
+    case "text": return node.text ? `“${node.text}”` : "(空文本)";
+    case "p": return `字段:${node.field}`;
+    case "table": return node.field ? `表格:${node.field}` : "表格";
+    case "image": return "图片";
+    case "html": return "HTML 模块";
+    default: return node.type;
+  }
+}
+
+function buildTreeNode(node: EditorNodeV2): TreeNode {
+  return {
+    id: node.id,
+    type: node.type,
+    label: nodeLabel(node),
+    children: selectableChildrenOf(node).map(buildTreeNode),
+  };
+}
+
+const nodeTree = computed(() => schema.value.pages.map(page => buildTreeNode(page)));
+
+const STORAGE_KEY = "ticket-designer-schema-v2";
+const MAX_HISTORY = 100;
+const dirty = ref(false);
+const undoStack = ref<FormSchemaV2[]>([]);
+const redoStack = ref<FormSchemaV2[]>([]);
+const fileInput = ref<HTMLInputElement | null>(null);
+/**
+ * 视图模式：
+ * - `design`：设计态，可编辑结构、可选中/添加组件；
+ * - `preview`：**预览态，只读** —— 带数据渲染，但不可添加组件、不可选中、字段不可输入；
+ * - `fill`：填充态，带数据渲染且字段可输入（用于验证 P9.1b「数据回写正确」）。
+ */
+type ViewMode = "design" | "preview" | "fill";
+const viewMode = ref<ViewMode>("design");
+/** 非设计态：结构一律不可编辑（不可选中、不可拖拽、不可添加/删除组件）。 */
+const previewMode = computed(() => viewMode.value !== "design");
+/** 只读预览：带数据但字段不可输入。 */
+const readonlyMode = computed(() => viewMode.value === "preview");
+// 预览/填写态的表单数据。使用响应式对象，字段输入可即时回写并被渲染层读取。
+const previewFormData = reactive<{ value: FormDataV2 | null }>({ value: null });
+const previewData = computed<FormDataV2 | null>(() => previewFormData.value);
+
+/**
+ * 渲染层（GridSchemaNode）在填写态通过 inject 拿到该回调，把字段输入回写到
+ * 响应式 previewFormData，从而满足 P9.1b「数据回写正确」。设计态与只读预览态不调用。
+ */
+provide("formFill", (field: string, value: string) => {
+  if (previewFormData.value && !readonlyMode.value) previewFormData.value[field] = value;
+});
+
+/** 在「设计 / 预览 / 填充」之间切换；再次点击同一模式则回到设计态。 */
+function toggleViewMode(mode: "preview" | "fill"): void {
+  viewMode.value = viewMode.value === mode ? "design" : mode;
+  if (viewMode.value === "design") {
+    previewFormData.value = null;
+    return;
+  }
+  previewFormData.value = { ...demoData };
+  clearSelection();
+}
+
+function printDocument(): void {
+  window.print();
+}
+
 let lastClickedLeafId: string | null = null;
 let selectionDepth = 0;
+let lastCommitTag = "";
+let lastCommitTime = 0;
 
-function reloadSample(): void {
-  schema.value = makeYunlvSecondTicketFirstFiveRowsSchema();
+// Any schema assignment (all ops are immutable) marks the document dirty.
+watch(
+  schema,
+  () => {
+    dirty.value = true;
+  },
+  { flush: "sync" },
+);
+
+function clearSelection(): void {
   selectedNodeId.value = null;
   selectedInsertionSlotId.value = null;
   selectionPathIds.value = [];
   selectionPathIndex.value = 0;
   lastClickedLeafId = null;
   selectionDepth = 0;
+}
+
+/**
+ * Apply a schema change. Structural edits omit `tag` so each becomes its own
+ * undo step; inspector text edits pass a per-node `tag` so consecutive
+ * keystrokes within 800ms coalesce into a single undo step.
+ */
+function commit(next: FormSchemaV2, tag?: string): void {
+  const now = Date.now();
+  if (tag && tag === lastCommitTag && now - lastCommitTime < 800) {
+    schema.value = next;
+  } else {
+    undoStack.value.push(schema.value);
+    if (undoStack.value.length > MAX_HISTORY) undoStack.value.shift();
+    redoStack.value = [];
+    schema.value = next;
+    lastCommitTag = tag ?? "";
+  }
+  lastCommitTime = now;
+}
+
+/** Replace the whole document (load/sample/blank) and reset history. */
+function resetHistory(next: FormSchemaV2): void {
+  undoStack.value = [];
+  redoStack.value = [];
+  lastCommitTag = "";
+  schema.value = next;
+  dirty.value = false;
+}
+
+function undo(): void {
+  const prev = undoStack.value.pop();
+  if (!prev) return;
+  redoStack.value.push(schema.value);
+  schema.value = prev;
+  lastCommitTag = "";
+  dirty.value = true;
+  clearSelection();
+}
+
+function redo(): void {
+  const next = redoStack.value.pop();
+  if (!next) return;
+  undoStack.value.push(schema.value);
+  schema.value = next;
+  lastCommitTag = "";
+  dirty.value = true;
+  clearSelection();
+}
+
+const canUndo = computed(() => undoStack.value.length > 0);
+const canRedo = computed(() => redoStack.value.length > 0);
+
+function saveToLocal(): void {
+  try {
+    const text = serializeFormSchemaV2(schema.value, true);
+    localStorage.setItem(STORAGE_KEY, text);
+    dirty.value = false;
+  } catch (error) {
+    alert(
+      `保存失败：${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
+function loadFromLocal(): void {
+  const text = localStorage.getItem(STORAGE_KEY);
+  if (!text) {
+    alert("本地没有已保存的模板");
+    return;
+  }
+  try {
+    resetHistory(parseFormSchemaV2(text));
+    clearSelection();
+  } catch (error) {
+    alert(
+      `读取失败：${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
+function exportFile(): void {
+  try {
+    const text = serializeFormSchemaV2(schema.value, true);
+    const blob = new Blob([text], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `ticket-schema-v2-${Date.now()}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    alert(
+      `导出失败：${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
+function importFile(event: Event): void {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      resetHistory(parseFormSchemaV2(String(reader.result)));
+      clearSelection();
+    } catch (error) {
+      alert(
+        `导入失败：${error instanceof Error ? error.message : String(error)}`,
+      );
+    } finally {
+      input.value = "";
+    }
+  };
+  reader.onerror = () => {
+    alert("文件读取失败");
+    input.value = "";
+  };
+  reader.readAsText(file);
+}
+
+function triggerImport(): void {
+  fileInput.value?.click();
+}
+
+function onKeydown(event: KeyboardEvent): void {
+  const mod = event.ctrlKey || event.metaKey;
+  if (!mod) return;
+  const key = event.key.toLowerCase();
+  if (key === "z" && !event.shiftKey) {
+    event.preventDefault();
+    undo();
+  } else if ((key === "z" && event.shiftKey) || key === "y") {
+    event.preventDefault();
+    redo();
+  } else if (key === "s") {
+    event.preventDefault();
+    saveToLocal();
+  }
+}
+
+function beforeUnload(event: BeforeUnloadEvent): void {
+  if (dirty.value) {
+    event.preventDefault();
+    event.returnValue = "";
+  }
+}
+
+onMounted(() => {
+  window.addEventListener("keydown", onKeydown);
+  window.addEventListener("beforeunload", beforeUnload);
+});
+onUnmounted(() => {
+  window.removeEventListener("keydown", onKeydown);
+  window.removeEventListener("beforeunload", beforeUnload);
+});
+
+function reloadSample(): void {
+  resetHistory(makeYunlvSecondTicketFullSchema());
+  clearSelection();
 }
 
 function resetBlank(): void {
-  schema.value = createEmptyFormSchemaV2();
-  selectedNodeId.value = null;
-  selectedInsertionSlotId.value = null;
-  selectionPathIds.value = [];
-  selectionPathIndex.value = 0;
-  lastClickedLeafId = null;
-  selectionDepth = 0;
+  resetHistory(createEmptyFormSchemaV2());
+  clearSelection();
 }
 
 function addRootGrid(): void {
+  // 预览/填充态一律不允许改动结构（预览态本身也不可添加组件）。
+  if (previewMode.value) return;
   const grid = createGridNodeV2();
-  schema.value = insertRootGridV2(schema.value, grid);
+  commit(insertRootGridV2(schema.value, grid));
   selectedNodeId.value = grid.id;
   selectedInsertionSlotId.value = null;
   selectionPathIds.value = [schema.value.pages[0].id, grid.id];
   selectionPathIndex.value = 1;
 }
 
-function addNodeToSelectedCell(kind: "static" | "field" | "table"): void {
+/**
+ * 添加 Grid：若当前已选中某个 cell（insertionSlot 存在），则把 Grid 嵌进该 cell；
+ * 否则退化为在页面根追加一个新 Grid（与旧「添加 Grid」行为一致）。
+ * 同时支持从模板拖拽到任意 cell（见 startPaletteDrag / onCanvasDrop）。
+ */
+function addGrid(): void {
+  if (previewMode.value) return;
+  if (insertionSlot.value) {
+    addNodeToSelectedCell("grid");
+  } else {
+    addRootGrid();
+  }
+}
+
+function createNodeByKind(
+  kind: "text" | "field" | "table" | "html" | "image" | "grid",
+): FormNodeV2 {
+  return kind === "text"
+    ? createTextNodeV2()
+    : kind === "field"
+      ? createFieldPNodeV2()
+      : kind === "table"
+        ? createTableNodeV2()
+        : kind === "html"
+          ? createHtmlNodeV2()
+          : kind === "grid"
+            ? createGridNodeV2()
+            : createImageNodeV2();
+}
+
+function addNodeToSelectedCell(
+  kind: "text" | "field" | "table" | "html" | "image" | "grid",
+): void {
+  // 预览/填充态不允许添加组件。
+  if (previewMode.value) return;
   const ownerCell = insertionSlot.value;
   if (!ownerCell) return;
-  const child =
-    kind === "static"
-      ? createStaticPNodeV2()
-      : kind === "field"
-        ? createFieldPNodeV2()
-        : createTableNodeV2();
-  schema.value = appendNodeToCellV2(schema.value, ownerCell.id, child);
+  const child = createNodeByKind(kind);
+  commit(appendNodeToCellV2(schema.value, ownerCell.id, child));
+  selectedNodeId.value = child.id;
+}
+
+// ── 拖拽生成：从模板拖到画布指定格 ──
+const DRAG_MIME = "application/x-ticket-node-kind";
+let dragTargetEl: HTMLElement | null = null;
+
+function setDropHighlight(cell: HTMLElement | null): void {
+  if (dragTargetEl && dragTargetEl !== cell) {
+    dragTargetEl.classList.remove("v2-drop-target");
+  }
+  if (cell && cell !== dragTargetEl) {
+    cell.classList.add("v2-drop-target");
+  }
+  dragTargetEl = cell;
+}
+
+function clearDropHighlight(): void {
+  if (dragTargetEl) {
+    dragTargetEl.classList.remove("v2-drop-target");
+    dragTargetEl = null;
+  }
+}
+
+function startPaletteDrag(
+  kind: "text" | "field" | "table" | "html" | "image" | "grid",
+  event: DragEvent,
+): void {
+  if (previewMode.value) return;
+  event.dataTransfer?.setData(DRAG_MIME, kind);
+  if (event.dataTransfer) event.dataTransfer.effectAllowed = "copy";
+}
+
+function onCanvasDragOver(event: DragEvent): void {
+  const dt = event.dataTransfer;
+  if (!dt) return;
+  if (previewMode.value || !Array.from(dt.types).includes(DRAG_MIME)) return;
+  event.preventDefault();
+  const cell = (event.target as HTMLElement).closest<HTMLElement>("[data-layout-id]");
+  setDropHighlight(cell ?? null);
+}
+
+function onCanvasDragLeave(event: DragEvent): void {
+  const related = event.relatedTarget as HTMLElement | null;
+  if (!related || !related.closest("[data-layout-id]")) {
+    clearDropHighlight();
+  }
+}
+
+function onCanvasDrop(event: DragEvent): void {
+  if (previewMode.value) return;
+  const kind = (event.dataTransfer?.getData(DRAG_MIME) ?? "") as
+    | "text"
+    | "field"
+    | "table"
+    | "html"
+    | "image"
+    | "grid";
+  clearDropHighlight();
+  if (!kind) return;
+  event.preventDefault();
+  const cell = (event.target as HTMLElement).closest<HTMLElement>("[data-layout-id]");
+  const cellId = cell?.dataset.layoutId;
+  if (!cellId) return;
+  const slot = nodeIndex.value.get(cellId)?.node;
+  if (!slot || (slot.type !== "grid-cell" && slot.type !== "table-cell-template")) return;
+  const child = createNodeByKind(kind);
+  commit(appendNodeToCellV2(schema.value, cellId, child));
   selectedNodeId.value = child.id;
 }
 
 function removeSelectedNode(): void {
-  if (!selectedNodeId.value || selectedNode.value?.type === "page") return;
-  schema.value = removeNodeV2(schema.value, selectedNodeId.value);
-  selectedNodeId.value = null;
-  selectedInsertionSlotId.value = null;
-  selectionPathIds.value = [];
-  selectionPathIndex.value = 0;
-  lastClickedLeafId = null;
-  selectionDepth = 0;
+  if (
+    !selectedNodeId.value ||
+    selectedNode.value?.type === "page" ||
+    selectedNode.value?.type === "grid-cell"
+  )
+    return;
+  commit(removeNodeV2(schema.value, selectedNodeId.value));
+  clearSelection();
+}
+
+// ── 单元格合并 / 拆分（P6.2c / P6.2d）──
+function mergeSelectedCellRight(): void {
+  const id = selectedNodeId.value;
+  const ctx = selectedCellContext.value;
+  if (!id || !ctx || !ctx.hasNextSibling) return;
+  const row = (nodeIndex.value.get(id)?.parent as GridRowV2 | undefined);
+  if (!row) return;
+  const rightId = row.cells[ctx.columnIndex + 1].id;
+  commit(mergeGridCellsV2(schema.value, id, rightId), `merge:${id}`);
+  selectedNodeId.value = id;
+}
+
+function splitSelectedCell(): void {
+  const id = selectedNodeId.value;
+  const ctx = selectedCellContext.value;
+  if (!id || !ctx || !ctx.canSplit) return;
+  commit(splitGridCellV2(schema.value, id), `split:${id}`);
+  selectedNodeId.value = id;
+}
+
+// ── 格内排序 / 跨格移动（P6.3b / P6.3c）──
+// UI 拖拽推迟；此处用「配置面板按钮 + 目标下拉」替代，底层结构纯函数与拖拽版一致。
+function moveSelectedNode(direction: "up" | "down"): void {
+  const id = selectedNodeId.value;
+  if (!id) return;
+  commit(moveNodeWithinParentV2(schema.value, id, direction), `reorder:${id}`);
+  selectedNodeId.value = id;
+}
+
+function moveSelectedNodeToTarget(): void {
+  const id = selectedNodeId.value;
+  const target = moveTargetId.value;
+  if (!id || !target) return;
+  const next = moveNodeV2(schema.value, id, target);
+  // 目标非法（移入自身后代）或与当前位置相同（自身所在格）时 moveNodeV2 原样返回。
+  if (next === schema.value) return;
+  commit(next, `move:${id}`);
+  selectedNodeId.value = id;
 }
 
 function selectNode(event: MouseEvent): void {
+  if (previewMode.value) return;
   const target = event.target as HTMLElement;
-  selectedInsertionSlotId.value = target.closest<HTMLElement>("[data-layout-id]")?.dataset.layoutId ?? null;
+  selectedInsertionSlotId.value =
+    target.closest<HTMLElement>("[data-layout-id]")?.dataset.layoutId ?? null;
   const ids: string[] = [];
   let cursor = target.closest<HTMLElement>("[data-node-id]");
   while (cursor) {
@@ -118,7 +648,7 @@ function selectNode(event: MouseEvent): void {
       cursor.parentElement?.closest<HTMLElement>("[data-node-id]") ?? null;
   }
   const selectableIds = ids.filter((id) => {
-    return isSelectableSchemaNodeV2(nodeIndex.value.get(id)?.node);
+    return isStyleEditableNode(nodeIndex.value.get(id)?.node);
   });
   const leafId = selectableIds[0] ?? null;
   if (!leafId) {
@@ -176,59 +706,92 @@ function selectIssue(issue: SchemaIssueV2): void {
   lastClickedLeafId = selectableIds[0];
 }
 
+function selectNodeById(id: string): void {
+  if (previewMode.value) return;
+  const ref = nodeIndex.value.get(id);
+  if (!ref || !isSelectableSchemaNodeV2(ref.node)) return;
+  selectedNodeId.value = id;
+  selectedInsertionSlotId.value = null;
+  const ancestors: string[] = [];
+  let cursor = ref.parent;
+  while (cursor) {
+    if (isSelectableSchemaNodeV2(cursor)) ancestors.unshift(cursor.id);
+    cursor = nodeIndex.value.get(cursor.id)?.parent ?? null;
+  }
+  selectionPathIds.value = [...ancestors, id];
+  selectionPathIndex.value = selectionPathIds.value.length - 1;
+  selectionDepth = selectionPathIds.value.length - 1;
+  lastClickedLeafId = id;
+}
+
 function updateSelectedNode(
   updater: (node: EditorNodeV2) => EditorNodeV2,
+  tag?: string,
 ): void {
   if (!selectedNodeId.value) return;
-  schema.value = updateSchemaNodeV2(
-    schema.value,
-    selectedNodeId.value,
-    updater,
-  );
+  commit(updateSchemaNodeV2(schema.value, selectedNodeId.value, updater), tag);
 }
 
 function updateSelectedText(event: Event): void {
-  const value = (event.target as HTMLInputElement).value;
-  updateSelectedNode((node) =>
-    node.type === "p" && node.mode === "static"
-      ? { ...node, text: value }
-      : node,
+  const value = (event.target as HTMLTextAreaElement).value;
+  updateSelectedNode(
+    (node) => (node.type === "text" ? { ...node, text: value } : node),
+    selectedNodeId.value ? `edit:${selectedNodeId.value}` : undefined,
   );
 }
 
 function updateSelectedField(event: Event): void {
   const value = (event.target as HTMLInputElement).value;
-  updateSelectedNode((node) =>
-    node.type === "p" && node.mode === "field"
-      ? { ...node, field: value }
-      : node,
+  updateSelectedNode(
+    (node) =>
+      node.type === "p" && node.mode === "field"
+        ? { ...node, field: value }
+        : node,
+    selectedNodeId.value ? `edit:${selectedNodeId.value}` : undefined,
   );
 }
 
 function updateSelectedPrefix(event: Event): void {
   const value = (event.target as HTMLInputElement).value;
-  updateSelectedNode((node) =>
-    node.type === "p" && node.mode === "field"
-      ? { ...node, prefix: value || undefined }
-      : node,
+  updateSelectedNode(
+    (node) =>
+      node.type === "p" && node.mode === "field"
+        ? { ...node, prefix: value || undefined }
+        : node,
+    selectedNodeId.value ? `edit:${selectedNodeId.value}` : undefined,
   );
 }
 
 function updateSelectedSuffix(event: Event): void {
   const value = (event.target as HTMLInputElement).value;
-  updateSelectedNode((node) =>
-    node.type === "p" && node.mode === "field"
-      ? { ...node, suffix: value || undefined }
-      : node,
+  updateSelectedNode(
+    (node) =>
+      node.type === "p" && node.mode === "field"
+        ? { ...node, suffix: value || undefined }
+        : node,
+    selectedNodeId.value ? `edit:${selectedNodeId.value}` : undefined,
   );
 }
 
 function updateGridBorder(event: Event): void {
   if (selectedNode.value?.type !== "grid") return;
-  schema.value = updateGridBorderV2(
-    schema.value,
-    selectedNode.value.id,
-    (event.target as HTMLSelectElement).value as BorderModeV2,
+  commit(
+    updateGridBorderV2(
+      schema.value,
+      selectedNode.value.id,
+      (event.target as HTMLSelectElement).value as BorderModeV2,
+    ),
+  );
+}
+
+function updateTableBorder(event: Event): void {
+  if (selectedNode.value?.type !== "table") return;
+  commit(
+    updateTableBorderV2(
+      schema.value,
+      selectedNode.value.id,
+      (event.target as HTMLSelectElement).value as BorderModeV2,
+    ),
   );
 }
 
@@ -242,20 +805,349 @@ function updateGridDimensions(event: Event): void {
     input.dataset.dimension === "columns"
       ? value
       : (selectedNode.value.rows[0]?.cells.length ?? 1);
-  schema.value = resizeGridV2(
-    schema.value,
-    selectedNode.value.id,
-    rowCount,
-    columnCount,
+  commit(
+    resizeGridV2(schema.value, selectedNode.value.id, rowCount, columnCount),
   );
 }
 
 function updateTableRows(event: Event): void {
   if (selectedNode.value?.type !== "table") return;
-  schema.value = updateTableMinRowsV2(
-    schema.value,
-    selectedNode.value.id,
-    Number((event.target as HTMLInputElement).value),
+  commit(
+    updateTableMinRowsV2(
+      schema.value,
+      selectedNode.value.id,
+      Number((event.target as HTMLInputElement).value),
+    ),
+  );
+}
+
+function updateTableHeaderHeight(event: Event): void {
+  if (selectedNode.value?.type !== "table") return;
+  commit(
+    updateTableHeaderHeightV2(
+      schema.value,
+      selectedNode.value.id,
+      Number((event.target as HTMLInputElement).value),
+    ),
+  );
+}
+
+function updateTableRowHeight(event: Event): void {
+  if (selectedNode.value?.type !== "table") return;
+  commit(
+    updateTableRowHeightV2(
+      schema.value,
+      selectedNode.value.id,
+      Number((event.target as HTMLInputElement).value),
+    ),
+  );
+}
+
+function addTableColumn(): void {
+  if (selectedNode.value?.type !== "table") return;
+  commit(addTableColumnV2(schema.value, selectedNode.value.id));
+}
+
+function removeTableColumn(columnKey: string): void {
+  if (selectedNode.value?.type !== "table") return;
+  commit(removeTableColumnV2(schema.value, selectedNode.value.id, columnKey));
+}
+
+function renameTableColumnKey(oldKey: string, event: Event): void {
+  if (selectedNode.value?.type !== "table") return;
+  const newKey = (event.target as HTMLInputElement).value.trim();
+  if (!newKey || newKey === oldKey) return;
+  commit(
+    renameTableColumnKeyV2(schema.value, selectedNode.value.id, oldKey, newKey),
+  );
+}
+
+function updateTableColumn(
+  columnKey: string,
+  field: "title" | "width" | "align",
+  event: Event,
+): void {
+  if (selectedNode.value?.type !== "table") return;
+  const target = event.target as HTMLInputElement | HTMLSelectElement;
+  const patch: Partial<TableColumnV2> =
+    field === "width"
+      ? { width: parseColumnWidth(target.value) }
+      : ({ [field]: target.value || undefined } as Partial<TableColumnV2>);
+  commit(
+    updateTableColumnV2(schema.value, selectedNode.value.id, columnKey, patch),
+    `tblcol:${columnKey}:${field}`,
+  );
+}
+
+function parseColumnWidth(raw: string): GridTrackV2 {
+  const value = raw.trim().toLowerCase();
+  if (value === "auto") return "auto";
+  if (/^\d+(\.\d+)?fr$/.test(value)) return value as `${number}fr`;
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : 24;
+}
+
+function updateGridColumnWidth(columnIndex: number, event: Event): void {
+  if (selectedNode.value?.type !== "grid") return;
+  commit(
+    setGridColumnWidthV2(
+      schema.value,
+      selectedNode.value.id,
+      columnIndex,
+      parseColumnWidth((event.target as HTMLInputElement).value),
+    ),
+    `col:${selectedNode.value.id}:${columnIndex}`,
+  );
+}
+
+// ── 单元格（grid-cell）样式：仅覆盖，可清除回归 Grid 默认 ──
+function updateSelectedCellPadding(event: Event): void {
+  const value = Math.max(0, Number((event.target as HTMLInputElement).value) || 0);
+  updateSelectedNode(
+    (node) => (node.type === "grid-cell" ? { ...node, padding: value } : node),
+    selectedNodeId.value ? `cellpad:${selectedNodeId.value}` : undefined,
+  );
+}
+
+function updateSelectedCellAlign(event: Event): void {
+  const raw = (event.target as HTMLSelectElement).value;
+  updateSelectedNode(
+    (node) =>
+      node.type === "grid-cell"
+        ? { ...node, align: (raw || undefined) as GridCellV2["align"] }
+        : node,
+    selectedNodeId.value ? `cellalign:${selectedNodeId.value}` : undefined,
+  );
+}
+
+function updateSelectedCellVerticalAlign(event: Event): void {
+  const raw = (event.target as HTMLSelectElement).value;
+  updateSelectedNode(
+    (node) =>
+      node.type === "grid-cell"
+        ? { ...node, verticalAlign: (raw || undefined) as GridCellV2["verticalAlign"] }
+        : node,
+    selectedNodeId.value ? `cellvalign:${selectedNodeId.value}` : undefined,
+  );
+}
+
+function clearCellOverride(): void {
+  updateSelectedNode(
+    (node) =>
+      node.type === "grid-cell"
+        ? { ...node, padding: undefined, align: undefined, verticalAlign: undefined }
+        : node,
+    selectedNodeId.value ? `cellclear:${selectedNodeId.value}` : undefined,
+  );
+}
+
+// ── Grid 级单元格默认（padding / 对齐） ──
+function updateGridCellDefault(
+  field: "cellPadding" | "cellAlign" | "cellVerticalAlign",
+  event: Event,
+): void {
+  if (selectedNode.value?.type !== "grid") return;
+  const target = event.target as HTMLInputElement | HTMLSelectElement;
+  const raw = target.value;
+  const patch =
+    field === "cellPadding"
+      ? { cellPadding: raw === "" ? undefined : Math.max(0, Number(raw) || 0) }
+      : ({ [field]: raw === "" ? undefined : raw } as Partial<
+          Pick<GridNodeV2, "cellAlign" | "cellVerticalAlign">
+        >);
+  commit(
+    updateGridCellDefaultsV2(schema.value, selectedNode.value.id, patch),
+    `gridcell:${field}`,
+  );
+}
+
+/** 统一设置 text / p 节点的文本样式字段（字号/粗细/颜色/对齐/字体等）。 */
+function updateSelectedTextStyle(patch: Partial<TextStyleV2>): void {
+  updateSelectedNode(
+    (node) =>
+      node.type === "p" || node.type === "text"
+        ? { ...node, style: { ...node.style, ...patch } }
+        : node,
+    selectedNodeId.value ? `style:${selectedNodeId.value}` : undefined,
+  );
+}
+
+function updateSelectedFontSize(event: Event): void {
+  const raw = (event.target as HTMLInputElement).value;
+  const value = Math.max(1, Math.floor(Number(raw) || 1));
+  updateSelectedTextStyle({ fontSize: value });
+}
+
+function updateSelectedLineHeight(event: Event): void {
+  const raw = (event.target as HTMLInputElement).value;
+  const value = Number(raw);
+  updateSelectedTextStyle({
+    lineHeight: Number.isFinite(value) && value > 0 ? value : undefined,
+  });
+}
+
+function updateSelectedFontWeight(event: Event): void {
+  const value = (event.target as HTMLSelectElement).value;
+  updateSelectedTextStyle({
+    fontWeight: (value || undefined) as "normal" | "bold" | undefined,
+  });
+}
+
+function updateSelectedColor(event: Event): void {
+  const value = (event.target as HTMLInputElement).value;
+  updateSelectedTextStyle({ color: value || undefined });
+}
+
+function updateSelectedFontFamily(event: Event): void {
+  const value = (event.target as HTMLInputElement).value;
+  updateSelectedTextStyle({ fontFamily: value || undefined });
+}
+
+function updateSelectedAlign(event: Event): void {
+  const value = (event.target as HTMLSelectElement).value;
+  updateSelectedTextStyle({
+    align: (value || undefined) as "left" | "center" | "right" | undefined,
+  });
+}
+
+function updateSelectedVerticalAlign(event: Event): void {
+  const value = (event.target as HTMLSelectElement).value;
+  updateSelectedTextStyle({
+    verticalAlign: (value || undefined) as
+      | "top"
+      | "middle"
+      | "bottom"
+      | undefined,
+  });
+}
+
+function updateSelectedInputType(event: Event): void {
+  const value = (event.target as HTMLSelectElement)
+    .value as FieldPNodeV2["inputType"];
+  updateSelectedNode(
+    (node) =>
+      node.type === "p" && node.mode === "field"
+        ? { ...node, inputType: value }
+        : node,
+    selectedNodeId.value ? `inputtype:${selectedNodeId.value}` : undefined,
+  );
+}
+
+function updateSelectedHtml(event: Event): void {
+  const value = (event.target as HTMLTextAreaElement).value;
+  updateSelectedNode(
+    (node) => (node.type === "html" ? { ...node, html: value } : node),
+    selectedNodeId.value ? `html:${selectedNodeId.value}` : undefined,
+  );
+}
+
+function updateSelectedCss(event: Event): void {
+  const value = (event.target as HTMLTextAreaElement).value;
+  updateSelectedNode(
+    (node) =>
+      node.type === "html" ? { ...node, css: value || undefined } : node,
+    selectedNodeId.value ? `css:${selectedNodeId.value}` : undefined,
+  );
+}
+
+function updateSelectedImageSrc(event: Event): void {
+  const value = (event.target as HTMLInputElement).value;
+  updateSelectedNode(
+    (node) =>
+      node.type === "image" ? { ...node, src: value || undefined } : node,
+    selectedNodeId.value ? `imgsrc:${selectedNodeId.value}` : undefined,
+  );
+}
+
+function updateSelectedImageField(event: Event): void {
+  const value = (event.target as HTMLInputElement).value;
+  updateSelectedNode(
+    (node) =>
+      node.type === "image" ? { ...node, field: value || undefined } : node,
+    selectedNodeId.value ? `imgfield:${selectedNodeId.value}` : undefined,
+  );
+}
+
+function updateSelectedImageSize(
+  dimension: "width" | "height",
+  event: Event,
+): void {
+  const value = Number((event.target as HTMLInputElement).value);
+  updateSelectedNode(
+    (node) =>
+      node.type === "image"
+        ? {
+            ...node,
+            [dimension]:
+              Number.isFinite(value) && value > 0 ? value : undefined,
+          }
+        : node,
+    selectedNodeId.value ? `imgsize:${selectedNodeId.value}` : undefined,
+  );
+}
+
+function updateSelectedImageFit(event: Event): void {
+  const value = (event.target as HTMLSelectElement).value as
+    | "contain"
+    | "cover"
+    | "fill";
+  updateSelectedNode(
+    (node) => (node.type === "image" ? { ...node, objectFit: value } : node),
+    selectedNodeId.value ? `imgfit:${selectedNodeId.value}` : undefined,
+  );
+}
+
+// ── Toolbar: 基础行高 / 纸张设置 ──────────────────────────────
+
+function updateBaseRowHeight(event: Event): void {
+  const value = Math.max(
+    1,
+    Math.floor(Number((event.target as HTMLInputElement).value) || 8),
+  );
+  commit(updateBaseRowHeightV2(schema.value, value));
+}
+
+function updatePaperSize(event: Event): void {
+  const size = (event.target as HTMLSelectElement)
+    .value as FormSchemaV2["paper"]["size"];
+  // 方向由纸张尺寸派生（去掉方向选择）：A4 → 纵向，A3 → 横向。
+  const orientation = size === "A3" ? "landscape" : "portrait";
+  commit(updatePaperConfigV2(schema.value, { size, orientation }));
+}
+
+// ── Field P: action 属性（外部组件触发） ───────────────────────
+
+function updateSelectedAction(event: Event): void {
+  const value = (event.target as HTMLSelectElement)
+    .value as FieldPNodeV2["action"];
+  updateSelectedNode(
+    (node) =>
+      node.type === "p" && node.mode === "field"
+        ? { ...node, action: value || undefined }
+        : node,
+    selectedNodeId.value ? `action:${selectedNodeId.value}` : undefined,
+  );
+}
+
+function updateSelectedMultiline(event: Event): void {
+  const checked = (event.target as HTMLInputElement).checked;
+  updateSelectedNode(
+    (node) =>
+      node.type === "p" && node.mode === "field"
+        ? { ...node, multiline: checked ? true : undefined }
+        : node,
+    selectedNodeId.value ? `multiline:${selectedNodeId.value}` : undefined,
+  );
+}
+
+function updateSelectedDefault(event: Event): void {
+  const value = (event.target as HTMLTextAreaElement).value;
+  updateSelectedNode(
+    (node) =>
+      node.type === "p" && node.mode === "field"
+        ? { ...node, default: value || undefined }
+        : node,
+    selectedNodeId.value ? `default:${selectedNodeId.value}` : undefined,
   );
 }
 </script>
@@ -265,86 +1157,224 @@ function updateTableRows(event: Event): void {
     <header class="v2-toolbar">
       <div class="v2-toolbar__title">固定版式表单设计器 V2</div>
       <div class="v2-toolbar__meta">
-        嵌套 Schema · A4 · 基础行高 {{ schema.baseRowHeight }}mm
+        <label class="v2-toolbar__control">
+          <span>纸张</span>
+          <select :value="schema.paper.size" @change="updatePaperSize">
+            <option value="A4">A4（纵向）</option>
+            <option value="A3">A3（横向）</option>
+          </select>
+        </label>
+        <label class="v2-toolbar__control">
+          <span>行高(mm)</span>
+          <input
+            type="number"
+            min="1"
+            max="99"
+            step="1"
+            :value="schema.baseRowHeight"
+            @change="updateBaseRowHeight"
+          />
+        </label>
       </div>
-      <button class="v2-toolbar__button" type="button" @click="resetBlank">
-        新建空白模板
-      </button>
-      <button class="v2-toolbar__button" type="button" @click="reloadSample">
-        载入前五行样例
-      </button>
+      <span
+        class="v2-toolbar__dirty"
+        :class="{ 'v2-toolbar__dirty--on': dirty }"
+        >{{ dirty ? "● 未保存" : "已保存" }}</span
+      >
+      <div class="v2-toolbar__group">
+        <button class="v2-toolbar__button" type="button" @click="resetBlank">
+          新建空白
+        </button>
+        <button class="v2-toolbar__button" type="button" @click="reloadSample">
+          载入样例
+        </button>
+      </div>
+      <div class="v2-toolbar__group">
+        <button
+          class="v2-toolbar__button"
+          type="button"
+          :disabled="!canUndo"
+          @click="undo"
+        >
+          撤销
+        </button>
+        <button
+          class="v2-toolbar__button"
+          type="button"
+          :disabled="!canRedo"
+          @click="redo"
+        >
+          重做
+        </button>
+      </div>
+      <div class="v2-toolbar__group">
+        <button class="v2-toolbar__button" type="button" @click="saveToLocal">
+          保存
+        </button>
+        <button class="v2-toolbar__button" type="button" @click="loadFromLocal">
+          读取
+        </button>
+        <button class="v2-toolbar__button" type="button" @click="exportFile">
+          导出文件
+        </button>
+        <button class="v2-toolbar__button" type="button" @click="triggerImport">
+          导入文件
+        </button>
+      </div>
+      <div class="v2-toolbar__group">
+        <button
+          class="v2-toolbar__button"
+          type="button"
+          data-view-mode="preview"
+          :class="{ 'v2-toolbar__button--active': viewMode === 'preview' }"
+          @click="toggleViewMode('preview')"
+        >
+          {{ viewMode === "preview" ? "退出预览" : "预览" }}
+        </button>
+        <button
+          class="v2-toolbar__button"
+          type="button"
+          data-view-mode="fill"
+          :class="{ 'v2-toolbar__button--active': viewMode === 'fill' }"
+          @click="toggleViewMode('fill')"
+        >
+          {{ viewMode === "fill" ? "退出填充" : "填充" }}
+        </button>
+        <button class="v2-toolbar__button" type="button" @click="printDocument">
+          打印
+        </button>
+      </div>
+      <input
+        ref="fileInput"
+        type="file"
+        accept=".json,application/json"
+        class="v2-toolbar__file"
+        @change="importFile"
+      />
     </header>
 
     <div class="v2-designer__body">
       <aside class="v2-sidebar v2-sidebar--left">
-        <div class="v2-sidebar__heading">组件库</div>
-        <div v-if="false" class="v2-grid-size-control">
-          <label>
-            <span>行</span>
-            <input :value="1" type="number" min="1" step="1" />
-          </label>
-          <label>
-            <span>列</span>
-            <input :value="1" type="number" min="1" step="1" />
-          </label>
-        </div>
+        <div class="v2-sidebar__heading">模板</div>
+
+        <div class="v2-sidebar__group-title">基础组件</div>
         <button
           class="v2-palette-item v2-palette-item--button"
           type="button"
-          @click="addRootGrid"
+          draggable="true"
+          data-palette="text"
+          :disabled="previewMode"
+          @dragstart="startPaletteDrag('text', $event)"
+          @click="addNodeToSelectedCell('text')"
+        >
+          文本 Text
+        </button>
+        <button
+          class="v2-palette-item v2-palette-item--button"
+          type="button"
+          draggable="true"
+          data-palette="field"
+          :disabled="previewMode"
+          @dragstart="startPaletteDrag('field', $event)"
+          @click="addNodeToSelectedCell('field')"
+        >
+          字段 Field
+        </button>
+        <button
+          class="v2-palette-item v2-palette-item--button"
+          type="button"
+          draggable="true"
+          data-palette="image"
+          :disabled="previewMode"
+          @dragstart="startPaletteDrag('image', $event)"
+          @click="addNodeToSelectedCell('image')"
+        >
+          图片 Image
+        </button>
+        <button
+          class="v2-palette-item v2-palette-item--button"
+          type="button"
+          draggable="true"
+          data-palette="html"
+          :disabled="previewMode"
+          @dragstart="startPaletteDrag('html', $event)"
+          @click="addNodeToSelectedCell('html')"
+        >
+          HTML 模块
+        </button>
+
+        <div class="v2-sidebar__group-title">布局组件</div>
+        <button
+          class="v2-palette-item v2-palette-item--button"
+          type="button"
+          draggable="true"
+          data-palette="grid"
+          :disabled="previewMode"
+          @dragstart="startPaletteDrag('grid', $event)"
+          @click="addGrid"
         >
           添加 Grid
         </button>
-        <div class="v2-sidebar__subheading">向组件所在格子插入</div>
         <button
           class="v2-palette-item v2-palette-item--button"
           type="button"
-          :disabled="!insertionSlot"
-          @click="addNodeToSelectedCell('static')"
-        >
-          固定文字 P
-        </button>
-        <button
-          class="v2-palette-item v2-palette-item--button"
-          type="button"
-          :disabled="!insertionSlot"
-          @click="addNodeToSelectedCell('field')"
-        >
-          可输入字段 P
-        </button>
-        <button
-          class="v2-palette-item v2-palette-item--button"
-          type="button"
-          :disabled="!insertionSlot"
+          draggable="true"
+          data-palette="table"
+          :disabled="previewMode"
+          @dragstart="startPaletteDrag('table', $event)"
           @click="addNodeToSelectedCell('table')"
         >
           明细 Table
         </button>
-        <button
-          class="v2-palette-item v2-palette-item--button v2-palette-item--danger"
-          type="button"
-          :disabled="!selectedNodeId || selectedNode?.type === 'page'"
-          @click="removeSelectedNode"
-        >
-          删除选中节点
-        </button>
+
         <p class="v2-sidebar__hint">
-          先选择要操作的组件；Row 和 Cell 只作为 Grid 的内部布局数据，不会进入节点链。
+          1.点击插入到选中格，或拖动模板到任意格子；<br />
+          2.选中组件后可在右侧面板配置并删除。<br />
+          3.预览/填充态为只读展示，不可添加或改动结构。
         </p>
+
+        <div class="v2-sidebar__heading v2-sidebar__heading--tree">结构</div>
+        <div class="v2-tree">
+          <NodeTreeItem
+            v-for="root in nodeTree"
+            :key="root.id"
+            :node="root"
+            :selected-id="selectedNodeId"
+            :depth="0"
+            @select="selectNodeById"
+          />
+        </div>
       </aside>
 
-      <main class="v2-canvas" @click="selectNode">
+      <main
+        class="v2-canvas"
+        :class="{ 'v2-canvas--preview': previewMode }"
+        @click="selectNode"
+        @dragover.prevent="onCanvasDragOver"
+        @dragleave="onCanvasDragLeave"
+        @drop="onCanvasDrop"
+      >
         <GridSchemaRenderer
           :schema="schema"
-          :selected-node-id="selectedNodeId"
+          :selected-node-id="previewMode ? null : selectedNodeId"
+          :data="previewData"
+          :readonly="readonlyMode"
         />
       </main>
 
       <aside class="v2-sidebar v2-sidebar--right">
         <div class="v2-sidebar__heading">节点检查</div>
-        <div class="v2-inspector-row">
+        <div class="v2-inspector-row v2-inspector-row--head">
           <span>当前节点</span>
           <code>{{ selectedNodeId ?? "未选择" }}</code>
+          <button
+            class="v2-inspector__delete"
+            type="button"
+            :disabled="!selectedNodeId || selectedNode?.type === 'page' || selectedNode?.type === 'grid-cell'"
+            @click="removeSelectedNode"
+          >
+            删除
+          </button>
         </div>
         <div class="v2-inspector-row">
           <span>节点类型</span>
@@ -372,6 +1402,54 @@ function updateTableRows(event: Event): void {
           <span>Schema 版本</span>
           <strong>{{ schema.version }}</strong>
         </div>
+        <template v-if="selectedPosition">
+          <div class="v2-sidebar__subheading">位置（格内排序 / 跨格移动）</div>
+          <div class="v2-toolbar v2-toolbar--row">
+            <button
+              class="v2-toolbar__button"
+              type="button"
+              data-node-move="up"
+              :disabled="!selectedPosition.canMoveUp"
+              @click="moveSelectedNode('up')"
+            >
+              上移
+            </button>
+            <button
+              class="v2-toolbar__button"
+              type="button"
+              data-node-move="down"
+              :disabled="!selectedPosition.canMoveDown"
+              @click="moveSelectedNode('down')"
+            >
+              下移
+            </button>
+          </div>
+          <label class="v2-control">
+            <span>移动到其它格</span>
+            <select
+              v-model="moveTargetId"
+              data-move-target="true"
+            >
+              <option value="">选择目标…</option>
+              <option
+                v-for="target in dropTargets"
+                :key="target.id"
+                :value="target.id"
+              >
+                {{ target.label }}
+              </option>
+            </select>
+          </label>
+          <button
+            class="v2-toolbar__button"
+            type="button"
+            data-node-move="target"
+            :disabled="!moveTargetId"
+            @click="moveSelectedNodeToTarget"
+          >
+            移动到此格
+          </button>
+        </template>
         <template v-if="selectedNode?.type === 'grid'">
           <div class="v2-grid-dimensions">
             <label class="v2-control">
@@ -406,36 +1484,429 @@ function updateTableRows(event: Event): void {
               <option value="none">无边框</option>
             </select>
           </label>
-        </template>
-        <template
-          v-else-if="
-            selectedNode?.type === 'p' && selectedNode.mode === 'static'
-          "
-        >
-          <label class="v2-control">
-            <span>固定文本</span>
-            <input :value="selectedNode.text" @input="updateSelectedText" />
+          <div class="v2-sidebar__subheading">列宽（mm / fr / auto）</div>
+          <label
+            v-for="(cell, columnIndex) in selectedNode.rows[0].cells"
+            :key="columnIndex"
+            class="v2-control v2-control--inline"
+          >
+            <span>第 {{ columnIndex + 1 }} 列</span>
+            <input
+              :value="selectedNode.columns?.[columnIndex] ?? cell.width ?? 24"
+              @change="updateGridColumnWidth(columnIndex, $event)"
+            />
+          </label>
+          <div class="v2-sidebar__subheading">单元格默认（padding / 对齐）</div>
+          <label class="v2-control v2-control--inline">
+            <span>默认内边距(mm)</span>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              data-cell-default="padding"
+              :value="selectedNode.cellPadding ?? ''"
+              @change="updateGridCellDefault('cellPadding', $event)"
+            />
+          </label>
+          <label class="v2-control v2-control--inline">
+            <span>默认水平对齐</span>
+            <select
+              data-cell-default="align"
+              :value="selectedNode.cellAlign ?? ''"
+              @change="updateGridCellDefault('cellAlign', $event)"
+            >
+              <option value="">左（默认）</option>
+              <option value="left">左</option>
+              <option value="center">居中</option>
+              <option value="right">右</option>
+            </select>
+          </label>
+          <label class="v2-control v2-control--inline">
+            <span>默认垂直对齐</span>
+            <select
+              data-cell-default="valign"
+              :value="selectedNode.cellVerticalAlign ?? ''"
+              @change="updateGridCellDefault('cellVerticalAlign', $event)"
+            >
+              <option value="">居中（默认）</option>
+              <option value="top">顶部</option>
+              <option value="middle">居中</option>
+              <option value="bottom">底部</option>
+            </select>
           </label>
         </template>
-        <template
-          v-else-if="
-            selectedNode?.type === 'p' && selectedNode.mode === 'field'
-          "
-        >
+        <template v-else-if="selectedNode?.type === 'text'">
+          <label class="v2-control">
+            <span>文本内容</span>
+            <textarea
+              class="v2-textarea"
+              rows="3"
+              :value="selectedNode.text"
+              @input="updateSelectedText"
+            ></textarea>
+          </label>
+          <div class="v2-sidebar__subheading">文本样式</div>
+          <div class="v2-style-grid">
+            <label class="v2-control v2-control--inline">
+              <span>字号(px)</span>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                :value="selectedNode.style?.fontSize ?? ''"
+                @change="updateSelectedFontSize"
+              />
+            </label>
+            <label class="v2-control v2-control--inline">
+              <span>行高</span>
+              <input
+                type="number"
+                min="0"
+                step="0.1"
+                :value="selectedNode.style?.lineHeight ?? ''"
+                @change="updateSelectedLineHeight"
+              />
+            </label>
+            <label class="v2-control v2-control--inline">
+              <span>粗细</span>
+              <select
+                :value="selectedNode.style?.fontWeight ?? 'normal'"
+                @change="updateSelectedFontWeight"
+              >
+                <option value="normal">常规</option>
+                <option value="bold">加粗</option>
+              </select>
+            </label>
+            <label class="v2-control v2-control--inline">
+              <span>颜色</span>
+              <input
+                type="color"
+                :value="selectedNode.style?.color ?? '#111827'"
+                @input="updateSelectedColor"
+              />
+            </label>
+          </div>
+          <label class="v2-control">
+            <span>水平对齐</span>
+            <select
+              :value="selectedNode.style?.align ?? 'left'"
+              @change="updateSelectedAlign"
+            >
+              <option value="left">左</option>
+              <option value="center">居中</option>
+              <option value="right">右</option>
+            </select>
+          </label>
+          <label class="v2-control">
+            <span>垂直对齐</span>
+            <select
+              :value="selectedNode.style?.verticalAlign ?? 'middle'"
+              @change="updateSelectedVerticalAlign"
+            >
+              <option value="top">顶部</option>
+              <option value="middle">居中</option>
+              <option value="bottom">底部</option>
+            </select>
+          </label>
+          <label class="v2-control">
+            <span>字体</span>
+            <input
+              :value="selectedNode.style?.fontFamily ?? ''"
+              @input="updateSelectedFontFamily"
+            />
+          </label>
+        </template>
+
+        <template v-else-if="selectedNode?.type === 'p'">
           <label class="v2-control">
             <span>字段名</span>
             <input :value="selectedNode.field" @input="updateSelectedField" />
           </label>
+          <p v-if="selectedInTableRowTemplate" class="v2-hint">
+            表格行模板：<code>{row}</code> 会替换为行号，如
+            <code>工作任务_{row}_1</code> 在第 2 行绑定为 <code>工作任务_2_1</code>。
+          </p>
           <label class="v2-control">
             <span>前标签（可选）</span>
-            <input :value="selectedNode.prefix ?? ''" @input="updateSelectedPrefix" />
+            <input
+              :value="selectedNode.prefix ?? ''"
+              @input="updateSelectedPrefix"
+            />
           </label>
           <label class="v2-control">
             <span>后标签（可选）</span>
-            <input :value="selectedNode.suffix ?? ''" @input="updateSelectedSuffix" />
+            <input
+              :value="selectedNode.suffix ?? ''"
+              @input="updateSelectedSuffix"
+            />
+          </label>
+          <label class="v2-control">
+            <span>输入类型</span>
+            <select
+              :value="selectedNode.inputType ?? 'text'"
+              @change="updateSelectedInputType"
+            >
+              <option value="text">文本</option>
+              <option value="number">数字</option>
+              <option value="date">日期</option>
+              <option value="signature">签名</option>
+            </select>
+          </label>
+          <label class="v2-control">
+            <span>外部组件（action）</span>
+            <select
+              :value="selectedNode.action ?? 'text'"
+              @change="updateSelectedAction"
+            >
+              <option value="text">无（纯文本输入）</option>
+              <option value="date">日期选择器</option>
+              <option value="signature">签名板</option>
+              <option value="upload">文件上传</option>
+            </select>
+          </label>
+          <label class="v2-control v2-control--inline">
+            <span>多行</span>
+            <input
+              type="checkbox"
+              :checked="selectedNode.multiline !== false"
+              @change="updateSelectedMultiline"
+            />
+          </label>
+          <label class="v2-control">
+            <span>默认值（支持换行）</span>
+            <textarea
+              class="v2-textarea"
+              :value="selectedNode.default ?? ''"
+              @input="updateSelectedDefault"
+            ></textarea>
+          </label>
+          <div class="v2-sidebar__subheading">文本样式</div>
+          <div class="v2-style-grid">
+            <label class="v2-control v2-control--inline">
+              <span>字号(px)</span>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                :value="selectedNode.style?.fontSize ?? ''"
+                @change="updateSelectedFontSize"
+              />
+            </label>
+            <label class="v2-control v2-control--inline">
+              <span>行高</span>
+              <input
+                type="number"
+                min="0"
+                step="0.1"
+                :value="selectedNode.style?.lineHeight ?? ''"
+                @change="updateSelectedLineHeight"
+              />
+            </label>
+            <label class="v2-control v2-control--inline">
+              <span>粗细</span>
+              <select
+                :value="selectedNode.style?.fontWeight ?? 'normal'"
+                @change="updateSelectedFontWeight"
+              >
+                <option value="normal">常规</option>
+                <option value="bold">加粗</option>
+              </select>
+            </label>
+            <label class="v2-control v2-control--inline">
+              <span>颜色</span>
+              <input
+                type="color"
+                :value="selectedNode.style?.color ?? '#111827'"
+                @input="updateSelectedColor"
+              />
+            </label>
+          </div>
+          <label class="v2-control">
+            <span>水平对齐</span>
+            <select
+              :value="selectedNode.style?.align ?? 'left'"
+              @change="updateSelectedAlign"
+            >
+              <option value="left">左</option>
+              <option value="center">居中</option>
+              <option value="right">右</option>
+            </select>
+          </label>
+          <label class="v2-control">
+            <span>垂直对齐</span>
+            <select
+              :value="selectedNode.style?.verticalAlign ?? 'middle'"
+              @change="updateSelectedVerticalAlign"
+            >
+              <option value="top">顶部</option>
+              <option value="middle">居中</option>
+              <option value="bottom">底部</option>
+            </select>
+          </label>
+          <label class="v2-control">
+            <span>字体</span>
+            <input
+              :value="selectedNode.style?.fontFamily ?? ''"
+              @input="updateSelectedFontFamily"
+            />
+          </label>
+        </template>
+        <template v-else-if="selectedNode?.type === 'grid-cell'">
+          <p class="v2-sidebar__hint">
+            单元格仅可设置内边距与对齐；删除已禁用，请删除所在 Grid 或先清空内容。
+          </p>
+          <div class="v2-sidebar__subheading">合并 / 拆分</div>
+          <div class="v2-toolbar v2-toolbar--row">
+            <button
+              class="v2-toolbar__button"
+              type="button"
+              data-cell-merge="true"
+              :disabled="!selectedCellContext?.hasNextSibling"
+              @click="mergeSelectedCellRight"
+            >
+              合并右侧相邻格
+            </button>
+            <button
+              class="v2-toolbar__button"
+              type="button"
+              data-cell-split="true"
+              :disabled="!selectedCellContext?.canSplit"
+              @click="splitSelectedCell"
+            >
+              拆分此格（colspan {{ selectedNode.colspan ?? 1 }}）
+            </button>
+          </div>
+          <label class="v2-control">
+            <span>内边距(padding, mm)</span>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              data-cell-padding="true"
+              :value="selectedNode.padding ?? ''"
+              @change="updateSelectedCellPadding"
+            />
+          </label>
+          <label class="v2-control">
+            <span>水平对齐{{ selectedCellBox ? `（生效：${selectedCellBox.align}）` : '' }}</span>
+            <select :value="selectedNode.align ?? ''" @change="updateSelectedCellAlign">
+              <option value="">默认（继承 Grid）</option>
+              <option value="left">左</option>
+              <option value="center">居中</option>
+              <option value="right">右</option>
+            </select>
+          </label>
+          <label class="v2-control">
+            <span>垂直对齐{{ selectedCellBox ? `（生效：${selectedCellBox.verticalAlign}）` : '' }}</span>
+            <select :value="selectedNode.verticalAlign ?? ''" @change="updateSelectedCellVerticalAlign">
+              <option value="">默认（继承 Grid）</option>
+              <option value="top">顶部</option>
+              <option value="middle">居中</option>
+              <option value="bottom">底部</option>
+            </select>
+          </label>
+          <button
+            class="v2-toolbar__button"
+            type="button"
+            :disabled="!selectedNode.padding && !selectedNode.align && !selectedNode.verticalAlign"
+            @click="clearCellOverride"
+          >
+            清除覆盖（恢复 Grid 默认）
+          </button>
+        </template>
+        <template v-else-if="selectedNode?.type === 'html'">
+          <label class="v2-control">
+            <span>HTML 片段（不含脚本）</span>
+            <textarea
+              class="v2-textarea"
+              rows="6"
+              :value="selectedNode.html"
+              @input="updateSelectedHtml"
+            ></textarea>
+          </label>
+          <label class="v2-control">
+            <span>CSS（仅 Shadow DOM 内生效）</span>
+            <textarea
+              class="v2-textarea"
+              rows="4"
+              :value="selectedNode.css ?? ''"
+              @input="updateSelectedCss"
+            ></textarea>
+          </label>
+          <p class="v2-sidebar__hint" v-pre>
+            支持
+            {{ 字段 }}
+            占位符，渲染时由引擎原地填充；样式仅在模块内部生效，不污染整张表单。
+          </p>
+        </template>
+        <template v-else-if="selectedNode?.type === 'image'">
+          <label class="v2-control">
+            <span>图片地址 / Base64</span>
+            <input
+              :value="selectedNode.src ?? ''"
+              @input="updateSelectedImageSrc"
+            />
+          </label>
+          <label class="v2-control">
+            <span>数据字段（可选，填充态覆盖 src）</span>
+            <input
+              :value="selectedNode.field ?? ''"
+              @input="updateSelectedImageField"
+            />
+          </label>
+          <div class="v2-grid-dimensions">
+            <label class="v2-control">
+              <span>宽(mm)</span>
+              <input
+                type="number"
+                min="0"
+                :value="selectedNode.width ?? ''"
+                @change="updateSelectedImageSize('width', $event)"
+              />
+            </label>
+            <label class="v2-control">
+              <span>高(mm)</span>
+              <input
+                type="number"
+                min="0"
+                :value="selectedNode.height ?? ''"
+                @change="updateSelectedImageSize('height', $event)"
+              />
+            </label>
+          </div>
+          <label class="v2-control">
+            <span>填充方式</span>
+            <select
+              :value="selectedNode.objectFit ?? 'contain'"
+              @change="updateSelectedImageFit"
+            >
+              <option value="contain">contain</option>
+              <option value="cover">cover</option>
+              <option value="fill">fill</option>
+            </select>
           </label>
         </template>
         <template v-else-if="selectedNode?.type === 'table'">
+          <label class="v2-control">
+            <span>表头高度（行高倍数）</span>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              :value="selectedNode.headerHeight"
+              @change="updateTableHeaderHeight"
+            />
+          </label>
+          <label class="v2-control">
+            <span>行高（行高倍数）</span>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              :value="selectedNode.rowHeight"
+              @change="updateTableRowHeight"
+            />
+          </label>
           <label class="v2-control">
             <span>最小行数</span>
             <input
@@ -446,6 +1917,59 @@ function updateTableRows(event: Event): void {
               @change="updateTableRows"
             />
           </label>
+          <label class="v2-control">
+            <span>边框</span>
+            <select :value="selectedNode.border ?? 'all'" @change="updateTableBorder">
+              <option value="all">外框 + 内部</option>
+              <option value="outer">仅外框</option>
+              <option value="inner">仅内部</option>
+              <option value="none">无边框</option>
+            </select>
+          </label>
+          <div class="v2-sidebar__subheading">列配置</div>
+          <div class="v2-col-table">
+            <!-- 表头 -->
+            <div class="v2-col-table__row v2-col-table__head">
+              <span class="v2-col-table__th">标题</span>
+              <span class="v2-col-table__th">字段</span>
+              <span class="v2-col-table__th v2-col-table__th--action"></span>
+            </div>
+            <!-- 各列行 -->
+            <div
+              v-for="column in selectedNode.columns"
+              :key="column.key"
+              class="v2-col-table__row"
+            >
+              <input
+                class="v2-col-table__input"
+                :value="column.title"
+                placeholder="列标题"
+                @input="updateTableColumn(column.key, 'title', $event)"
+              />
+              <input
+                class="v2-col-table__input v2-col-table__input--mono"
+                :value="column.key"
+                placeholder="字段名"
+                @input="renameTableColumnKey(column.key, $event)"
+              />
+              <button
+                class="v2-inspector__delete v2-inspector__delete--small"
+                type="button"
+                :disabled="selectedNode.columns.length <= 1"
+                :title="`删除列 ${column.key}`"
+                @click="removeTableColumn(column.key)"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+          <button
+            class="v2-toolbar__button v2-add-col"
+            type="button"
+            @click="addTableColumn"
+          >
+            + 添加列
+          </button>
         </template>
         <div
           class="v2-issues"
@@ -497,12 +2021,64 @@ function updateTableRows(event: Event): void {
 }
 
 .v2-toolbar__meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   color: #a9b5c7;
   font-size: 12px;
 }
 
-.v2-toolbar__button {
+.v2-toolbar__control {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #a9b5c7;
+  font-size: 11px;
+}
+
+.v2-toolbar__control span {
+  white-space: nowrap;
+}
+
+.v2-toolbar__control select,
+.v2-toolbar__control input {
+  height: 24px;
+  padding: 0 4px;
+  border: 1px solid #4c6484;
+  border-radius: 3px;
+  color: #f8fafc;
+  background: #263957;
+  font-size: 11px;
+}
+
+.v2-toolbar__control input {
+  width: 44px;
+  text-align: center;
+}
+
+.v2-toolbar__dirty {
+  padding: 1px 8px;
+  border-radius: 10px;
+  color: #94a3b8;
+  background: rgb(255 255 255 / 8%);
+  font-size: 11px;
+}
+
+.v2-toolbar__dirty--on {
+  color: #fde68a;
+  background: rgb(253 230 138 / 18%);
+}
+
+.v2-toolbar__group {
+  display: flex;
+  gap: 6px;
+}
+
+.v2-toolbar__group:first-of-type {
   margin-left: auto;
+}
+
+.v2-toolbar__button {
   height: 28px;
   padding: 0 12px;
   border: 1px solid #4c6484;
@@ -513,9 +2089,18 @@ function updateTableRows(event: Event): void {
   font-size: 12px;
 }
 
+.v2-toolbar__button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.v2-toolbar__file {
+  display: none;
+}
+
 .v2-designer__body {
   display: grid;
-  grid-template-columns: 224px minmax(0, 1fr) 280px;
+  grid-template-columns: 224px minmax(0, 1fr) 400px;
   min-height: 0;
 }
 
@@ -537,6 +2122,22 @@ function updateTableRows(event: Event): void {
   color: #334155;
   font-size: 13px;
   font-weight: 700;
+}
+
+.v2-sidebar__heading--tree {
+  margin-top: 16px;
+  margin-bottom: 8px;
+  padding-top: 12px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.v2-tree {
+  max-height: 42vh;
+  overflow: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  padding: 4px 2px;
+  background: #fcfdff;
 }
 
 .v2-palette-item {
@@ -588,16 +2189,19 @@ function updateTableRows(event: Event): void {
   font-size: 12px;
 }
 
-.v2-palette-item--danger {
-  color: #991b1b;
-  border-color: #fecaca;
-  background: #fff7f7;
-}
-
 .v2-sidebar__subheading {
   margin: 16px 0 8px;
   color: #64748b;
   font-size: 11px;
+  font-weight: 700;
+}
+
+.v2-sidebar__group-title {
+  margin: 16px 0 8px;
+  padding-left: 8px;
+  border-left: 3px solid #2563eb;
+  color: #1e293b;
+  font-size: 12px;
   font-weight: 700;
 }
 
@@ -613,6 +2217,12 @@ function updateTableRows(event: Event): void {
   overflow: hidden;
 }
 
+.v2-canvas :deep(.v2-drop-target) {
+  outline: 2px dashed #2563eb;
+  outline-offset: -2px;
+  background: #eff6ff;
+}
+
 .v2-inspector-row {
   display: flex;
   align-items: center;
@@ -621,6 +2231,139 @@ function updateTableRows(event: Event): void {
   margin-bottom: 12px;
   color: #64748b;
   font-size: 12px;
+}
+
+.v2-inspector-row--head {
+  position: sticky;
+  top: 0;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #ffffff;
+}
+
+.v2-inspector__delete {
+  margin-left: auto;
+  padding: 4px 8px;
+  border: 1px solid #fca5a5;
+  border-radius: 4px;
+  color: #b91c1c;
+  background: #fff7f7;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.v2-inspector__delete:hover:not(:disabled) {
+  background: #fee2e2;
+}
+
+.v2-inspector__delete:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.v-inspector__delete--small {
+  padding: 2px 8px;
+  font-size: 11px;
+}
+
+.v-table-col {
+  padding: 10px;
+  margin-bottom: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  background: #f8fafc;
+}
+
+/* ── 列配置：表格行式布局 ── */
+.v2-col-table {
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.v2-col-table__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 32px;
+  align-items: center;
+  gap: 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.v2-col-table__row:last-child {
+  border-bottom: none;
+}
+
+.v2-col-table__head {
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0 !important;
+}
+
+.v2-col-table__th {
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: none;
+}
+
+.v2-col-table__th--action {
+  padding: 6px 4px;
+}
+
+.v2-col-table__input {
+  width: 100%;
+  min-height: 32px;
+  padding: 4px 8px;
+  border: none;
+  border-right: 1px solid #f1f5f9;
+  background: #fff;
+  font-size: 12px;
+  color: #1e293b;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.v2-col-table__input:focus {
+  background: #eff6ff;
+  box-shadow: inset 0 0 0 1px #93c5fd;
+}
+
+.v2-col-table__input--mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  color: #475569;
+}
+
+.v2-add-col {
+  width: 100%;
+  margin-top: 8px;
+  border-color: #93c5fd;
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+
+.v2-add-col:hover {
+  background: #dbeafe;
+}
+
+.v2-style-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+  margin-bottom: 4px;
+}
+
+.v2-style-grid .v2-control {
+  margin-bottom: 0;
+}
+
+.v2-style-grid .v2-control--inline input[type="color"] {
+  width: 100%;
+  height: 26px;
+  padding: 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 3px;
+  background: #fff;
 }
 
 .v2-inspector-row code {
@@ -669,11 +2412,58 @@ function updateTableRows(event: Event): void {
   gap: 8px;
 }
 
+.v2-hint {
+  margin: -6px 0 12px;
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.v2-hint code {
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: #f1f5f9;
+  font-size: 11px;
+}
+
 .v2-control input,
 .v2-control select {
   width: 100%;
   min-height: 30px;
   padding: 0 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  box-sizing: border-box;
+  color: #1e293b;
+  background: #fff;
+  font-size: 12px;
+}
+
+.v2-textarea {
+  width: 100%;
+  min-height: 30px;
+  padding: 6px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  box-sizing: border-box;
+  color: #1e293b;
+  background: #fff;
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  resize: vertical;
+}
+
+.v2-control--inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.v2-control--inline input {
+  flex: 1 1 auto;
+  width: auto;
+  min-height: 28px;
+  padding: 0 6px;
   border: 1px solid #cbd5e1;
   border-radius: 4px;
   box-sizing: border-box;
@@ -710,6 +2500,11 @@ function updateTableRows(event: Event): void {
 .v2-issue--selectable:hover {
   color: #1d4ed8;
   text-decoration: underline;
+}
+
+@page {
+  size: A4;
+  margin: 0;
 }
 
 @media print {

@@ -1,0 +1,101 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`前五行渲染基线（P4.5 快照） > DOM 结构快照与基线一致 1`] = `
+"<div data-v-d627bc46="" class="grid-form-canvas">
+  <main data-v-d627bc46="" class="grid-form-paper" style="width: 210mm; min-height: 297mm; padding: 10mm 10mm 10mm 10mm;" data-node-id="ticket-page-1">
+    <div data-v-af1345cc="" data-v-d627bc46="" class="layout-grid layout-grid--none" data-node-id="ticket-title-layout">
+      <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 1fr; min-height: 16mm;" data-layout-id="row-title">
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="cell-title" data-node-id="cell-title">
+          <div data-v-af1345cc="" class="layout-text" style="justify-content: center; align-items: center; text-align: center; font-size: 22px; font-weight: bold;" data-node-id="title-text">云南铝业股份有限公司 电气第二种工作票</div>
+        </div>
+      </div>
+    </div>
+    <div data-v-af1345cc="" data-v-d627bc46="" class="layout-grid layout-grid--all" data-node-id="ticket-layout">
+      <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 14mm 1fr 14mm 1fr; min-height: 8mm;" data-layout-id="row-unit-number">
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="cell-u-l" data-node-id="cell-u-l">
+          <div data-v-af1345cc="" class="layout-text" style="justify-content: center; align-items: center; text-align: center;" data-node-id="unit-label">单位</div>
+        </div>
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="cell-u-f" data-node-id="cell-u-f">
+          <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--underline" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" contenteditable="true" data-field="单位" data-node-id="unit-field"></p>
+        </div>
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="cell-n-l" data-node-id="cell-n-l">
+          <div data-v-af1345cc="" class="layout-text" style="justify-content: center; align-items: center; text-align: center;" data-node-id="number-label">编号</div>
+        </div>
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="cell-n-f" data-node-id="cell-n-f">
+          <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--underline" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" contenteditable="true" data-field="编号" data-node-id="number-field"></p>
+        </div>
+      </div>
+      <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 14mm 1fr 14mm 1fr; min-height: 8mm;" data-layout-id="row-owner-team">
+        <div data-v-af1345cc="" class="layout-grid__cell" style="grid-column: span 4; padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="cell-o-l" data-node-id="cell-o-l">
+          <div data-v-af1345cc="" class="layout-text" style="justify-content: flex-start; align-items: center;" data-node-id="owner-label">工作负责人（监护人）：</div>
+          <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--underline" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" contenteditable="true" data-field="工作负责人_监护人" data-node-id="owner-field"></p>
+          <div data-v-af1345cc="" class="layout-text" style="justify-content: flex-start; align-items: center;" data-node-id="team-label">班组：</div>
+          <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--underline" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" contenteditable="true" data-field="班组" data-node-id="team-field"></p>
+        </div>
+      </div>
+      <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 14mm 1fr 14mm 1fr; min-height: 8mm;" data-layout-id="row-members">
+        <div data-v-af1345cc="" class="layout-grid__cell" style="grid-column: span 4; padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="cell-m-l" data-node-id="cell-m-l">
+          <div data-v-af1345cc="" class="layout-text" style="justify-content: flex-start; align-items: center;" data-node-id="members-label">工作班成员（不包括工作负责人）：</div>
+          <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--underline" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" contenteditable="true" data-field="工作班成员" data-node-id="members-field"></p>
+          <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--composite" style="justify-content: center; align-items: center; text-align: center; white-space: pre-wrap;" data-field="工作班成员人数" data-node-id="member-count-field"><span data-v-af1345cc="" class="layout-p__label">共</span><span data-v-af1345cc="" class="layout-p__input layout-p--underline" contenteditable="true" data-field="工作班成员人数"></span><span data-v-af1345cc="" class="layout-p__label">人</span></p>
+        </div>
+      </div>
+      <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 14mm 1fr 14mm 1fr; min-height: 8mm;" data-layout-id="row-station">
+        <div data-v-af1345cc="" class="layout-grid__cell" style="grid-column: span 4; padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="cell-s-l" data-node-id="cell-s-l">
+          <div data-v-af1345cc="" class="layout-text" style="justify-content: flex-start; align-items: center;" data-node-id="station-label">工作的变、配电站名称及设备名称：</div>
+          <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--underline" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" contenteditable="true" data-field="变配电站名称" data-node-id="station-field"></p>
+        </div>
+      </div>
+      <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 14mm 1fr 14mm 1fr; min-height: 40mm;" data-layout-id="row-work-task">
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="cell-wt-label" data-node-id="cell-wt-label">
+          <div data-v-af1345cc="" class="layout-text" style="justify-content: center; align-items: center; text-align: center; font-weight: bold; writing-mode: vertical-rl;" data-node-id="work-task-label">工作任务</div>
+        </div>
+        <div data-v-af1345cc="" class="layout-grid__cell" style="grid-column: span 3; padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="cell-wt-r1" data-node-id="cell-wt-r1">
+          <table data-v-af1345cc="" class="layout-table layout-table--all" data-node-id="work-task-table" data-field="工作任务">
+            <thead data-v-af1345cc="">
+              <tr data-v-af1345cc="" class="layout-table__row layout-table__header" style="grid-template-columns: 1fr 1fr; min-height: 8mm;">
+                <th data-v-af1345cc="" class="layout-table__cell" style="justify-content: center;">工作地点或地段</th>
+                <th data-v-af1345cc="" class="layout-table__cell" style="justify-content: center;">工作内容</th>
+              </tr>
+            </thead>
+            <tbody data-v-af1345cc="">
+              <tr data-v-af1345cc="" class="layout-table__row" style="grid-template-columns: 1fr 1fr; min-height: 8mm;">
+                <td data-v-af1345cc="" class="layout-table__cell" style="justify-content: center;" data-layout-id="wt-loc-tpl">
+                  <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--underline" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" contenteditable="true" data-field="工作任务_1_1" data-node-id="wt-loc"></p>
+                </td>
+                <td data-v-af1345cc="" class="layout-table__cell" style="justify-content: center;" data-layout-id="wt-con-tpl">
+                  <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--underline" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" contenteditable="true" data-field="工作任务_1_2" data-node-id="wt-con"></p>
+                </td>
+              </tr>
+              <tr data-v-af1345cc="" class="layout-table__row" style="grid-template-columns: 1fr 1fr; min-height: 8mm;">
+                <td data-v-af1345cc="" class="layout-table__cell" style="justify-content: center;" data-layout-id="wt-loc-tpl">
+                  <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--underline" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" contenteditable="true" data-field="工作任务_2_1" data-node-id="wt-loc"></p>
+                </td>
+                <td data-v-af1345cc="" class="layout-table__cell" style="justify-content: center;" data-layout-id="wt-con-tpl">
+                  <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--underline" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" contenteditable="true" data-field="工作任务_2_2" data-node-id="wt-con"></p>
+                </td>
+              </tr>
+              <tr data-v-af1345cc="" class="layout-table__row" style="grid-template-columns: 1fr 1fr; min-height: 8mm;">
+                <td data-v-af1345cc="" class="layout-table__cell" style="justify-content: center;" data-layout-id="wt-loc-tpl">
+                  <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--underline" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" contenteditable="true" data-field="工作任务_3_1" data-node-id="wt-loc"></p>
+                </td>
+                <td data-v-af1345cc="" class="layout-table__cell" style="justify-content: center;" data-layout-id="wt-con-tpl">
+                  <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--underline" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" contenteditable="true" data-field="工作任务_3_2" data-node-id="wt-con"></p>
+                </td>
+              </tr>
+              <tr data-v-af1345cc="" class="layout-table__row" style="grid-template-columns: 1fr 1fr; min-height: 8mm;">
+                <td data-v-af1345cc="" class="layout-table__cell" style="justify-content: center;" data-layout-id="wt-loc-tpl">
+                  <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--underline" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" contenteditable="true" data-field="工作任务_4_1" data-node-id="wt-loc"></p>
+                </td>
+                <td data-v-af1345cc="" class="layout-table__cell" style="justify-content: center;" data-layout-id="wt-con-tpl">
+                  <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--underline" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" contenteditable="true" data-field="工作任务_4_2" data-node-id="wt-con"></p>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>"
+`;
