@@ -3,7 +3,8 @@
 > 本文描述嵌套 Schema 下的组件语义和设计器操作。总体架构见 [design.md](./design.md)，
 > 渲染算法见 [engine.md](./engine.md)，实施路线见 [development-plan.md](./development-plan.md)。
 >
-> 本文为业务/交互设计目标（spec）；具体能力是否已实现、当前缺口见 [development-plan.md](./development-plan.md) §2.1 与对应阶段。
+> 本文为业务/交互设计目标（spec）；具体能力是否已实现、当前缺口见 [development-plan.md](./development-plan.md) §2.1；
+> P0–P8 阶段详细规格存档见 [archive/phase-specs-p0-p8.md](./archive/phase-specs-p0-p8.md)；文档总索引见 [README.md](./README.md)。
 
 ## 1. 产品产物
 

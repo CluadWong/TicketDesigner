@@ -2,7 +2,8 @@
 
 > 本文定义唯一正式 Schema V2 的索引、校验、递归渲染、尺寸、溢出和打印契约。
 >
-> 本文为渲染引擎契约（spec）；实现进度与缺口见 [development-plan.md](./development-plan.md) §2.1 与阶段 P4 / P8 / P9。
+> 本文为渲染引擎契约（spec）；实现进度与缺口见 [development-plan.md](./development-plan.md) §2.1。
+> 阶段规格：P4 / P8 存档于 [archive/phase-specs-p0-p8.md](./archive/phase-specs-p0-p8.md)，P9 见 development-plan.md §13；文档总索引见 [README.md](./README.md)。
 
 ## 1. 引擎职责
 

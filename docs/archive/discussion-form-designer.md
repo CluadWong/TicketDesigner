@@ -1,3 +1,10 @@
+> **已归档（2026-08-31）**：本文是项目早期的方案讨论**对话记录**（Schema 渲染 vs 直接生成 HTML、
+> FormPreview / PreviewDialog 等探索），结论已被 [../design.md](../design.md)（统一设计）与
+> [../engine.md](../engine.md)（渲染引擎）吸收，并落地为当前的 Schema V2 实现。
+> 仅作决策过程留档，**不再是当前方案依据**；当前实现状态见 [../development-plan.md](../development-plan.md)。
+
+---
+
 # (1) 讨论表单设计器实现方案
 
 > **Workspace:** e:\Project\ssh\TicketDesigner

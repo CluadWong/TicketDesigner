@@ -5,7 +5,8 @@
 > 组件业务语义见 [design-biz.md](./design-biz.md)，渲染契约见 [engine.md](./engine.md)，
 > 实施顺序见 [development-plan.md](./development-plan.md)。若旧文档或代码注释与本文冲突，以本文为准。
 >
-> 本文为设计目标契约（spec）；各项能力的实现进度与当前缺口以 [development-plan.md](./development-plan.md) §2.1 与对应阶段（P0–P12）为准。
+> 本文为设计目标契约（spec）；各项能力的实现进度与当前缺口以 [development-plan.md](./development-plan.md) §2.1 为准。
+> **P0–P8 阶段详细规格已存档**至 [archive/phase-specs-p0-p8.md](./archive/phase-specs-p0-p8.md)，P9–P12 见 development-plan.md §13–§16；文档总索引见 [README.md](./README.md)。
 
 ## 1. 目标
 
