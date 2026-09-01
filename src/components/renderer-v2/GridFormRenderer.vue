@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import type { CSSProperties } from "vue";
-import type { FormSchemaV2, FormDataV2 } from "@/types";
+import type { FormSchemaV2, FormDataV2, FormNodeV2 } from "@/types";
 import GridSchemaNode from "./GridSchemaNode.vue";
 
 defineOptions({ name: "GridFormRenderer" });
@@ -38,6 +38,17 @@ function paperStyle(page: FormSchemaV2["pages"][number]): CSSProperties {
     padding: `${page.margin.top}mm ${page.margin.right}mm ${page.margin.bottom}mm ${page.margin.left}mm`,
   };
 }
+
+/** 相邻 Grid 外框去重（Item 2）：页面子节点竖向堆叠，相邻且都绘制外框的 Grid，
+ *  抑制后一个 Grid 的上边框（保留前一个的下边框单线）。非 Grid / 非外框节点返回 undefined。 */
+function pageSiblingSuppressBorders(children: FormNodeV2[], index: number): { top?: boolean; right?: boolean; bottom?: boolean; left?: boolean } | undefined {
+  const node = children[index];
+  const draws = node.type === "grid" && (node.border === "all" || node.border === "outer");
+  if (!draws) return undefined;
+  const prev = children[index - 1];
+  const prevBordered = !!prev && prev.type === "grid" && (prev.border === "all" || prev.border === "outer");
+  return { top: prevBordered };
+}
 </script>
 
 <template>
@@ -51,13 +62,14 @@ function paperStyle(page: FormSchemaV2["pages"][number]): CSSProperties {
       :data-node-id="page.id"
     >
       <GridSchemaNode
-        v-for="node in page.children"
+        v-for="(node, index) in page.children"
         :key="node.id"
         :node="node"
         :base-row-height="schema.baseRowHeight"
         :selected-node-id="selectedNodeId"
         :data="data"
         :readonly="props.readonly"
+        :suppress-borders="pageSiblingSuppressBorders(page.children, index)"
       />
     </main>
   </div>

@@ -59,51 +59,21 @@ describe("GridSchemaNode 填写态数据回写（P9.1b）", () => {
     expect(wrapper.text()).toContain("人");
   });
 
-  it("字段 multiline=false 时填写态渲染单行 input", async () => {
+  it("文本字段填写态默认渲染 textarea（自动换行，字符串类型），不渲染单行 input", async () => {
     const formFill = vi.fn();
     const wrapper = mount(GridSchemaNode, {
       props: {
-        node: { id: "single", type: "p" as const, mode: "field" as const, field: "编号", multiline: false },
+        node: { id: "single", type: "p" as const, mode: "field" as const, field: "编号" },
         baseRowHeight: 8,
         data: { 编号: "A1" },
       },
       global: { provide: { formFill } },
     });
 
-    expect(wrapper.find("textarea.layout-p__control").exists()).toBe(false);
-    const control = wrapper.find("input.layout-p__control");
-    expect(control.exists()).toBe(true);
-    expect((control.element as HTMLInputElement).value).toBe("A1");
-  });
-
-  it("inputType=number 时单行控件 type=number", async () => {
-    const wrapper = mount(GridSchemaNode, {
-      props: {
-        node: { id: "num", type: "p" as const, mode: "field" as const, field: "数量", inputType: "number" as const, multiline: false },
-        baseRowHeight: 8,
-        data: { 数量: "3" },
-      },
-      global: { provide: { formFill: vi.fn() } },
-    });
-
-    expect((wrapper.find("input.layout-p__control").element as HTMLInputElement).type).toBe("number");
-  });
-
-  it("data 为空时回退到节点 default（支持多行），且预览态不渲染控件", async () => {
-    const wrapper = mount(GridSchemaNode, {
-      props: {
-        node: { id: "def", type: "p" as const, mode: "field" as const, field: "备注", default: "预设第一行\n预设第二行" },
-        baseRowHeight: 8,
-        readonly: true,
-      },
-      global: { provide: { formFill: vi.fn() } },
-    });
-
-    // 预览态静态渲染 default，不出现可输入控件
-    expect(wrapper.find("textarea.layout-p__control").exists()).toBe(false);
     expect(wrapper.find("input.layout-p__control").exists()).toBe(false);
-    expect(wrapper.text()).toContain("预设第一行");
-    expect(wrapper.text()).toContain("预设第二行");
+    const control = wrapper.find("textarea.layout-p__control");
+    expect(control.exists()).toBe(true);
+    expect((control.element as HTMLTextAreaElement).value).toBe("A1");
   });
 
   it("设计态（无 data）输入不回写，避免污染填写数据", async () => {

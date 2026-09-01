@@ -50,7 +50,6 @@ function normalizeNode(value: unknown): RecordValue {
       headerHeight: node.headerHeight ?? 1,
       rowHeight: node.rowHeight ?? 1,
       minRows: node.minRows ?? 0,
-      repeatable: node.repeatable ?? false,
       rowTemplate: Array.isArray(node.rowTemplate)
         ? node.rowTemplate.map(template => normalizeTemplate(template))
         : [],

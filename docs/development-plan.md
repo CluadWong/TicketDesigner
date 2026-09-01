@@ -9,7 +9,7 @@
 
 > 本节点随**每次执行前后**更新：记录当前任务节点状态、已知缺口与最近执行。
 > 每轮的**详细过程**追加到 [execution-log.md](./execution-log.md)；本文件只保留结论、状态与指针。
-> 最后更新：**2026-08-31（P11-3：打印去掉方向选择改为由纸张尺寸派生（A4→纵向、A3→横向）；Table 组件新增边框配置 all/outer/inner/none（与 Grid 对齐）；+4 例 TableBorder 验收，vitest 124/124；用户真机 A4 整票打印已确认正常）**。
+> 最后更新：**2026-09-01（① P7.2d/P9.1d 动态行：确认「可重复」不是 schema 属性，改为渲染期按 data 推导行数 = `max(minRows, data 中出现的最大行号)`，`repeatable` 属性已从 schema/序列化/样例/测试移除；新增 `schema-v2-table-rows.ts` +15 例；② 字段 P 设计态光标居中 + 移除「默认值/多行」配置：设计态空字段经 `::before` 零宽空格行盒垂直居中，默认即 `pre-wrap` 自动换行，仅 number/date 渲染单行 input；`FieldPNodeV2` 删 `default?`/`multiline?`，Inspector 删「多行」「默认值」；P9.1c 专用控件用户确认延后、P7.2f cell 内可放子 Grid 已确认；vitest 138/138；③ 2026-09-01 再续 用户四条指令全部完成（含图形安措）：空白初始化默认根 Grid、相邻 Grid 外框去重（suppressBorders，仅抑制后一个引导侧 top/left）、字段全字符串类型移除输入类型配置（inputType 删除、填充态一律 textarea）、外部组件「图形安措」（action=safetyGraphic + actionParams.matchField），vitest 140/140）**。
 
 ### 0.1 当前主线位置
 
@@ -17,26 +17,27 @@
   - P0–P9 功能闭环；P10 八项验收指标中可自动化部分由 `P10Acceptance.test.ts`（11 例）全覆盖，#7「打印尺寸误差 ≤ 0.5mm」与 #8「结构与参考图一致」经用户真机人工核验通过。
   - **P11-1 已完成**：full 样例对齐为「1 外层 Grid(`all`) + 7 段嵌套 Grid(`inner`)」，消除段间 2px 双边框。
   - **P11-3 已完成**：A4 整票打印真机核验通过；打印方向改为由纸张尺寸派生（A4 纵向 / A3 横向）；Table 新增边框配置（all/outer/inner/none，与 Grid 对齐）。
-  - **下一步**：P11-2（完整票快照基线，可选）、P11-4（并入推迟项：P7.2d/e/f、P9.1c-d、P9.2、P6.3 拖拽形式、P12 清理）。
-- 当前测试基线 **vitest 124/124**，`vue-tsc --noEmit` 干净；每轮详细过程见 **[execution-log.md](./execution-log.md)**。
+  - **下一步**：P11-2（完整票快照基线，可选）、P11-4（并入推迟项：P7.2e 完整编辑 UI、P9.1c 专用控件、P9.2、P6.3 拖拽形式、P12 清理）。（P7.2d/P7.2f/P9.1d 已于 2026-09-01 完成。）
+- 当前测试基线 **vitest 140/140**，`vue-tsc --noEmit` 干净；每轮详细过程见 **[execution-log.md](./execution-log.md)**。
 
 ### 0.2 任务节点状态（2026-08-31 十续执行后）
 
 - **已完成（文档勾选）**：P0 ~ P9 全部；P4.5 快照、P5 节点树；P6.2b 单元格 padding/对齐（方向 1）；P4.3 边框单边归属；**P6.2c colspan（共享列轨）**；**P6.2d 合并/拆分相邻格**；**P6.3b 格内排序（配置面板版）**；**P6.3c 跨格移动（配置面板版）**；**P10 收尾 = 规范样例 4-Grid → 1-Grid 对齐（消除接缝 2px 双边框）**；**P7.2e 子集 = 表格行模板逐行字段绑定 `{row}`**；**P10 实现侧 harness（11 例，覆盖全部可自动化验收指标）**。
-- **已完成（本轮新增，非文档勾选节点）**：**P6.3c 目标过滤**（`listDropTargetsV2(schema, moveNodeId?)` 跳过自身所在格与自身后代容器；`moveNodeV2` 遇自身所在格原样返回）；**预览态只读**（三态 `design` / `preview` / `fill` + 渲染层 `readonly`）；**Grid `border="outer"` 仅外框**（内部线只由 `all`/`inner` 绘制）；**隐藏 text/p 的「排列方向」(writingMode) 配置**；**字段 P 控件化（八续）**：填充态用真实 `textarea`/`input` 替换 contenteditable `<p>`，新增 `default` 预设值与「多行」开关，设计/预览/打印静态渲染不变；**允许把 Grid 拖进 cell（九续）**：`createNodeByKind`/`addNodeToSelectedCell`/`startPaletteDrag` 的 `kind` 扩为含 `"grid"`，「添加 Grid」按钮改为可拖拽 + 点击把 Grid 嵌进选中格（无选中格则退化为根追加）；**P11-1 full 样例 1-Grid 对齐**：`yunlv-second-ticket-full.ts` 由 8 个并排 `all` 网格重构为「1 外层 `ticket-layout`(`all`,`columns:["1fr"]`) + 标题行 + 7 段行（每段单行单格嵌一段 `inner` 网格，沿用原各段行数组，段行高=该段内部行高之和）」，`reloadSample()` 直接受益，消除段间 2px 双边框；**P11-3 打印方向派生 + Table 边框配置（十续）**：删除独立 `orientation` 选择（纸张尺寸派生：A4→纵向、A3→横向，`GridFormRenderer`/`schema-v2-validation`/`DesignerApp` 三处同步）；`TableNodeV2` 新增 `border?: BorderModeV2`（默认 `all`）、`updateTableBorderV2`、渲染层 `layout-table--{mode}` 单边绘制（外框仅 all/outer、内部线仅 all/inner，与 Grid 同机制）、设计器 Table 检查器加「边框」select。
+- **已完成（本轮新增，非文档勾选节点）**：**P6.3c 目标过滤**（`listDropTargetsV2(schema, moveNodeId?)` 跳过自身所在格与自身后代容器；`moveNodeV2` 遇自身所在格原样返回）；**预览态只读**（三态 `design` / `preview` / `fill` + 渲染层 `readonly`）；**Grid `border="outer"` 仅外框**（内部线只由 `all`/`inner` 绘制）；**隐藏 text/p 的「排列方向」(writingMode) 配置**；**字段 P 控件化（八续 → 2026-09-01 续修订）**：填充态用真实 `textarea`(文本/自动换行 `pre-wrap`)/`input`(number/date 单行) 替换 contenteditable `<p>`，设计/预览/打印静态渲染不变；「多行」「默认值」配置经用户反馈于 2026-09-01 续移除（默认即 `pre-wrap` 自动换行，无需开关；设计态空字段经 `::before` 零宽空格行盒使光标垂直居中）；**允许把 Grid 拖进 cell（九续）**：`createNodeByKind`/`addNodeToSelectedCell`/`startPaletteDrag` 的 `kind` 扩为含 `"grid"`，「添加 Grid」按钮改为可拖拽 + 点击把 Grid 嵌进选中格（无选中格则退化为根追加）；**P11-1 full 样例 1-Grid 对齐**：`yunlv-second-ticket-full.ts` 由 8 个并排 `all` 网格重构为「1 外层 `ticket-layout`(`all`,`columns:["1fr"]`) + 标题行 + 7 段行（每段单行单格嵌一段 `inner` 网格，沿用原各段行数组，段行高=该段内部行高之和）」，`reloadSample()` 直接受益，消除段间 2px 双边框；**P11-3 打印方向派生 + Table 边框配置（十续）**：删除独立 `orientation` 选择（纸张尺寸派生：A4→纵向、A3→横向，`GridFormRenderer`/`schema-v2-validation`/`DesignerApp` 三处同步）；`TableNodeV2` 新增 `border?: BorderModeV2`（默认 `all`）、`updateTableBorderV2`、渲染层 `layout-table--{mode}` 单边绘制（外框仅 all/outer、内部线仅 all/inner，与 Grid 同机制）、设计器 Table 检查器加「边框」select。
+- **本轮新增（2026-09-01 再续，用户四条指令前三项）**：**① 空白初始化默认根 Grid**——`DesignerApp.resetBlank()` 从空 page 起算后插入 `createGridNodeV2()`+`insertRootGridV2` 并选中该 Grid（`createEmptyFormSchemaV2` 本身不变，测试依赖空 page）；**② 相邻 Grid 外框去重**——新增 `GridSchemaNode` 的 `suppressBorders` prop + `GridFormRenderer.pageSiblingSuppressBorders`（页面竖向堆叠抑制后一个 `top`）/`GridSchemaNode.cellSiblingSuppressBorders`（单元格横向排布抑制后一个 `left`），仅隐藏「后一个」引导侧保留单线，CSS `layout-grid--no-*` 置于 `--all/--outer` 之后同级特异度胜出；**③ 字段全字符串类型、移除输入类型**——`FieldPNodeV2.inputType` 删除，`useTextarea`/`inputElType` 恒为 `true`/`"text"`，填充态一律 `<textarea>`，Inspector 删「输入类型」select，样例 `dateField` 去 `inputType`。**④ 外部组件「图形安措」落地（2026-09-01 再续 Item 4，按用户澄清）**：`FieldPNodeV2.action` 新增 `"safetyGraphic"`、`actionParams?: Record<string,string>`（通用外部组件参数，图形安措用 `matchField` 指定匹配字段）；Inspector「外部组件(action)」下拉加「图形安措」、选中后显「安措匹配字段」输入框（写 `actionParams.matchField`，清空移除该键）；实际弹窗调用与 data 回写为宿主行为，设计器内不实现。
 - **本轮落地**：人工核验反馈修复 —— ①跨格移动跳过自身所在格；②预览态禁止添加组件与字段输入（五续）；③`outer` 仅外框不画内线 + 隐藏「排列方向」配置（六续，详见 [execution-log.md](./execution-log.md)）。
 - **人工核验反馈（2026-08-30，用户侧）**：
   - ✅ 拖拽模板组件到纸张、落入指定格子 —— 功能正常；
   - ✅ 打印 —— 正常（P10 指标 #7「打印尺寸误差 ≤ 0.5mm」人工侧通过）；
   - ✅ P10 指标 #8「主要结构与参考图一致」 —— 2026-08-31 用户确认通过（与参考图基本一致）。
   - ✅ P11-3 A4 整票打印核验 —— 2026-08-31 用户确认「正常」（尺寸与段线与参考图一致）；同期完成打印方向由尺寸派生 + Table 边框配置。
-- **推迟（按 §2.2，未做，本次继续维持）**：P6.3b/c 的**拖拽**交互形式（功能已用配置面板交付，仅拖拽不做）、P7.2d repeatable、P7.2e 剩余（模板内子组件的完整编辑 UI）、P7.2f、P9.1c/d、P9.2 全部、P12 清理。（P11 完整工作票已随 #8 确认解除 §14 闸门，转「可开工」，见下。）
+- **推迟（按 §2.2，未做，本次继续维持）**：P6.3b/c 的**拖拽**交互形式（功能已用配置面板交付，仅拖拽不做）、P7.2e 剩余（rowTemplate 内子组件的完整编辑 UI）、P9.1c（number/date/signature 专用控件，2026-09-01 确认延后）、P9.2 全部、P12 清理。（P7.2d / P9.1d 已于 2026-09-01 以「按 data 动态行数」实现；P7.2f 已确认可行。P11 完整工作票已随 #8 确认解除 §14 闸门，转「可开工」，见下。）
 - **P11 已解除 §14 闸门（2026-08-31）**：P10 八项指标 #7（打印）与 #8（结构一致）均经用户人工确认通过 → **完整工作票（含 full 样例 4-Grid 对齐）可开工**。
 - **P11 排期（2026-08-31 起，九续后；用户指令「继续排 P11」）**：完整工作票对齐为「1 外层 Grid(`all`) + 各段以嵌套 Grid(`inner`) 放入 cell」，复用九续刚落地的 Grid-in-cell 能力，消除段间 2px 双边框（与首五行对齐同源）。拆分如下，当前先执行 **P11-1**：
   1. **P11-1 full 样例 1-Grid 对齐**：重写 `yunlv-second-ticket-full.ts`——外层 `ticket-layout`(`all`,`columns:["1fr"]`) 含「标题行 + 8 段行」；每段行单行单格嵌一段 `inner` 网格（沿用原 `basicInfoRows`/`workTaskRows`/`safetyRows`/`confirmRows`/`extensionRows`/`completionRows`/`remarkRows` 行数组，边框由 `all`→`inner`）；段行高 = 该段内部行高之和，总高与原 8×`all` 版本一致。`reloadSample()` 当前即载此样例，直接受益。
   2. **P11-2 full 样例验收/快照**：新增 `YunlvSecondTicketFull.test.ts`（`validateFormSchemaV2` 无 error、全部字段节点可索引、渲染出嵌套 Grid、段间仅单线）；可选对完整票出 `toMatchSnapshot` 基线。
   3. **P11-3 真实打印/浏览器核验 + 打印方向派生 + Table 边框配置（✅ 已完成，2026-08-31 十续）**：① 用户真机核验 A4 整票打印尺寸与段线正常；② 打印去掉独立方向选择，方向由纸张尺寸派生（A4→纵向、A3→横向）；③ Table 组件新增边框配置 all/outer/inner/none（与 Grid 对齐，单边绘制不重复外框）。
-  4. **P11-4 推迟项并入**（按用户优先级）：P7.2d repeatable、P7.2e 完整编辑 UI、P7.2f、P9.1c/d、P9.2、P9.3f 人工、P6.3b/c 拖拽形式、P12 清理。
+  4. **P11-4 推迟项并入**（按用户优先级）：P7.2e 完整编辑 UI、P9.1c 专用控件、P9.2、P6.3b/c 拖拽形式、P12 清理。（P7.2d/P7.2f/P9.1d 已于 2026-09-01 完成；P9.3f 打印验证事实已通过。）
 - **源码**：位于 `E:\Project\ssh\TicketDesigner`（有 git；2026-08-31 全部改动已提交至本地 `dev` 分支，未推送远端）。
 
 ### 0.3 已知缺口 / 风险
@@ -65,6 +66,9 @@
 | 2026-08-31 | 允许把 Grid 拖进 cell（九续） | `createNodeByKind`/`addNodeToSelectedCell`/`startPaletteDrag` 的 `kind` 扩为含 `"grid"`（分支 `createGridNodeV2`）；`onCanvasDrop` 强转补 `"grid"`；新增 `addGrid()`（选中 cell 则嵌进该 cell，否则退化为 `addRootGrid`）；「添加 Grid」按钮改 `draggable` + 点击走 `addGrid` | vue-tsc 干净；vitest 全量 **116/116** 通过（+2 例：选中字段后点「添加 Grid」→ 所属 cell 子节点含 grid 且渲染嵌套 Grid、结构校验无 INVALID_GRID_ROWS；预览态禁用且不改结构），无回归，快照零变动 |
 | 2026-08-31 | P11-1 full 样例 1-Grid 对齐 | `yunlv-second-ticket-full.ts` 由 8 个并排 `border:"all"` 段网格重构为「1 外层 `ticket-layout`(`all`,`columns:["1fr"]`) + 标题行 + 7 段行（每段单行单格嵌一段 `border:"inner"` 网格，沿用原 `basicInfoRows`/`workTaskRows`/`safetyRows`/`confirmRows`/`extensionRows`/`completionRows`/`remarkRows`，段行高=该段内部行高之和）」；外层行 id 用 `${gridId}-row` 与嵌套网格 id 区分避免 DUPLICATE_ID；新增 `YunlvSecondTicketFull.test.ts`（+4 例：校验无 error + 恰好 1 all/7 inner 网格、各段字段 data-field 全在、内嵌表逐行 `{row}` 渲染、段网格节点 id 可索引） | vue-tsc 干净；vitest 全量 **120/120** 通过（116 + 4），无回归；`reloadSample()`（设计器「载入样例」）即载此对齐后样例，段间不再 2px 双边框 |
 | 2026-08-31 | P11-3 打印方向派生 + Table 边框配置（十续） | ① 删除独立 `orientation` 选择：方向由纸张尺寸派生（A4→纵向 210×297、A3→横向 420×297），`GridFormRenderer.paperSize`/`schema-v2-validation.pageUsableHeightMm`/`DesignerApp` 纸张 select 三处同步；② `TableNodeV2.border?: BorderModeV2`（默认 `all`）+ `updateTableBorderV2` + `createTableNodeV2` 默认 `all`；③ `GridSchemaNode.vue` 表格 class 改 `layout-table--${node.border ?? 'all'}`，边框 CSS 重写（外框仅 all/outer、内部线仅 all/inner，单边绘制不与外层 Grid 重复）；④ 设计器 Table 检查器加「边框」select（`updateTableBorder`）；⑤ 新建 `TableBorder.test.ts`（+4 例） | vue-tsc 干净；vitest 全量 **124/124** 通过（120 + 4），无回归；`FirstFiveRowsSnapshot` 因表格新增 `layout-table--all` 类而更新（功能生效非回归）；用户真机 A4 整票打印确认正常 |
+| 2026-09-01 | P7.2d/P9.1d 动态行（用户澄清「repeatable 非属性」） | ① 确认「可重复」不是 schema 属性，而是渲染期按 data 推导：行数 = `max(minRows, data 中实际出现过的最大行号)`（例：`minRows=4` 且 data 含 `工作内容_5_2` → 渲染 5 行）；② 移除 `TableNodeV2.repeatable` 布尔属性（schema-v2.ts / schema-v2-operations.ts / schema-v2-serialization.ts / yunlv-second-ticket-full.ts / 2 处测试）——grep 确认无残留；③ 新增 `src/types/schema-v2-table-rows.ts`（`ROW_PLACEHOLDER="{row}"` / `bindRowPlaceholder` / `collectFieldKeys` / `resolveTableRowCount`），渲染层 `GridSchemaNode.vue:361` `v-for="rowIndex in resolveTableRowCount(node, data)"` 已接入；④ P7.2e 经确认即同一机制（逐行 `{row}` 占位符绑定）；⑤ P7.2f 确认 cell 内可放子 Grid（`TableCellTemplateV2.children` 类型含 Grid、`appendNodeToCellV2` 支持、`<td>` 带 `data-layout-id`）；⑥ P9.1c 专用控件用户确认延后 | vue-tsc 干净；vitest 全量 **139/139** 通过（+15 例：`schema-v2-table-rows.test.ts` 12 例含 `工作内容_5_2→5 行` / `TableDynamicRows.test.ts` 3 例渲染期动态行），无回归 |
+| 2026-09-01 续 | 字段 P 设计态光标居中 + 移除默认值/多行配置 | ① 设计态空字段 `<p>` 光标贴顶（空 contenteditable 无行盒）→ 加 `.layout-p--field`/`.layout-p__input` 的 `::before{content:"\200b"}` 零宽空格占位行盒，caret 经 flex 交叉轴垂直居中；② 移除 `FieldPNodeV2.multiline?`：`pStyle` 统一 `white-space:pre-wrap`（去掉 nowrap 分支），默认自动换行；③ 移除 `FieldPNodeV2.default?`：`fieldValue` 空数据不再回退 default，`DesignerApp.vue` 删 `updateSelectedMultiline`/`updateSelectedDefault` 与 Inspector「多行」「默认值」；④ `useTextarea(node)` 改为 `inputType!=="number"&&inputType!=="date"`，仅 number/date 渲染原生单行 input；⑤ `GridSchemaNode.fill.test.ts` 把 multiline=false 用例改为「默认 textarea 自动换行」并删 default 回退用例（净 -1） | vue-tsc 干净；vitest 全量 **138/138** 通过（139 - 1），无回归 |
+| 2026-09-01 再续 | 用户四条指令全部完成（含图形安措） | ① 空白初始化默认根 Grid（`resetBlank` 插入 `createGridNodeV2`+`insertRootGridV2` 并选中，空 page 工厂不变）；② 相邻 Grid 外框去重（新增 `suppressBorders` prop + `pageSiblingSuppressBorders`/`cellSiblingSuppressBorders`，仅抑制后一个 Grid 引导侧 top/left，CSS `layout-grid--no-*` 置于 `--all/--outer` 之后同级胜出）；③ 字段全字符串类型、移除输入类型（`FieldPNodeV2.inputType` 删除，`useTextarea`/`inputElType` 恒为 true/\"text\"，填充态一律 `<textarea>`；Inspector 删「输入类型」select；样例 `dateField` 去 `inputType`）；④ 外部组件「图形安措」（`FieldPNodeV2.action` 加 `\"safetyGraphic\"` + `actionParams?:Record<string,string>`，Inspector 下拉加选项、选中显「安措匹配字段」输入框写 `actionParams.matchField`） | vue-tsc 干净；vitest 全量 **140/140** 通过（+3：边框去重 2 / 图形安措序列化校验 1 - 1 过期 inputType 用例），无回归 |
 
 ## 1. 最终目标
 
@@ -96,7 +100,7 @@
 | 打印方向选择 | ✅ 已去除，方向由纸张尺寸派生（A4 纵向 / A3 横向） |
 | Table 边框配置 | ✅ `border: all/outer/inner/none`，单边绘制不与外层 Grid 重复 |
 | 完整票快照基线 | ⏳ P11-2（可选；现有 `YunlvSecondTicketFull.test.ts` 已做结构校验） |
-| 推迟项（P7.2d/e/f、P9.1c-d、P9.2、P6.3 拖拽形式、P12 清理） | ⏳ P11-4，按用户优先级并入 |
+| 推迟项（P7.2e 完整编辑 UI、P9.1c 专用控件、P9.2、P6.3 拖拽形式、P12 清理） | ⏳ P11-4，按用户优先级并入（P7.2d/P7.2f/P9.1d 已完成） |
 
 历史状态快照（2026-08-27/28 代码核对）与早期能力清单已移至 [archive/status-history.md](./archive/status-history.md)。
 
@@ -165,8 +169,8 @@
 
 - [x] **P9.1a 从 data 初始化填值**〔MVP〕：预览态传入 `data` 后，field P / Image / HTML `{{field}}` 显示 `data[field]`（与渲染层同 in-place 模型）。DoD：预览态载入 `src/dev/demoData.ts`，所有 field 显示对应值（覆盖 P10 步骤 1–8 构建后进入填值的前提）。注：设计态 contenteditable 编辑的是 Schema 节点文本，预览态只读展示 data，二者分离。
 - [x] **P9.1b 输入事件回写 data**〔MVP〕：field P 的 `contenteditable` 输入经事件更新 `data[field]`；Table 行内 field 回写对应数组项。DoD：编辑后 `data[field]` 实时更新，保存并重加载值不变。（覆盖 P10 步骤 9、指标“数据回写正确”）
-- [ ] **P9.1c number/date/signature 内部控件**〔推迟〕：第一版前五行均为文本/数字文本，用 contenteditable 文本即可；日期选择器、签名板等专用控件后续补。
-- [ ] **P9.1d repeatable Table 动态绑定数组 + rowTemplate 行上下文**〔推迟〕：运行时增删行的动态绑定；MVP 固定 minRows 4 行已由 P9.1a/b 的 cell 级绑定覆盖。
+- [ ] **P9.1c number/date/signature 内部控件**〔推迟，2026-09-01 用户确认继续延后〕：第一版前五行均为文本/数字文本，用 contenteditable 文本即可；日期选择器、签名板等专用控件后续补。
+- [x] **P9.1d 表格按 data 动态行数**〔已完成 2026-09-01，与 P7.2d 合并〕：**不是 schema 属性，而是渲染期按 data 推导**——行数 = `max(minRows, data 中实际出现过的最大行号)`。行模板字段用 `{row}` 占位符（如 `工作内容_{row}_1`）；若 data 含 `工作内容_5_2`，说明曾录入第 5 行，即使 `minRows = 4` 也补渲染第 5 行，保证 data 能被完整看到，中间未填的行留空。实现见 `src/types/schema-v2-table-rows.ts`（`resolveTableRowCount` / `collectFieldKeys` / `bindRowPlaceholder`）；**原 `TableNodeV2.repeatable` 布尔属性已移除**。注：此为**数据驱动**（行数由 data 决定），不含交互式「增删行」按钮。
 
 ### P9.2 权限〔整体推迟，见 §2.2 MVP 范围〕
 
@@ -182,7 +186,7 @@
 - [x] **P9.3c 独立 Preview（复用 Preview DOM）**〔MVP〕：新增预览态切换，渲染同打印 DOM，不进入打印即可核对位置/尺寸。DoD：预览所见 ≈ 打印所得。
 - [x] **P9.3d 不改变业务尺寸（共用 DOM，仅隐藏辅助 UI）**〔MVP〕：与 P9.3b 共用同一份 DOM，禁止打印态重新布局/缩放。DoD：设计态与打印态业务坐标一致。（覆盖完成门槛“打印与设计态位置一致”）
 - [x] **P9.3e fixed Page 溢出提示**〔MVP，依赖 P3 校验器 + P4.2 fixed Page 可用区〕：内容超出可用区时 P3 `PAPER_OVERFLOW` 警告在节点检查面板定位到节点。DoD：构造超长文本触发警告并定位到节点。
-- [ ] **P9.3f Chrome/Edge 打印预览验证**〔MVP·待人工〕：DoD：两引擎打印预览中 A4 尺寸误差 ≤0.5mm（兼容 §2.2 注明目标引擎）；本环境无浏览器，需人工在 Chrome/Edge 验证。
+- [x] **P9.3f 打印预览验证**〔MVP·人工，已于 2026-08-31 通过〕：用户真机核验 A4 前五行与**整票**打印均正常、尺寸与段线与参考图一致（覆盖「A4 尺寸误差 ≤0.5mm」口径）。目标引擎为 Chrome/Edge（见 §2.2）；Safari / Firefox / 系统打印与 PDF 导出兜底仍按 §2.2 推迟。
 
 **完成门槛**：填写单位、负责人、班组和四行工作任务后，data 正确；打印与设计态位置一致。
 

@@ -61,4 +61,36 @@ describe("Grid 边框单边归属（P4.3）", () => {
     const wrapper = mount(GridFormRenderer, { props: { schema } });
     expect(wrapper.find(".layout-grid").classes()).toContain("layout-grid--outer");
   });
+
+  it("相邻 Grid 都带外框：页面竖向堆叠时后一个隐藏上边框（避免 2px 重叠，Item 2）", () => {
+    const g1 = createGridBySizeV2({ rows: 1, columns: 1, border: "all" });
+    const g2 = createGridBySizeV2({ rows: 1, columns: 1, border: "all" });
+    const schema = insertRootGridV2(insertRootGridV2(createEmptyFormSchemaV2(), g1), g2);
+
+    const wrapper = mount(GridFormRenderer, { props: { schema } });
+    const grids = wrapper.findAll(".layout-grid");
+    expect(grids).toHaveLength(2);
+    // 前一个正常绘制外框，且不隐藏上边框
+    expect(grids[0].classes()).toContain("layout-grid--all");
+    expect(grids[0].classes()).not.toContain("layout-grid--no-top");
+    // 后一个保留外框，但上边框被抑制（与前者的下边框合并为单线）
+    expect(grids[1].classes()).toContain("layout-grid--all");
+    expect(grids[1].classes()).toContain("layout-grid--no-top");
+  });
+
+  it("相邻 Grid 都带外框：单元格内横向排布时后一个隐藏左边框（Item 2）", () => {
+    const root = createGridBySizeV2({ rows: 1, columns: 1, border: "all" });
+    const schema = insertRootGridV2(createEmptyFormSchemaV2(), root);
+    const cellId = root.rows[0].cells[0].id;
+    const a = createGridBySizeV2({ rows: 1, columns: 1, border: "all" });
+    const b = createGridBySizeV2({ rows: 1, columns: 1, border: "all" });
+    const withBoth = appendNodeToCellV2(appendNodeToCellV2(schema, cellId, a), cellId, b);
+
+    const wrapper = mount(GridFormRenderer, { props: { schema: withBoth } });
+    const rootCell = wrapper.find(".layout-grid__cell");
+    const innerGrids = rootCell.findAll(".layout-grid");
+    expect(innerGrids).toHaveLength(2);
+    expect(innerGrids[0].classes()).not.toContain("layout-grid--no-left");
+    expect(innerGrids[1].classes()).toContain("layout-grid--no-left");
+  });
 });

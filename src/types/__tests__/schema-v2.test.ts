@@ -136,7 +136,6 @@ describe("Schema V2 validation", () => {
         headerHeight: 1,
         rowHeight: 1,
         minRows: 1,
-        repeatable: false,
         rowTemplate: [
           {
             id: "template-1",
@@ -232,7 +231,6 @@ describe("Schema V2 validation", () => {
         headerHeight: 1,
         rowHeight: 1,
         minRows: 1,
-        repeatable: false,
         rowTemplate: [
           {
             id: "template-1",
@@ -312,5 +310,23 @@ describe("Schema V2 serialization", () => {
     expect((htmlNode as unknown as Record<string, unknown>).trusted).toBeUndefined();
     expect((htmlNode as unknown as Record<string, unknown>).bindings).toBeUndefined();
     expect(imageNode).toMatchObject({ type: "image", src: "data:image/png;base64,AAAA", field: "photo", width: 30, objectFit: "cover" });
+  });
+
+  it("图形安措外部组件：action=safetyGraphic + actionParams 可序列化回写且不报错（Item 4）", () => {
+    const schema = makeSchema();
+    schema.pages[0].children.push({
+      id: "safety-1",
+      type: "p",
+      mode: "field",
+      field: "安措图",
+      action: "safetyGraphic",
+      actionParams: { matchField: "安全措施" },
+    } as never);
+    const restored = parseFormSchemaV2(serializeFormSchemaV2(schema));
+    expect(restored.pages[0].children).toContainEqual(
+      expect.objectContaining({ id: "safety-1", action: "safetyGraphic", actionParams: { matchField: "安全措施" } }),
+    );
+    const issues = validateFormSchemaV2(schema);
+    expect(issues.filter(i => i.level === "error")).toHaveLength(0);
   });
 });

@@ -254,10 +254,10 @@ type PNode = StaticPNode | FieldPNode
 
 - [x] **P7.2a 新增/删除列**〔MVP·已完成〕：右侧面板「列配置」已支持新增/删除列（保留至少 1 列），并自动同步 `rowTemplate`；移动列仍按原排期推迟。DoD：可增删列并即时渲染。
 - [x] **P7.2b 编辑 key、标题、宽度、对齐**〔MVP·已完成〕：列配置支持编辑标题 / 字段名(key) / 宽度 / 对齐（key 重命名同步 `rowTemplate` 的 columnKey 与 id）。DoD：可创建 2 列表格并设列宽、标题、对齐。
-- [x] **P7.2c headerHeight、rowHeight、minRows**〔MVP·部分〕：`minRows` 已可通过配置面板设置；`headerHeight`/`rowHeight` 补 schema 字段与 UI。DoD：可设表头高/行高/minRows（覆盖 P10 步骤 6 表头1·行高1·minRows4）。
-- [ ] **P7.2d repeatable**〔推迟〕：动态增删行，第一版固定 minRows 即可（与 P9.1d 一致）。
+- [x] **P7.2c headerHeight、rowHeight、minRows**〔MVP·已完成，2026-09-01 核验补齐〕：三者均在 `TableNodeV2` schema 中，渲染层按 `headerHeight/rowHeight × baseRowHeight` 输出 `min-height`，设计器 Inspector 亦已暴露表头高与行高（原标注为「部分」系文档未及时更新，实际已完整）。DoD：可设表头高/行高/minRows（覆盖 P10 步骤 6 表头1·行高1·minRows4）。
+- [x] **P7.2d 表格动态行**〔已完成 2026-09-01，并入 P9.1d〕：经用户澄清，**「可重复」不是 schema 属性**，而是渲染期按 data 推导的行数 = `max(minRows, data 中实际出现过的最大行号)`（例：`minRows=4` 且 data 含 `工作内容_5_2` → 渲染 5 行）。实现见 `src/types/schema-v2-table-rows.ts`；**`TableNodeV2.repeatable` 布尔属性已移除**。详见 [../development-plan.md](../development-plan.md) §13 P9.1d。
 - [~] **P7.2e 编辑 rowTemplate 的 Cell children**〔部分完成〕：**逐行字段绑定已落地（P10 阻塞项）**——行模板内后代 `field` 支持 `{row}` 行号占位符，渲染层 `withRowIndex(node, rowIndex)` 在 tbody 每行实例化时替换为 1-based 行号（如 `工作任务_{row}_1` → 第 2 行 `工作任务_2_1`），与 `demoData`/`acceptance-row-spec.md` 的 8 个逐行键一致；设计器对「位于表格行模板内」的 P 节点显示 `{row}` 用法提示。不含占位符时原样返回同一引用（无额外开销）。**剩余（仍推迟）**：模板内子组件的完整编辑 UI（依赖 P9.1d 动态绑定，第一版不做）。
-- [ ] **P7.2f 单元格放 P 或子 Grid**〔MVP〕：工作任务表格 cell 内为 field P（已可插入 P）。DoD：表格 cell 可插入 P/子 Grid。
+- [x] **P7.2f 单元格放 P 或子 Grid**〔已完成，2026-09-01 核验〕：`TableCellTemplateV2.children: FormNodeV2[]` 类型上已含 Grid；`appendNodeToCellV2` 同时支持 `grid-cell` 与 `table-cell-template` 且接受任意 `FormNodeV2`；渲染层 `<td>` 带 `data-layout-id`，拖拽可被 `closest('[data-layout-id]')` 命中；`withRowIndex` 递归处理 Grid 子节点（含 `{row}` 替换）。即表格 cell 内可放 P **和**子 Grid。
 
 ### P7.3 HTML〔第一版 MVP 基础版，见 engine.md §11〕
 

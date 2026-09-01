@@ -122,13 +122,12 @@ Table 用于规则明细，不用于整张表单排版。
 - 新增、删除和移动列。
 - 设置列 key、标题、宽度和对齐。
 - 设置表头高度、数据行高度和最小行数。
-- 设置 repeatable。
 - 编辑 rowTemplate 中每个列的子组件。
 - 将 P 或子 Grid 放入单元格模板。
 - 新建 Table 时，每个列模板默认包含一个 Field P，渲染结构为 `tbody > tr > td > p`；删除默认 P 后可以放置其他组件。
 
-设计态根据 minRows 重复 rowTemplate。填写态如果 repeatable=true 且 data[field] 有数组，
-按数组长度生成数据行，但不少于业务要求的最小行数配置。
+设计态根据 minRows 重复 rowTemplate 作为空数据占位。填写态渲染行数 = `max(minRows, data 中实际出现的最大行号)`：
+行模板字段用 `{row}` 占位符（如 `工作内容_{row}_2`），data 含 `工作内容_5_2` 即补渲染第 5 行；中间未填行留空，保证 data 完整可见（非 repeatable 配置属性）。
 
 ## 7. HTML 与 Image
 
@@ -202,7 +201,7 @@ Table 用于规则明细，不用于整张表单排版。
 | Page | 纸张、方向、边距、fixed 模式 |
 | Grid | 行数、列数、边框、整体样式 |
 | P | mode、text/field、inputType、下划线、文字样式 |
-| Table | field、columns、表头/行高、minRows、repeatable |
+| Table | field、columns、表头/行高、minRows（动态行数由 data 推导，无 repeatable 属性） |
 | HTML | html、css（Shadow DOM 隔离，{{field}} 绑定） |
 | Image | src/field、尺寸、objectFit |
 
@@ -226,7 +225,7 @@ interface FormPreviewProps {
 
 - static P 不访问 data。
 - field P 读取和回写 data[field]。
-- repeatable Table 从 data[field] 读取数组。
+- Table 数据行数由 data 推导（非 schema 属性）：渲染行数 = `max(minRows, 行模板字段 data 键中最大行号)`，行模板字段用 `{row}` 占位符与 data 逐行键对应。
 - readonly 禁止编辑但保留内容。
 - hidden 默认隐藏内容并保留固定版式空间，完全折叠需要显式 layoutHidden 规则。
 - required 在预览中标记，并在提交时校验。

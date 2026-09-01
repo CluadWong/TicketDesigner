@@ -458,7 +458,15 @@ function reloadSample(): void {
 }
 
 function resetBlank(): void {
-  resetHistory(createEmptyFormSchemaV2());
+  // 空白初始化默认配一个 Grid 作为根部（用户要求），仍从空 page 起算，
+  // 便于用户在「添加 Grid」前就有一个可编辑的容器。
+  const blank = createEmptyFormSchemaV2();
+  const grid = createGridNodeV2();
+  resetHistory(insertRootGridV2(blank, grid));
+  selectedNodeId.value = grid.id;
+  selectedInsertionSlotId.value = null;
+  selectionPathIds.value = [blank.pages[0].id, grid.id];
+  selectionPathIndex.value = 1;
   clearSelection();
 }
 
@@ -1021,18 +1029,6 @@ function updateSelectedVerticalAlign(event: Event): void {
   });
 }
 
-function updateSelectedInputType(event: Event): void {
-  const value = (event.target as HTMLSelectElement)
-    .value as FieldPNodeV2["inputType"];
-  updateSelectedNode(
-    (node) =>
-      node.type === "p" && node.mode === "field"
-        ? { ...node, inputType: value }
-        : node,
-    selectedNodeId.value ? `inputtype:${selectedNodeId.value}` : undefined,
-  );
-}
-
 function updateSelectedHtml(event: Event): void {
   const value = (event.target as HTMLTextAreaElement).value;
   updateSelectedNode(
@@ -1129,27 +1125,22 @@ function updateSelectedAction(event: Event): void {
   );
 }
 
-function updateSelectedMultiline(event: Event): void {
-  const checked = (event.target as HTMLInputElement).checked;
+/** 图形安措（action=safetyGraphic）的「安措匹配字段」：写入 actionParams.matchField；
+ *  清空时移除该键，actionParams 为空则置 undefined（避免残留空对象）。 */
+function updateSelectedSafetyField(event: Event): void {
+  const raw = (event.target as HTMLInputElement).value.trim();
   updateSelectedNode(
-    (node) =>
-      node.type === "p" && node.mode === "field"
-        ? { ...node, multiline: checked ? true : undefined }
-        : node,
-    selectedNodeId.value ? `multiline:${selectedNodeId.value}` : undefined,
+    (node) => {
+      if (node.type !== "p" || node.mode !== "field") return node;
+      const params: Record<string, string> = { ...(node.actionParams ?? {}) };
+      if (raw) params.matchField = raw;
+      else delete params.matchField;
+      return { ...node, actionParams: Object.keys(params).length ? params : undefined };
+    },
+    selectedNodeId.value ? `actionParams:${selectedNodeId.value}` : undefined,
   );
 }
 
-function updateSelectedDefault(event: Event): void {
-  const value = (event.target as HTMLTextAreaElement).value;
-  updateSelectedNode(
-    (node) =>
-      node.type === "p" && node.mode === "field"
-        ? { ...node, default: value || undefined }
-        : node,
-    selectedNodeId.value ? `default:${selectedNodeId.value}` : undefined,
-  );
-}
 </script>
 
 <template>
@@ -1641,18 +1632,6 @@ function updateSelectedDefault(event: Event): void {
             />
           </label>
           <label class="v2-control">
-            <span>输入类型</span>
-            <select
-              :value="selectedNode.inputType ?? 'text'"
-              @change="updateSelectedInputType"
-            >
-              <option value="text">文本</option>
-              <option value="number">数字</option>
-              <option value="date">日期</option>
-              <option value="signature">签名</option>
-            </select>
-          </label>
-          <label class="v2-control">
             <span>外部组件（action）</span>
             <select
               :value="selectedNode.action ?? 'text'"
@@ -1662,23 +1641,16 @@ function updateSelectedDefault(event: Event): void {
               <option value="date">日期选择器</option>
               <option value="signature">签名板</option>
               <option value="upload">文件上传</option>
+              <option value="safetyGraphic">图形安措</option>
             </select>
           </label>
-          <label class="v2-control v2-control--inline">
-            <span>多行</span>
+          <label v-if="selectedNode.action === 'safetyGraphic'" class="v2-control">
+            <span>安措匹配字段</span>
             <input
-              type="checkbox"
-              :checked="selectedNode.multiline !== false"
-              @change="updateSelectedMultiline"
+              type="text"
+              :value="selectedNode.actionParams?.matchField ?? ''"
+              @change="updateSelectedSafetyField"
             />
-          </label>
-          <label class="v2-control">
-            <span>默认值（支持换行）</span>
-            <textarea
-              class="v2-textarea"
-              :value="selectedNode.default ?? ''"
-              @input="updateSelectedDefault"
-            ></textarea>
           </label>
           <div class="v2-sidebar__subheading">文本样式</div>
           <div class="v2-style-grid">

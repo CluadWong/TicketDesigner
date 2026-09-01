@@ -249,8 +249,8 @@ inputType=date/signature 可以使用专用内部控件，但外层仍保持 PNo
 数据行数量：
 
 ```ts
-const dataRows = repeatable ? toArray(data[table.field]) : []
-const rowCount = Math.max(table.minRows, dataRows.length)
+// 动态行数由 data 推导，不是 schema 属性（见 src/types/schema-v2-table-rows.ts）
+const rowCount = resolveTableRowCount(table, data) // = Math.max(minRows, data 中实际出现的最大行号)
 ```
 
 重复行字段不能简单生成相同 DOM ID。VNode/DOM 标识应组合 template node ID 和 row key；模板 Schema ID 保持不变。
@@ -306,7 +306,7 @@ const verticalOverflow = element.scrollHeight > element.clientHeight + tolerance
 
 - 后续用于动态报表。
 - 根级 Grid 作为不可拆分块。
-- repeatable Table 可按完整行切分并重复表头。
+- Table（动态行数由 data 推导）可按完整行切分并重复表头。
 - flow 不属于前五行设计器闭环的前置条件。
 
 ## 14. 设计器结构操作

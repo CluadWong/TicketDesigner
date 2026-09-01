@@ -66,19 +66,16 @@ export interface FieldPNodeV2 extends SchemaNodeBaseV2 {
   prefix?: string;
   /** Optional inline label rendered after the input area. */
   suffix?: string;
-  inputType?: "text" | "number" | "date" | "signature";
-  /** External component trigger: date picker, signature pad, file upload, etc.
-   *  The renderer shows a visual hint (icon/placeholder); actual component is
-   *  invoked by the host application via a registered action handler. */
-  action?: "text" | "date" | "signature" | "upload";
+  /** 外部组件触发类型（选项值）：由宿主弹窗调用、在回调里把数据回写 data 再渲染到票面上。
+   *  text=无（纯文本输入）、date=日期选择器、signature=签名板、upload=文件上传、
+   *  safetyGraphic=图形安措（选中后需在 `actionParams.matchField` 指定匹配字段）。 */
+  action?: "text" | "date" | "signature" | "upload" | "safetyGraphic";
+  /** 外部组件的额外参数（含义由 `action` 决定）。图形安措用 `matchField` 指定要匹配的字段名。 */
+  actionParams?: Record<string, string>;
   underline?: boolean;
   webUnderline?: boolean;
   printUnderline?: boolean;
   style?: TextStyleV2;
-  /** 是否多行：填充态渲染 `<textarea>`（默认，支持换行/预设多行）；false 渲染单行 `<input>`。 */
-  multiline?: boolean;
-  /** 预设默认值：data 中该字段为空时回退展示（设计/预览/打印/填充均生效），支持 `\n` 多行。 */
-  default?: string;
 }
 
 export type PNodeV2 = FieldPNodeV2;
@@ -136,7 +133,6 @@ export interface TableNodeV2 extends SchemaNodeBaseV2 {
   headerHeight: number;
   rowHeight: number;
   minRows: number;
-  repeatable: boolean;
   rowTemplate: TableCellTemplateV2[];
   /** 边框模式（与 Grid 一致）：all=外框+内部线（默认）、inner=仅内部线、outer=仅外框、none=无。 */
   border?: BorderModeV2;

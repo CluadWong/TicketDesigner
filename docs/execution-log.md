@@ -67,3 +67,32 @@
   2. **打印去掉方向选择（方向由纸张尺寸派生）**：删除独立 `orientation` 选择——`GridFormRenderer.vue` 的 `paperSize` 改 `A4→纵向(210×297)` / `A3→横向(420×297)`，`schema-v2-validation.ts` 的 `pageUsableHeightMm` 同步按尺寸推方向；`DesignerApp.vue` 删除 `updatePaperOrientation`，纸张 select 选项改为「A4（纵向）」/「A3（横向）」。
   3. **Table 组件新增边框配置（与 Grid 对齐）**：`TableNodeV2` 加 `border?: BorderModeV2`（默认 `all`）；`schema-v2-operations.ts` 新增 `updateTableBorderV2` + `createTableNodeV2` 默认 `border:"all"`；`GridSchemaNode.vue` 表格 class 改为 `layout-table--${node.border ?? 'all'}`，边框 CSS 重写（外框仅 `all`/`outer`、内部行列线仅 `all`/`inner`，机制与 Grid 同，单边绘制避免与外层 Grid 重复）；设计器 Table 检查器新增「边框」select（`updateTableBorder` + import `updateTableBorderV2`）。
   4. **验证**：新建 `TableBorder.test.ts`（+4 例：未设→`layout-table--all`、none、inner、outer）；`FirstFiveRowsSnapshot` 因表格新增 `layout-table--all` 类而更新（即新功能生效，非回归）。`vue-tsc` 干净；`vitest` 全量 **124/124** 通过（120 + 4），无回归。
+
+- **本轮（2026-09-01）P7.2d/P9.1d 动态行 = 用户澄清「repeatable 不是 schema 属性」**：
+  1. **用户澄清（与代码现状一致，确认无需改实现）**：`repeatable` 不应是 schema 布尔属性，而是渲染期运行时行为——对比 data 字段值对应的行数与配置行数，若 data 行数超过配置（`minRows`）则动态增加渲染行数以完整呈现 data。例：表格 `minRows=4`、data 含 `{工作内容_5_2:"a"}` → 说明曾录入第 5 行 → 再次渲染须动态出第 5 行。
+  2. **核对现状**：实现早已就位——`src/types/schema-v2-table-rows.ts` 的 `resolveTableRowCount(table, data)` = `Math.max(minRows, data 中实际出现的最大行号)`；渲染层 `GridSchemaNode.vue:361` 已用 `v-for="rowIndex in resolveTableRowCount(node, data)"`；`withRowIndex(node, rowIndex)` 在 tbody 每行把后代 `field` 的 `{row}` 占位符替换为 1-based 行号（逐行数据键绑定依赖它）。
+  3. **移除 `repeatable` 属性**（仅落点收尾，行为不变）：从 `schema-v2.ts`（`TableNodeV2` 接口）、`schema-v2-operations.ts`（`createTableNodeV2` 默认值）、`schema-v2-serialization.ts`（序列化行 `repeatable: node.repeatable ?? false`）、`yunlv-second-ticket-full.ts`（样例）、`GridSchemaHeight.test.ts` 与 `schema-v2.test.ts`（2 处断言）移除；grep 全仓 `repeatable` 确认零残留。`TableNodeV2` 现保留 `headerHeight` / `rowHeight` / `minRows` / `border?`。
+  4. **P7.2e 确认 = 同一机制**：P7.2e 的「逐行 `{row}` 占位符绑定」正是 `resolveTableRowCount` 能按 data 推导行号的前提（行模板字段键 `工作内容_{row}_2` 让 data 的第 5 行键 `工作内容_5_2` 被识别为行 5），故 P7.2d 与 P7.2e 同源，已在 §13 P9.1d 合并记录。
+  5. **P7.2f 确认可行**：`TableCellTemplateV2.children: FormNodeV2[]` 类型层已含 `Grid`；`appendNodeToCellV2` 同时支持 `grid-cell` 与 `table-cell-template` 且接受任意 `FormNodeV2`；渲染层 `<td>` 带 `data-layout-id`，拖拽可 `closest('[data-layout-id]')` 命中；`withRowIndex` 递归处理 Grid 子节点（含 `{row}` 替换）。即表格 cell 内可放 P 与子 Grid。
+  6. **P9.1c 专用控件延后**：用户确认 number/date/signature 专用控件继续延后（第一版前五行均为文本/数字文本，contenteditable 即可）。
+  7. **验证**：新增 `src/types/__tests__/schema-v2-table-rows.test.ts`（12 例，含用户原例 `工作内容_5_2→5 行`、`工作内容_12_1→12`、`工作内容_x_1→1` 等边界）+ `src/components/renderer-v2/__tests__/TableDynamicRows.test.ts`（3 例渲染期动态行）；`vue-tsc` 干净；`vitest` 全量 **139/139** 通过（124 + 12 + 3），无回归。
+
+- **本轮（2026-09-01 续）字段 P 设计态光标居中 + 移除默认值/多行配置**：
+  1. **用户反馈①（设计态光标贴顶）**：字段 `<p>` 在待输入（空）时光标贴着上边框，输入内容后才恢复垂直居中——视觉不一致。根因：空 `contenteditable` 的 flex/inline 容器无行盒（line-box）高度，caret 自然落到顶部。
+  2. **修复（设计态光标居中）**：`GridSchemaNode.vue` 为 `.layout-p--field` 与 `.layout-p__input` 增加 `::before { content: "\200b" }` 零宽空格占位行盒，使空字段也有行高，caret 经 flex 交叉轴垂直居中，与已输入态完全一致。
+  3. **用户反馈②（配置冗余）**：字段 P 不需要「默认值」与「多行」配置；默认即「内容超过宽度时自动换行」即可。
+  4. **移除 `multiline` 配置**：`FieldPNodeV2` 删 `multiline?: boolean`；`pStyle` 统一 `white-space: pre-wrap`（去掉 `multiline === false → nowrap` 分支）；设计/预览/打印静态渲染与（canFill 时）真实控件均默认换行。**仅 `number`/`date` 这类 `inputType` 仍渲染原生单行 `<input>`**——`useTextarea(node)` 改为 `node.inputType !== "number" && node.inputType !== "date"`，不动其单行行为。
+  5. **移除 `default` 配置**：`FieldPNodeV2` 删 `default?: string`；`fieldValue` 空数据时不再回退 `node.default`（仅 data 优先、空返回 `""`）；`DesignerApp.vue` 删 `updateSelectedMultiline` / `updateSelectedDefault` 两函数与 Inspector 的「多行」「默认值」两项控件；`.layout-p__control` 直接 `min-height: 2.6em; overflow: auto`（不再依赖 `--multiline` 修饰类，原 `.layout-p--multiline` / `.layout-p__control--multiline` 规则已删）。
+  6. **验证**：`GridSchemaNode.fill.test.ts` 把「multiline=false→单行 input」用例改为「文本字段（非 number/date）填写态默认渲染 `textarea`（自动换行）、不渲染单行 input」，并删除「data 为空回退节点 default」用例（净 -1 例）；`FieldPNodeV2` 现仅 `prefix`/`suffix`/`inputType`/`action`/`underline`/`webUnderline`/`printUnderline`/`style`。`vue-tsc` 干净；`vitest` 全量 **138/138** 通过（139 - 1），无回归。
+
+- **本轮（2026-09-01 再续）用户四条指令落地（前三项已完成，第四项待确认）**：
+  1. **空白初始化默认配一个 Grid 作为根部（Item 1）**：`DesignerApp.resetBlank()` 改为从 `createEmptyFormSchemaV2()` 空 page 起算后，调用 `createGridNodeV2()` + `insertRootGridV2(blank, grid)` 插入一个默认根 Grid，并选中它（`selectedNodeId` / `selectionPathIds` 指向该 Grid）。注意：`createEmptyFormSchemaV2` 本身**不改**（测试依赖其返回空 page）；默认根 Grid 仅作用于「重置/新建」路径，不影响载入样例或已有 schema。
+  2. **相邻 Grid 外框去重（Item 2）**：新增 `GridSchemaNode` 的 `suppressBorders?: {top?;right?;bottom?;left?}` prop + 两个兄弟推导函数：
+     - 页面级竖向堆叠：`GridFormRenderer.pageSiblingSuppressBorders(children, index)` —— 相邻且都绘制外框（all/outer）的 Grid，抑制后一个的 `top`（保留前一个的 `bottom` 单线）。
+     - 单元格级横向排布：`GridSchemaNode.cellSiblingSuppressBorders(children, index)` —— 抑制后一个的 `left`（保留前一个的 `right` 单线）。
+     - 渲染层 Grid 的 class 绑定加 `layout-grid--no-top/right/bottom/left`（仅当 `suppressBorders` 对应侧为真），CSS 规则置于 `--all`/`--outer` 之后以源码顺序胜出（同级特异度）。仅隐藏「后一个」的引导侧，避免 2px 重叠、保留单线。
+  3. **字段全部字符串类型，移除输入类型配置（Item 3）**：`FieldPNodeV2` 删 `inputType?: "text"|"number"|"date"|"signature"`；`useTextarea`/`inputElType` 改为恒返回 `true`/`"text"`，填充态一律渲染 `<textarea>`（自动换行 `pre-wrap`），不再有 number/date 单行 input；`DesignerApp.vue` 删 `updateSelectedInputType` 与 Inspector「输入类型」select（`text`/`number`/`date`/`signature` 选项）。样例 `yunlv-second-ticket-full.ts` 的 `dateField` 工厂去掉 `inputType:"date"`（保留 `action:"date"`），顶部注释同步修订。
+  4. **外部组件「图形安措」类型（Item 4，按用户澄清实现）**：用户澄清机制——外部组件一律由宿主**弹窗调用**、回调把数据回写 `data` 再渲染到票面；`action` 是选项值、`actionParams` 是外部组件的额外参数。据此落地：① `FieldPNodeV2.action` 联合类型新增 `"safetyGraphic"`；② 新增 `FieldPNodeV2.actionParams?: Record<string, string>`（通用外部组件参数，图形安措用 `matchField` 指定匹配字段）；③ Inspector「外部组件（action）」下拉新增「图形安措」选项，选中后下方出现「安措匹配字段」输入框（`updateSelectedSafetyField` 写入 `actionParams.matchField`，清空则移除该键、空对象置 undefined）；④ 渲染层不动（弹窗与 data 回写为宿主行为，字段 P 仍走普通控件渲染）。序列化 `normalizeNode` 经 `...node` 展开保留 `action`/`actionParams`、校验 `scanNode` 不拦截，无需改序列化/校验。
+  - **验证**：删 `GridSchemaNode.fill.test.ts`「inputType=number→单行 input」过期用例（-1），新增 `GridSchemaNode.border.test.ts` 相邻 Grid 去重 2 例 + `schema-v2.test.ts` 图形安措序列化/校验 1 例；`vue-tsc --noEmit` 干净；`vitest` 全量 **140/140** 通过（138 + 3 新增 - 1 删），无回归。
+  - **文档落地**：见本条目 + `development-plan.md` §0 + `MEMORY.md` + 本日日志。
+  - **未提交**（用户未要求，按「未经允许不提交 git」约定）。

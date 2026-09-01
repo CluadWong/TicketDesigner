@@ -10,8 +10,8 @@
  * - P10/P11 验收的参考基线
  *
  * 字段名与 demoData / demo HTML 的 `field` 属性逐字一致。
- * 日期字段标注 `action: "date"`，签名字段保留 `inputType: "text"`（签名板属外部组件，
- * 第一版用 contenteditable 文本兜底，action 可后续扩展为 `"signature"`）。
+ * 日期字段标注 `action: "date"`；签名字段属外部组件（action 可后续扩展为 `"signature"`），
+ * 第一版用 contenteditable 文本兜底。所有字段均为字符串类型（无输入类型配置，见 Phase D 第 3 项）。
  */
 import type {
   FieldPNodeV2,
@@ -94,9 +94,9 @@ const sectionRow = (id: string, rows: GridRowV2[], gridId: string): GridRowV2 =>
   return row(`${gridId}-row`, height, [cell(`${id}-cell`, [innerGrid(gridId, rows)], { width: "1fr" })]);
 };
 
-/** 日期字段工厂：自动带 action="date" */
+/** 日期字段工厂：自动带 action="date"（字段均为字符串类型，不再设 inputType） */
 const dateField = (id: string, field: string): FieldPNodeV2 =>
-  fieldP(id, field, { inputType: "date", action: "date" });
+  fieldP(id, field, { action: "date" });
 
 // ── 内嵌表格：工作任务明细 ───────────────────────────────────
 
@@ -111,7 +111,6 @@ const workTaskTable: TableNodeV2 = {
   headerHeight: 1,
   rowHeight: 1,
   minRows: 4,
-  repeatable: true,
   rowTemplate: [
     tableTemplate("wt-loc-tpl", "location", fieldP("wt-loc-1", "工作任务_1_1")),
     tableTemplate(

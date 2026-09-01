@@ -13,7 +13,12 @@ import type {
   FormDataV2,
 } from "@/types";
 import HtmlBlock from "./HtmlBlock.vue";
-import { resolveCellBoxV2 } from "@/types";
+import {
+  bindRowPlaceholder,
+  resolveCellBoxV2,
+  resolveTableRowCount,
+  ROW_PLACEHOLDER,
+} from "@/types";
 
 defineOptions({ name: "GridSchemaNodeV2" });
 
@@ -27,7 +32,29 @@ const props = defineProps<{
    * 与 `data` 同时传入时表示「预览」；仅传 `data` 表示「填充」（可输入）。
    */
   readonly?: boolean;
+  /**
+   * 相邻 Grid 外框去重（Item 2）：当本 Grid 与相邻兄弟 Grid 都配置了外框时，
+   * 由父级（页面竖向堆叠 / 单元格横向排布）传入需要隐藏的边框侧，避免重叠成 2px。
+   * 仅隐藏「后一个」Grid 的引导侧（页面级 top / 单元格级 left），保留前者的拖尾侧单线。
+   */
+  suppressBorders?: { top?: boolean; right?: boolean; bottom?: boolean; left?: boolean };
 }>();
+
+/** 该节点是否为绘制外框（all/outer）的 Grid。 */
+function drawsOuterFrame(node: FormNodeV2): boolean {
+  return node.type === "grid" && (node.border === "all" || node.border === "outer");
+}
+
+/**
+ * 单元格内子节点横向（flex row）排布：相邻且都绘制外框的 Grid，
+ * 抑制后一个 Grid 的左边框（保留前一个的右边框单线）。非 Grid / 非外框节点返回 undefined。
+ */
+function cellSiblingSuppressBorders(children: FormNodeV2[], index: number): { top?: boolean; right?: boolean; bottom?: boolean; left?: boolean } | undefined {
+  const node = children[index];
+  if (!drawsOuterFrame(node)) return undefined;
+  const prev = children[index - 1];
+  return { left: !!prev && drawsOuterFrame(prev) };
+}
 
 const fillMode = computed(() => props.data != null);
 /** 是否允许在字段中输入（填充态且非只读预览）。 */
@@ -90,11 +117,8 @@ function textCss(style?: TextStyleV2): CSSProperties {
 }
 
 function pStyle(node: PNodeV2): CSSProperties {
-  // 字段 P 默认允许换行（multiline !== false 时 pre-wrap），便于填写态多行输入。
-  return {
-    ...textCss(node.style),
-    whiteSpace: node.multiline === false ? "nowrap" : "pre-wrap",
-  };
+  // 字段 P 默认允许换行（内容超过宽度时自动换行），不再依赖 multiline 配置。
+  return { ...textCss(node.style), whiteSpace: "pre-wrap" };
 }
 
 function textStyle(node: TextNodeV2): CSSProperties {
@@ -118,21 +142,18 @@ function tableTemplate(node: TableNodeV2, columnKey: string) {
   return node.rowTemplate.find(template => template.columnKey === columnKey);
 }
 
-/** 表格行模板中的行号占位符，渲染时替换为该行的 1-based 序号。 */
-const ROW_PLACEHOLDER = /\{row\}/g;
-
 /**
  * 实例化表格行模板：把节点及其后代 `field` 中的 `{row}` 替换为实际行号。
  *
- * `minRows` 生成的每一行复用同一份 rowTemplate，若字段键写死则多行共用同一数据键、
+ * 每一行复用同一份 rowTemplate，若字段键写死则多行共用同一数据键、
  * 无法区分行。用占位符（如 `工作任务_{row}_1`）可让第 r 行绑定到 `工作任务_r_1`，
  * 从而与 demoData 的逐行键一致，满足 P10「数据回写正确 —— 键与 demoData 一致无错位」。
  * 不含占位符时原样返回同一引用，不产生额外对象。
  */
 function withRowIndex(node: FormNodeV2, rowIndex: number): FormNodeV2 {
   const bound =
-    "field" in node && typeof node.field === "string" && node.field.includes("{row}")
-      ? ({ ...node, field: node.field.replace(ROW_PLACEHOLDER, String(rowIndex)) } as FormNodeV2)
+    "field" in node && typeof node.field === "string" && node.field.includes(ROW_PLACEHOLDER)
+      ? ({ ...node, field: bindRowPlaceholder(node.field, rowIndex) } as FormNodeV2)
       : node;
   if (bound.type === "grid") {
     return {
@@ -182,21 +203,20 @@ function onFillInput(field: string | undefined, event: Event): void {
   formFill(field, readEditableText(event.target as HTMLElement));
 }
 
-/** 字段展示值：优先 data 中的填写值，为空时回退到节点预设 `default`（支持 \n 多行）。 */
+/** 字段展示值：优先 data 中的填写值，为空时回退到空字符串（不再使用节点 default）。 */
 function fieldValue(node: PNodeV2): string {
   const raw = props.data?.[node.field];
-  if (raw == null || raw === "") return node.default ?? "";
+  if (raw == null || raw === "") return "";
   return String(raw);
 }
 
-/** 多行：填充态渲染 `<textarea>`（默认，换行/预设多行）；false → 单行 `<input>`。 */
-function isMultiline(node: PNodeV2): boolean {
-  return node.multiline !== false;
+/** 填充态控件：字段统一为字符串类型，全部用 `<textarea>`（默认自动换行）。 */
+function useTextarea(_node: PNodeV2): boolean {
+  return true;
 }
 
-/** 单行控件的 input type（number/date/text）；`<textarea>` 忽略 type。 */
-function inputElType(node: PNodeV2): string {
-  if (node.inputType === "number" || node.inputType === "date") return node.inputType;
+/** 单行控件的 input type（字段统一字符串，恒为 text；`<textarea>` 忽略 type）。 */
+function inputElType(_node: PNodeV2): string {
   return "text";
 }
 
@@ -231,7 +251,16 @@ function onImgError(): void {
   <div
     v-if="node.type === 'grid'"
     class="layout-grid"
-    :class="[`layout-grid--${node.border}`, { 'layout-node--selected': selectedNodeId === node.id }]"
+    :class="[
+      `layout-grid--${node.border}`,
+      {
+        'layout-node--selected': selectedNodeId === node.id,
+        'layout-grid--no-top': suppressBorders?.top,
+        'layout-grid--no-right': suppressBorders?.right,
+        'layout-grid--no-bottom': suppressBorders?.bottom,
+        'layout-grid--no-left': suppressBorders?.left,
+      },
+    ]"
     :data-node-id="node.id"
   >
     <div
@@ -251,13 +280,14 @@ function onImgError(): void {
         :data-node-id="cell.id"
       >
         <GridSchemaNode
-          v-for="child in cell.children"
+          v-for="(child, childIndex) in cell.children"
           :key="child.id"
           :node="child"
           :base-row-height="baseRowHeight"
           :selected-node-id="selectedNodeId"
           :data="data"
           :readonly="props.readonly"
+          :suppress-borders="cellSiblingSuppressBorders(cell.children, childIndex)"
         />
       </div>
     </div>
@@ -278,7 +308,6 @@ function onImgError(): void {
       'layout-p--field': true,
       'layout-p--composite': isCompositeField(node),
       'layout-p--underline': node.underline && !isCompositeField(node),
-      'layout-p--multiline': node.multiline === true,
       'layout-node--selected': selectedNodeId === node.id,
     }"
     :style="pStyle(node)"
@@ -290,9 +319,9 @@ function onImgError(): void {
       <template v-if="canFill">
         <span v-if="node.prefix" class="layout-p__label">{{ node.prefix }}</span>
         <component
-          :is="isMultiline(node) ? 'textarea' : 'input'"
+          :is="useTextarea(node) ? 'textarea' : 'input'"
           class="layout-p__control"
-          :class="{ 'layout-p--underline': node.underline, 'layout-p__control--multiline': isMultiline(node) }"
+          :class="{ 'layout-p--underline': node.underline }"
           :type="inputElType(node)"
           :value="fieldValue(node)"
           :data-field="node.field"
@@ -316,9 +345,9 @@ function onImgError(): void {
     <template v-else>
       <template v-if="canFill">
         <component
-          :is="isMultiline(node) ? 'textarea' : 'input'"
+          :is="useTextarea(node) ? 'textarea' : 'input'"
           class="layout-p__control"
-          :class="{ 'layout-p--underline': node.underline, 'layout-p__control--multiline': isMultiline(node) }"
+          :class="{ 'layout-p--underline': node.underline }"
           :type="inputElType(node)"
           :value="fieldValue(node)"
           :data-field="node.field"
@@ -356,7 +385,7 @@ function onImgError(): void {
     </thead>
     <tbody>
       <tr
-        v-for="rowIndex in node.minRows"
+        v-for="rowIndex in resolveTableRowCount(node, data)"
         :key="rowIndex"
         class="layout-table__row"
         :style="[tableColumnStyle(node.columns), { minHeight: `${node.rowHeight * baseRowHeight}mm` }]"
@@ -443,6 +472,14 @@ function onImgError(): void {
   border: 1px solid #111827;
 }
 
+/* 相邻 Grid 外框去重（Item 2）：当与相邻兄弟 Grid 都绘制外框时，隐藏本 Grid 的
+   引导侧边框（页面级 top / 单元格级 left），仅保留前者拖尾侧单线，避免重叠成 2px。
+   这些规则位于 --all/--outer 之后，等特异性下靠源码顺序胜出。 */
+.layout-grid--no-top { border-top: none; }
+.layout-grid--no-right { border-right: none; }
+.layout-grid--no-bottom { border-bottom: none; }
+.layout-grid--no-left { border-left: none; }
+
 /* 内部水平分隔线：非首行的 cell 上边框 = 上一行的下边界。
    仅 all / inner 绘制；outer（仅外框）与 none 不画内部线。 */
 .layout-grid--all > .layout-grid__row:not(:first-child) > .layout-grid__cell,
@@ -497,6 +534,15 @@ function onImgError(): void {
   cursor: text;
 }
 
+/* 设计态空字段（contenteditable 无内容）时，插入零宽行盒使光标垂直居中，
+   避免光标贴着上边框；零宽为伪元素、不可被 contenteditable 删除，故清空文本后光标仍居中。 */
+.layout-p::before {
+  content: "\200b";
+}
+.layout-p__input::before {
+  content: "\200b";
+}
+
 .layout-p--composite {
   gap: 1mm;
 }
@@ -531,6 +577,8 @@ function onImgError(): void {
   line-height: inherit;
   letter-spacing: inherit;
   white-space: pre-wrap;
+  min-height: 2.6em;
+  overflow: auto;
   box-sizing: border-box;
   outline: none;
   resize: none;
@@ -538,15 +586,6 @@ function onImgError(): void {
 
 .layout-p__control.layout-p--underline {
   border-bottom: 1px solid #111827;
-}
-
-.layout-p--multiline {
-  min-height: 2.6em;
-}
-
-.layout-p__control--multiline {
-  min-height: 2.6em;
-  overflow: auto;
 }
 
 .layout-p--underline {

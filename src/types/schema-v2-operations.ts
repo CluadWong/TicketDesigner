@@ -1115,7 +1115,6 @@ export function createTableNodeV2(): TableNodeV2 {
     headerHeight: 1,
     rowHeight: 1,
     minRows: 4,
-    repeatable: false,
     rowTemplate: columns.map(column => ({
       id: createSchemaNodeIdV2(`${id}-${column.key}`),
       type: "table-cell-template" as const,
