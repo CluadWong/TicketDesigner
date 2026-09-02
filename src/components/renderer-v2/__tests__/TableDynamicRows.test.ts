@@ -41,11 +41,11 @@ describe("表格按 data 动态渲染行数（P7.2d / P9.1d）", () => {
     expect(rows).toHaveLength(5);
     // 第 5 行第 2 列（col2）应带上该数据（填充态渲染真实控件，取 .value）
     const controls = rows[4]
-      .findAll("textarea, input")
-      .map(control => control.element as HTMLTextAreaElement);
-    expect(controls[1].value).toBe("a");
+      .findAll("[data-field]")
+      .map(control => control.element as HTMLElement);
+    expect(controls[1].textContent).toBe("a");
     // 第 5 行第 1 列（col1）无数据 → 留空
-    expect(controls[0].value).toBe("");
+    expect(controls[0].textContent).toBe("");
   });
 
   it("data 行数未超过配置时行数不变", () => {

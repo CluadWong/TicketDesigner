@@ -55,9 +55,9 @@ describe("字段组件配置：宽度 / 默认内容 / 内部边框", () => {
     const fill = make("fill");
     expect(fill.attributes("style") ?? "").not.toContain("width:");
 
-    // 2. 可输入区域挂上 width：设计态是 .layout-p__input，填充态是 .layout-p__control
+    // 2. 可输入区域挂上 width：设计态与填充态均为 .layout-p__input（统一渲染路径，见十续）
     expect(design.find(".layout-p__input").attributes("style")).toContain("width: 30mm");
-    expect(fill.find(".layout-p__control").attributes("style")).toContain("width: 30mm");
+    expect(fill.find(".layout-p__input").attributes("style")).toContain("width: 30mm");
   });
 
   it("默认内容：无 data 时渲染 default 预设文本", () => {
@@ -67,8 +67,8 @@ describe("字段组件配置：宽度 / 默认内容 / 内部边框", () => {
     expect(wrapper.text()).toBe("预设内容");
   });
 
-  it("默认内容：data 有值时优先于 default（预览态静态文本 + 填充态控件值）", () => {
-    // 预览态（readonly）：渲染静态文本，直接取 text
+  it("默认内容：data 有值时优先于 default（预览态只读控件 + 填充态控件值）", () => {
+    // 预览态（readonly）：复用同一 <p> 渲染路径，值落在文本（而非 textarea.value）
     const preview = mount(GridSchemaNode, {
       props: {
         node: fieldNode({ default: "预设内容" }),
@@ -77,9 +77,9 @@ describe("字段组件配置：宽度 / 默认内容 / 内部边框", () => {
         readonly: true,
       },
     });
-    expect(preview.text()).toBe("填写值");
+    expect(preview.find('[data-field="测试字段"]').text()).toBe("填写值");
 
-    // 填充态：值在真实控件（textarea）的 .value 上，而非 textContent
+    // 填充态：值同样落在 <p> 文本（统一渲染路径，见十续）
     const fill = mount(GridSchemaNode, {
       props: {
         node: fieldNode({ default: "预设内容" }),
@@ -87,8 +87,7 @@ describe("字段组件配置：宽度 / 默认内容 / 内部边框", () => {
         data: { 测试字段: "填写值" },
       },
     });
-    const control = fill.find(".layout-p__control").element as HTMLTextAreaElement;
-    expect(control.value).toBe("填写值");
+    expect(fill.find('[data-field="测试字段"]').text()).toBe("填写值");
   });
 
   it("默认内容：填充态无 data 时控件回退 default", () => {
@@ -99,12 +98,11 @@ describe("字段组件配置：宽度 / 默认内容 / 内部边框", () => {
         data: {},
       },
     });
-    const control = fill.find(".layout-p__control").element as HTMLTextAreaElement;
-    expect(control.value).toBe("预设内容");
+    expect(fill.find('[data-field="测试字段"]').text()).toBe("预设内容");
   });
 
   it("默认内容：data 存在该键且为空串时不回退 default（字段可被清空，G16）", () => {
-    // 预览态（readonly）：直接取 textContent，应为空而非默认内容
+    // 预览态（readonly）：清空后文本应为空串（不回退 default）
     const preview = mount(GridSchemaNode, {
       props: {
         node: fieldNode({ default: "预设内容" }),
@@ -113,9 +111,9 @@ describe("字段组件配置：宽度 / 默认内容 / 内部边框", () => {
         readonly: true,
       },
     });
-    expect(preview.text()).toBe("");
+    expect(preview.find('[data-field="测试字段"]').text()).toBe("");
 
-    // 填充态：控件 .value 应为空串（用户主动清空后，回写 "" 不应被 default 覆盖）
+    // 填充态：文本应为空串（用户主动清空后，回写 "" 不应被 default 覆盖）
     const fill = mount(GridSchemaNode, {
       props: {
         node: fieldNode({ default: "预设内容" }),
@@ -123,8 +121,7 @@ describe("字段组件配置：宽度 / 默认内容 / 内部边框", () => {
         data: { 测试字段: "" },
       },
     });
-    const control = fill.find(".layout-p__control").element as HTMLTextAreaElement;
-    expect(control.value).toBe("");
+    expect(fill.find('[data-field="测试字段"]').text()).toBe("");
   });
 
   it("默认内容：未设置且无 data 时渲染为空", () => {

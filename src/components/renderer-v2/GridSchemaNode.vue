@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch, inject } from "vue";
+import { computed, ref, watch, onMounted } from "vue";
 import type { CSSProperties } from "vue";
 import type {
   FormNodeV2,
@@ -22,7 +22,10 @@ import {
 
 defineOptions({ name: "GridSchemaNodeV2" });
 
-const emit = defineEmits<{ (e: "node-drag-start", id: string): void }>();
+const emit = defineEmits<{
+  (e: "node-drag-start", id: string): void;
+  (e: "field-change", field: string, value: string): void;
+}>();
 
 const props = defineProps<{
   node: FormNodeV2;
@@ -247,29 +250,52 @@ function onNodeDragStart(node: FormNodeV2, event: DragEvent): void {
 }
 
 /**
- * 填写态输入回调：仅当 fillMode 且字段存在时，把文本回写到上层 provide 的
- * formFill（响应式 data），满足 P9.1b「数据回写正确」。设计态不回写。
+ * 失焦（blur）回写：用户离开字段时 emit 一次 `field-change(field, value)`，
+ * 由使用方（FormRenderer / DesignerApp）决定写回响应式 data，满足 P9.1b「数据回写正确」。
+ * 输入过程中不实时回写（用户需求：预览 / 填写不必逐键记录）；取值亦可经
+ * `collectFieldValues(rootEl)` 直接遍历渲染 DOM 收集（用户需求：DOM 遍历采集）。
+ * 内核不再依赖任何字符串 key 的 inject 约定（A4 / G15）。设计态不回写。
  */
-const formFill = inject<(field: string, value: string) => void>(
-  "formFill",
-  () => {},
-);
 /**
  * 读取可编辑区域的文本，保留换行：优先用 innerText（浏览器按渲染返回带 \n 的文本），
  * jsdom 等无 innerText 实现时回退 textContent。满足「字段 P 允许多行」。
  */
 function readEditableText(el: HTMLElement): string {
-  // 填充态真实控件（input/textarea）直接取 .value，换行/预设多行均保留。
-  if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
-    return el.value;
-  }
   const inner = el.innerText;
   return typeof inner === "string" ? inner : (el.textContent ?? "");
 }
-function onFillInput(field: string | undefined, event: Event): void {
+function onFillBlur(field: string | undefined, event: Event): void {
   if (!canFill.value || !field) return;
-  formFill(field, readEditableText(event.target as HTMLElement));
+  emit("field-change", field, readEditableText(event.target as HTMLElement));
 }
+
+/**
+ * G11（A3 统一渲染路径）：innerBorder 字段在「预览 / 填写」下复用同一套逐行 `.layout-p__line`
+ * 结构 —— 仅 `contenteditable` 差异（填写可编辑、预览只读），从而浏览态与填写态版式一致，
+ * 且打印命中真实底边框（与 §0.3 已修打印一致）。
+ * 填充态用 `v-once` 渲染避免每次输入触发 Vue 重渲染导致光标跳位；外部 data 变化（如 v-model:data 重置）
+ * 经此 watch 用 `textContent` 重建（安全、无 HTML 注入），正在输入（焦点在可编辑区）时不打断。
+ */
+const innerLinesEl = ref<HTMLElement | null>(null);
+function syncInnerLinesFromData(): void {
+  if (props.node.type !== "p") return;
+  const el = innerLinesEl.value;
+  if (!el || !canFill.value) return;
+  // 用户正在输入时（焦点在可编辑区）不重建，避免光标跳位
+  if (el === (el.ownerDocument?.activeElement ?? null)) return;
+  while (el.firstChild) el.removeChild(el.firstChild);
+  for (const line of fieldLines(props.node)) {
+    const d = document.createElement("div");
+    d.className = "layout-p__line";
+    d.textContent = line;
+    el.appendChild(d);
+  }
+}
+watch(
+  () => (props.node.type === "p" ? fieldValue(props.node) : ""),
+  syncInnerLinesFromData,
+);
+onMounted(syncInnerLinesFromData);
 
 /**
  * 字段展示值：优先 data 中的填写值。
@@ -295,14 +321,6 @@ function fieldLines(node: PNodeV2): string[] {
 }
 
 /** 填充态控件：字段统一为字符串类型，全部用 `<textarea>`（默认自动换行）。 */
-function useTextarea(_node: PNodeV2): boolean {
-  return true;
-}
-
-/** 单行控件的 input type（字段统一字符串，恒为 text；`<textarea>` 忽略 type）。 */
-function inputElType(_node: PNodeV2): string {
-  return "text";
-}
 
 const BROKEN_PLACEHOLDER =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='60'%3E%3Crect width='100%25' height='100%25' fill='%23f1f5f9' stroke='%23cbd5e1'/%3E%3Ctext x='50%25' y='50%25' font-size='10' fill='%2394a3b8' text-anchor='middle' dominant-baseline='middle'%3E图片%3C/text%3E%3C/svg%3E";
@@ -389,6 +407,7 @@ function onImgError(): void {
             :drag-over-cell-id="dragOverCellId"
             :drag-over-index="dragOverIndex"
             @node-drag-start="(id: string) => emit('node-drag-start', id)"
+            @field-change="(field: string, value: string) => emit('field-change', field, value)"
           />
         </template>
         <div
@@ -422,77 +441,51 @@ function onImgError(): void {
       'layout-node--selected': selectedNodeId === node.id,
     }"
     :style="pStyle(node)"
-    :contenteditable="canFill ? undefined : isEditable(node)"
+    :contenteditable="isCompositeField(node) ? undefined : (canFill ? 'true' : isEditable(node))"
     :data-field="node.field"
     :data-node-id="node.id"
     :draggable="nodeDraggable"
     @dragstart="onNodeDragStart(node, $event)"
+    @blur="onFillBlur(node.field, $event)"
   >
-    <template v-if="isCompositeField(node)">
-      <template v-if="canFill">
-        <span v-if="node.prefix" class="layout-p__label">{{
-          node.prefix
-        }}</span>
-        <component
-          :is="useTextarea(node) ? 'textarea' : 'input'"
-          class="layout-p__control"
-          :class="{ 'layout-p--underline': node.underline }"
-          :style="fieldInputStyle(node)"
-          :type="inputElType(node)"
-          :value="fieldValue(node)"
-          :data-field="node.field"
-          @input="onFillInput(node.field, $event)"
-        ></component>
-        <span v-if="node.suffix" class="layout-p__label">{{
-          node.suffix
-        }}</span>
-      </template>
-      <template v-else>
-        <span v-if="node.prefix" class="layout-p__label">{{
-          node.prefix
-        }}</span>
-        <span
-          class="layout-p__input"
-          :class="{ 'layout-p--underline': node.underline }"
-          :style="fieldInputStyle(node)"
-          :contenteditable="props.readonly ? undefined : 'true'"
-          :data-field="node.field"
-          @input="onFillInput(node.field, $event)"
-          ><template v-if="node.innerBorder"
-            ><div
-              v-for="(line, li) in fieldLines(node)"
-              :key="li"
-              class="layout-p__line"
-            >{{ line }}</div></template
-          ><template v-else>{{ fieldValue(node) }}</template></span
-        >
-        <span v-if="node.suffix" class="layout-p__label">{{
-          node.suffix
-        }}</span>
-      </template>
-    </template>
+    <span v-if="node.prefix" class="layout-p__label">{{ node.prefix }}</span>
 
-    <template v-else>
-      <template v-if="canFill">
-        <component
-          :is="useTextarea(node) ? 'textarea' : 'input'"
-          class="layout-p__control"
-          :class="{ 'layout-p--underline': node.underline }"
-          :type="inputElType(node)"
-          :value="fieldValue(node)"
-          :data-field="node.field"
-          @input="onFillInput(node.field, $event)"
-        ></component>
-      </template>
-      <template v-else-if="node.innerBorder">
-        <div
+    <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
+         设计/预览/填写共用同一结构，仅 contenteditable 差异。 -->
+    <span
+      v-if="isCompositeField(node)"
+      class="layout-p__input"
+      :class="{ 'layout-p--underline': node.underline }"
+      :style="fieldInputStyle(node)"
+      :contenteditable="canFill ? 'true' : (props.readonly ? undefined : 'true')"
+      :data-field="node.field"
+      @blur="onFillBlur(node.field, $event)"
+      ><template v-if="node.innerBorder"
+        ><div
           v-for="(line, li) in fieldLines(node)"
           :key="li"
           class="layout-p__line"
-        >{{ line }}</div>
-      </template>
-      <template v-else>{{ fieldValue(node) }}</template>
-    </template>
+        >{{ line }}</div></template
+      ><template v-else>{{ fieldValue(node) }}</template></span
+    >
+
+    <!-- 非复合字段：innerBorder 时逐行渲染（v-once 静态 + 填写态 DOM 重建）。 -->
+    <span
+      v-else-if="node.innerBorder"
+      ref="innerLinesEl"
+      class="layout-p__lines"
+      v-once
+    ><div
+        v-for="(line, li) in fieldLines(node)"
+        :key="li"
+        class="layout-p__line"
+      >{{ line }}</div></span>
+
+    <!-- 非复合字段：普通展示值。直接作为 <p> 的 v-else 子项（不经 <template v-else>
+         包裹，否则 contenteditable <p> 的数据晚到时文本子节点不会重新 patch）。 -->
+    <span v-else class="layout-p__value">{{ fieldValue(node) }}</span>
+
+    <span v-if="node.suffix" class="layout-p__label">{{ node.suffix }}</span>
   </p>
 
   <table
@@ -562,6 +555,7 @@ function onImgError(): void {
               :drag-over-cell-id="dragOverCellId"
               :drag-over-index="dragOverIndex"
               @node-drag-start="(id: string) => emit('node-drag-start', id)"
+              @field-change="(field: string, value: string) => emit('field-change', field, value)"
             />
           </template>
           <div
@@ -761,33 +755,20 @@ function onImgError(): void {
   outline: none;
 }
 
-/* 填充态真实控件（input/textarea）：继承字段字体，去边框/背景，flex 填充，
-   与静态文本视觉一致；多行 textarea 预留手写高度。仅填充态出现，不影响
-   设计/预览/打印的静态渲染。 */
-.layout-p__control {
-  display: block;
+/* 非复合字段的展示值：原先直接作为 <p> 的文本内容渲染，但 Vue 对
+   contenteditable <p> 的直接文本子节点在「数据晚于挂载到达」时不会重新 patch
+   （复合字段的值放在 .layout-p__input 内则正常）。统一用 .layout-p__value 承载，
+   作为 <p> 的 flex 子项填充整行，既保持版式一致，又让预览/填充态数据变化能正确刷新。 */
+.layout-p__value {
   flex: 1 1 auto;
-  width: 100%;
-  min-width: 12mm;
-  margin: 0;
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  line-height: inherit;
-  letter-spacing: inherit;
+  min-width: 0;
   white-space: pre-wrap;
-  min-height: 2.6em;
-  overflow: auto;
-  box-sizing: border-box;
-  outline: none;
-  resize: none;
+  overflow-wrap: anywhere;
 }
 
-.layout-p__control.layout-p--underline {
-  border-bottom: 1px solid #111827;
-}
+/* 字段 P 已统一渲染为可编辑 <p>（预览 / 填写态与设计态同结构，行高一致），
+   不再使用 textarea 控件（G11 的 textarea 分支已回退，见十续）。复合字段的可输入区
+   为 .layout-p__input（设计/预览/填写共用），见上。 */
 
 /* 内部边框逐行：静态/预览/打印态将字段值拆成每行一个 <div class="layout-p__line">，
    min-height 保证空行也有一行的高度（底边框可见）；通用 `.layout-p :deep(div)` 已让其
@@ -799,6 +780,15 @@ function onImgError(): void {
   text-align: inherit;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+/* G11：innerBorder 字段在预览 / 填写下共用的逐行可编辑容器（仅 contenteditable 差异）。
+   内部 .layout-p__line 的底边框由 `.layout-p--inner-border :deep(div)` 绘制，真实边框打印必显示。 */
+.layout-p__lines {
+  display: block;
+  width: 100%;
+  outline: none;
+  min-height: 1.35em;
 }
 
 .layout-p--underline {

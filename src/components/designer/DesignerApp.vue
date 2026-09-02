@@ -6,9 +6,8 @@ import {
   onMounted,
   onUnmounted,
   reactive,
-  provide,
 } from "vue";
-import { GridFormRenderer as GridSchemaRenderer } from "@/components/renderer-v2";
+import { GridFormRenderer as GridSchemaRenderer, collectFieldValues } from "@/components/renderer-v2";
 import { makeYunlvSecondTicketFirstFiveRowsSchema } from "@/dev/yunlv-second-ticket-first-five-rows";
 import { makeYunlvSecondTicketFullSchema } from "@/dev/yunlv-second-ticket-full";
 import demoData from "@/dev/demoData";
@@ -240,14 +239,28 @@ const readonlyMode = computed(() => viewMode.value === "preview");
 const previewFormData = reactive<{ value: FormDataV2 | null }>({ value: null });
 const previewData = computed<FormDataV2 | null>(() => previewFormData.value);
 
+/** 渲染画布根容器（设计 / 预览 / 填充态都挂载于此），供 DOM 遍历采集字段值。 */
+const canvasEl = ref<HTMLElement | null>(null);
+
 /**
- * 渲染层（GridSchemaNode）在填写态通过 inject 拿到该回调，把字段输入回写到
- * 响应式 previewFormData，从而满足 P9.1b「数据回写正确」。设计态与只读预览态不调用。
+ * 通过遍历渲染 DOM 采集当前预览 / 填充态的字段值（用户需求：预览 / 填写不必逐键回写，
+ * 改用 DOM 遍历获取）。返回字段键 → 字符串值的映射。预览态（不回写响应式 data）尤其适用。
  */
-provide("formFill", (field: string, value: string) => {
+function collectFormValues(): FormDataV2 {
+  return canvasEl.value ? collectFieldValues(canvasEl.value) : ({} as FormDataV2);
+}
+
+defineExpose({ collectFormValues });
+
+/**
+ * 渲染内核（GridSchemaNode）在填写态 emit `field-change`；此处把字段输入写回响应式
+ * previewFormData，满足 P9.1b「数据回写正确」。不再依赖 inject("formFill") 私有约定
+ * （A4 / G15）。内核仅在 fill 态 emit（onFillInput 已守 canFill，只读预览 / 设计态不触发）。
+ */
+function onCanvasFieldChange(field: string, value: string): void {
   if (previewFormData.value && !readonlyMode.value)
     previewFormData.value[field] = value;
-});
+}
 
 /** 在「设计 / 预览 / 填充」之间切换；再次点击同一模式则回到设计态。 */
 function toggleViewMode(mode: "preview" | "fill"): void {
@@ -1465,6 +1478,7 @@ function updateSelectedSafetyField(event: Event): void {
 
       <main
         class="v2-canvas"
+        ref="canvasEl"
         :class="{ 'v2-canvas--preview': previewMode }"
         @click="selectNode"
         @dragover="onCanvasDragOver"
@@ -1476,10 +1490,11 @@ function updateSelectedSafetyField(event: Event): void {
           :schema="schema"
           :selected-node-id="previewMode ? null : selectedNodeId"
           :data="previewData"
-          :readonly="readonlyMode"
+          :readonly="false"
           :drag-over-cell-id="dragOverCellId"
           :drag-over-index="dragOverIndex"
           @node-drag-start="onCanvasNodeDragStart"
+          @field-change="onCanvasFieldChange"
         />
       </main>
 

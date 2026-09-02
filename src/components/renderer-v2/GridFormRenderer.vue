@@ -6,7 +6,10 @@ import GridSchemaNode from "./GridSchemaNode.vue";
 
 defineOptions({ name: "GridFormRenderer" });
 
-const emit = defineEmits<{ (e: "node-drag-start", id: string): void }>();
+const emit = defineEmits<{
+  (e: "node-drag-start", id: string): void;
+  (e: "field-change", field: string, value: string): void;
+}>();
 
 const props = defineProps<{
   schema: FormSchemaV2;
@@ -22,6 +25,11 @@ const props = defineProps<{
   /** 拖拽重排（P9）：当前悬停投放格与插入下标，透传给渲染树绘制插入指示线。 */
   dragOverCellId?: string | null;
   dragOverIndex?: number | null;
+  /**
+   * 无外壳模式（G8/G10）：去掉灰底纸张画布外壳（padding / 背景 / 阴影），
+   * 仅渲染纸张 `<main>`，便于消费页把表单嵌入自身页面中部（而非模拟整张纸）。
+   */
+  bare?: boolean;
 }>();
 
 const paperSize = computed(() => {
@@ -57,7 +65,7 @@ function pageSiblingSuppressBorders(children: FormNodeV2[], index: number): { to
 </script>
 
 <template>
-  <div class="grid-form-canvas">
+  <div class="grid-form-canvas" :class="{ 'grid-form-canvas--bare': bare }">
     <main
       v-for="page in schema.pages"
       :key="page.id"
@@ -78,6 +86,7 @@ function pageSiblingSuppressBorders(children: FormNodeV2[], index: number): { to
         :drag-over-cell-id="dragOverCellId"
         :drag-over-index="dragOverIndex"
         @node-drag-start="(id) => emit('node-drag-start', id)"
+        @field-change="(field, value) => emit('field-change', field, value)"
       />
     </main>
   </div>
@@ -90,6 +99,14 @@ function pageSiblingSuppressBorders(children: FormNodeV2[], index: number): { to
   padding: 24px;
   background: #e5e7eb;
   box-sizing: border-box;
+}
+
+/* 无外壳模式（G8/G10）：消费页嵌入场景，去掉灰底画布与留白，仅渲染纸张。 */
+.grid-form-canvas--bare {
+  height: auto;
+  padding: 0;
+  background: transparent;
+  overflow: visible;
 }
 
 .grid-form-paper {

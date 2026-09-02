@@ -292,3 +292,79 @@
 - **同步文档**：`delivery-scenario-gap.md` 追加 §5 整改进度；`development-plan.md` §0.3 加密风险标记解除 + 整改启动指针、§0.4 补执行行；`README.md` 无需改。
 - **未提交 git**（沿用约定，未经允许不提交）。
 - **下一步 ◆ P0**：G8（渲染组件独立入口 `preview` + props 收敛 `schema/data/mode/options`）/ G11（只读与可编辑统一 DOM）/ G15（回写 `inject("formFill")` 改 `emit`）；其余 ◆ P1/P2/P3（G9/G10/G14/G4/G7/G13/G17/G18）按 §3 路径推进。G6 渲染端显式占位框可后续补。
+
+---
+
+## 2026-09-02 七续 — 交付差距 G8 渲染组件可独立运行
+
+- **目标（定稿范围 G8 选项①）**：渲染组件可作为「消费页」独立引用——不依赖设计器即可 `schema + data + mode` 渲染并填写回写；库化打包（vite lib + dts）延后。
+- **实施（全量 vitest 170/170、vue-tsc 干净，基线 165→170）**：
+  1. **公共入口 `FormRenderer.vue`**（新建，`components/renderer-v2/`）：props 收敛为 `schema / data? / mode?("preview"|"fill") / options?({bare?})`；`v-model:data`（`update:data`）+ `@field-change`；内部 `provide("formFill", (field,value)=>{ data 回写 + emit update:data + emit field-change })` 桥接内核私有 `inject("formFill")`。设计器 `DesignerApp` 仍直接引用内核 `GridFormRenderer`，本组件是「消费页友好」包装，不暴露任何设计器私有状态（selectedNodeId / 拖拽态 / node-drag-start）。
+  2. **内核 `bare` 无外壳**：`GridFormRenderer.vue` 加 `bare?` prop + `<div class="grid-form-canvas" :class="{'grid-form-canvas--bare':bare}">`；CSS `.grid-form-canvas--bare{height:auto;padding:0;background:transparent;overflow:visible}` 去掉灰底画布与纸张阴影，便于消费页嵌入中部而非模拟整张纸。
+  3. **独立消费页 `preview/`**（新建）：`preview.html`（根目录，引用 `/src/preview/main.ts`）+ `src/preview/main.ts`（`createApp(App).mount("#app")`，引入 `@/styles/root.css`）+ `src/preview/App.vue`（样例 `makeYunlvSecondTicketFirstFiveRowsSchema` + `demoData`，mode 预览/填写切换 + bare 复选 + `@field-change` 打印；注释说明真实消费页流程 = 服务器 JSON → `parseTolerantFormSchemaV2(json).schema` → `<FormRenderer>`）。
+  4. **`vite.config.ts` 多页入口**：`build.rollupOptions.input` 加 `main: index.html` 与 `preview: preview.html`，设计器与消费页演示并存；开发期 `vite` 后分页访问 `/index.html` 与 `/preview.html`。
+  5. **`FormRenderer.test.ts`**（新建，5 例）：① preview 模式携带 data 回显只读静态文本、不渲染 `.layout-p__control`；② fill 模式字段初始值来自 data（精确选中 `.layout-p__control[data-field="单位"]`，因外层 `<p>` 也带 data-field，需限定）；③ fill 输入触发 `field-change`（`["单位","新单位值"]`）与 `update:data`（payload 含改写字段）；④ 消费页流程 `parseTolerantFormSchemaV2(JSON.stringify(schema)).schema` 喂给 preview 可渲染并回显；⑤ `options.bare` 渲染出 `grid-form-canvas--bare`。
+- **验证**：`vue-tsc --noEmit` 干净；`vitest` 全量 **170/170（17 文件）** 通过（165 + 新 5），无回归；未跑 `vite build`；未提交 git。
+- **遗留契约（G15 待办）**：G8 用 `provide("formFill")` 桥接 + `update:data` emit 已满足消费页「拿到实时数据」需求，但内核 `GridFormRenderer` 仍依赖私有 `inject("formFill")`，与 G15「彻底改为 emit 契约」目标尚有距离——本轮属「临时可用」，G15 仍需把内核回写从 inject 改为 emit。其余 ◆ P0：G11（只读与可编辑统一 DOM）待做。
+- **同步文档**：`delivery-scenario-gap.md` §5 进度表补 G8 ✅（含位置/要点）；`development-plan.md` §0「最后更新」开头插 ⑪、§0.3 缺口标记 G8 完成并收窄剩余 P0、§0.1 + §0.4 基线 170/170 + 执行行。
+
+## 2026-09-02 八续 — G11 统一渲染路径（A3）
+
+- **目标**：落实 [architecture-layering-review.md](./architecture-layering-review.md) §6.5 第 4 批 A3「预览/填写同构」——同一份数据在浏览（只读）/填写下版式一致（换行、行高、innerBorder 逐行横线），打印与填写结果对得上；A2（设计态 contenteditable 下线）经用户拍板**延后**，本轮设计态维持原 contenteditable 不回写 schema，未改动其结构。
+- **核心改动（`GridSchemaNode.vue`）**：
+  1. `<p>` 字段模板重写：预览/填写统一走 `v-if="fillMode"` 分支，复用同一控件——非 innerBorder 渲染 `<textarea :readonly="!canFill">`、innerBorder 渲染 `.layout-p__lines` 可编辑容器（`:contenteditable="canFill ? 'true' : undefined"`），仅 `readonly`/`contenteditable` 差异；设计态保留原 `v-else`（复合 `.layout-p__input` contenteditable、非复合 逐行 `<div>`/文本）。
+  2. innerBorder 填充态光标稳定：`v-once` 渲染初始逐行 `<div class="layout-p__line">`，新增 `innerLinesEl` ref + `syncInnerLinesFromData()`，`watch(() => fieldValue(props.node), ...)` 与 `onMounted` 在外部 data 变化时用 `textContent` 重建（焦点在可编辑区时跳过，避免光标跳位；`textContent` 无 HTML 注入）。
+  3. 类型收窄：`syncInnerLinesFromData` 头部加 `if (props.node.type !== "p") return;`；`watch` getter 改 `() => props.node.type === "p" ? fieldValue(props.node) : ""`（修复 vue-tsc TS2345 `FormNodeV2` 不能赋给 `FieldPNodeV2`）。
+  4. 删除恒为 `true`/`"text"` 的 `useTextarea`/`inputElType`，`<component :is="useTextarea(node) ? 'textarea' : 'input'">` 全部改为直接 `<textarea>`。
+- **关键修复 — Vue 3.5.41 编译器崩溃（两处）**：
+  - 现象：`vitest` 编译 `GridSchemaNode.vue` 抛 `TypeError: Cannot read properties of undefined (reading '2')`（@vue/compiler-core `injectSlotKey`，codegen 阶段）与 `reading 'trim'`（`transformOn`，transform 阶段）。
+  - 根因（本地 `compile_sfc.mjs` 复现确认）：① `<component :is>` 动态组件作为 `v-if`/`v-else` 分支子节点，编译期 `getMemoedVNodeCall`/`injectSlotKey` 路径异常；② `v-once` 元素作为 `v-if` 分支**唯一子节点**时，`createChildrenCodegenNode` 对该分支注入 `key` 触发 `injectSlotKey` 读 `node.arguments[2]`（undefined）崩溃。
+  - 方案：动态组件改直接 `<textarea>`（#① 消除）；`v-once` 的 innerBorder 容器不再作为 v-if 唯一子节点，改为与姊妹 `<textarea v-show="!node.innerBorder">` **同渲染、v-show 切换**（分支变为多子节点 → 走 fragment 路径，避开 `injectSlotKey`），`v-once` + watch 光标稳定逻辑保留。编译脚本复现确认两崩溃均消除。
+- **测试调整**：
+  - `GridSchemaNode.fill.test.ts:135` `control.element.value` → `(control.element as HTMLTextAreaElement).value`（vue-tsc TS2339 `value` 不存在于 `VueNode`）。
+  - 4 个渲染测试断言随统一路径更新：preview 现渲染 readonly `.layout-p__control` 并带值（`GridSchemaNode.fill.test.ts` / `FieldPConfig.test.ts` / `FormRenderer.test.ts` / `P10Acceptance.test.ts`）。
+  - `designer/__tests__/DesignerApp.test.ts` 预览断言：原查 `.layout-p__input` contenteditable → 改为断言渲染 readonly `.layout-p__control`（普通字段 `unit-field` 与复合字段 `member-count-field` 均如此），并校验复合字段 `.layout-p__input` 在预览下不再渲染。
+  - `FirstFiveRowsSnapshot`：设计态 DOM 因模板内 4 处 HTML 注释污染而变动 → 移除这些注释（G11 理由已写入 `<script>` JSDoc）后快照零变动，设计态 DOM 与基线一致（A2 维持）。
+- **验证**：`vue-tsc --noEmit` 干净；`vitest` 全量 **170/170（17 文件）** 通过，无回归；未跑 `vite build`；未提交 git。
+- **遗留**：A2 设计态 contenteditable 延后（本轮未动，行为维持「可临时编辑但不回写 schema」）；G15 内核回写从私有 `inject("formFill")` 改为 emit 契约仍待办（G8 已用 `provide`+`update:data` 桥接临时可用）。当前 ◆ P0 仅剩 G15。
+
+## 2026-09-02 九续 — G15 数据回写契约化（A4）
+
+- **目标**：落实 [architecture-layering-review.md](./architecture-layering-review.md) §6.5 第 1 批 A4「数据回写契约化」——内核不再依赖设计器私有的 `inject("formFill")` 字符串 key，改为正式 `emit("field-change", field, value)`，使渲染组件可彻底脱离设计器独立运行，消费页用 `v-model:data` 即可拿到实时填写结果。
+- **核心改动**：
+  1. `GridSchemaNode.vue`（内核叶）：删 `inject("formFill")` 与 `const formFill`；`defineEmits` 加 `(e: "field-change", field: string, value: string): void`；`onFillInput` 改 `emit("field-change", field, readEditableText(...))`；删 `import { inject }`。两处递归子 `<GridSchemaNode>` 加 `@field-change="... => emit('field-change', ...)"` 透传。
+  2. `GridFormRenderer.vue`（内核根）：`defineEmits` 加 `field-change`；页面级 `<GridSchemaNode>` 加 `@field-change="... => emit('field-change', ...)"`。
+  3. `FormRenderer.vue`（消费页公共入口）：删 `provide("formFill", ...)` 与 `import { provide }`；新增 `onFieldChange(field, value)` 监听内核 `@field-change`，写回内部 `data` 并 re-emit `field-change`/`update:data`（维持消费页 `v-model:data` 契约）。
+  4. `DesignerApp.vue`（设计器）：删 `provide("formFill", ...)` 与 `import { provide }`；`<GridSchemaRenderer>` 加 `@field-change="onCanvasFieldChange"`，`onCanvasFieldChange` 写回响应式 `previewFormData`。
+  5. `src/preview/App.vue`：无改动（本就监听 `FormRenderer` 的 `@field-change` 打印）。
+- **测试调整**：`GridSchemaNode.fill.test.ts` 7 例由 `global: { provide: { formFill } }` + `expect(formFill).toHaveBeenCalledWith(...)` 改为直接断言 `wrapper.emitted("field-change")`（设计态/只读预览/文本节点用例断言 `toBeFalsy()`）。`FormRenderer.test.ts`/`DesignerApp.test.ts` 因消费页/设计器改为监听 emit，行为不变，零改动。
+- **验证**：`vue-tsc --noEmit` 干净；`vitest` 全量 **170/170（17 文件）** 通过，无回归；未跑 `vite build`；未提交 git。
+- **结论**：◆ P0 全部落地（G5/G6/G8/G11/G12/G15/G16 均 ✅），渲染组件已具备「独立消费 JSON+data 并正确回写」能力；A4 完成，剩余 ◆ P1/P2/P3（G9/G10/G14/G4/G7/G13/G17/G18）按交付差距 §3 路径推进。
+
+---
+
+## 2026-09-02 十续 — 字段 P 改回 `<p>` 渲染 + 新增 collectFieldValues DOM 采集
+
+- **用户反馈（两条）**：① 预览/填充态原本把字段 P 的 `<p>` 替换成 `<textarea>` 渲染，导致 `<p>` 所在行高被撑开、版式与设计态不符；要求「保持原本的 `<p>` 标签进行数据填入即可」。② 预览时用户输入不必过程中逐键记录，只需提供一个「通过 DOM 遍历字段的组件」去获取。
+- **核心改动（`GridSchemaNode.vue`）**：
+  1. 字段 P 预览/填充态统一渲染为可编辑 `<p>`（与设计态同结构、行高一致），移除八续引入的 `<textarea>` 分支；`onFillInput` 改 `onFillBlur`（`@blur` 失焦一次 `emit("field-change", field, readEditableText(...))`，输入过程不实时回写）；非复合字段 `fieldValue(node)` 直接进 `<p>` 文本、复合字段 `.layout-p__input` span 可编辑、innerBorder 走 `.layout-p__lines`（`v-once`）逐行 `<div>`；`canFill` 保持 `computed(() => fillMode && props.readonly !== true)`。
+  2. 新增 `readEditableText`（优先 `innerText`、jsdom 回退 `textContent`，保留换行）。
+  3. 新增 `collectFieldValues(root)`（`collectFieldValues.ts`）：遍历渲染 DOM 的 `[data-field]` 读 `innerText`（img 读 `src`），供消费页/设计器随时采集（无需逐键回写）。
+  4. `DesignerApp.vue`：引入 `collectFieldValues`、`canvasEl` ref 挂在画布 `<main>`、`collectFormValues()` `defineExpose` 暴露；画布 `<GridSchemaRenderer :readonly="false">`（预览态字段可编辑、可被 DOM 采集）。
+  5. `renderer-v2/index.ts` 导出 `collectFieldValues`。
+- **Vue 3.5.41 编译器崩溃（十续新增，固化为 skill `vue-sfc-compiler-crashes`）**：`v-once` 元素作为 `v-if` 分支**唯一子节点**触发 `injectSlotKey`/`reading '2'`（`<component :is>` 分支内另触发 `transformOn`/`reading 'trim'`）；方案：把 `v-if` 直接挂 `v-once` 元素自身、非 v-if 分支用 `<template v-else>`（无额外 DOM、不污染快照），编译脚本复现确认崩溃消除。
+- **测试调整**：重写 `GridSchemaNode.fill.test.ts`（`<p>` contenteditable + 失焦 emit、设计/只读不 emit）；`FieldPConfig.test.ts`/`FormRenderer.test.ts`/`P10Acceptance.test.ts`/`TableDynamicRows.test.ts` 预览/填充断言改查 `[data-field].text()`；`DesignerApp.test.ts` 预览态断言 `<p>` 可编辑 + 值来自数据、填充态失焦回写、新增 `collectFormValues` DOM 采集用例；新增 `collectFieldValues.test.ts`（含表格逐行）。
+- **验证**：`vue-tsc --noEmit` 干净；`vitest` **171/173（17 文件）**——仅 `DesignerApp.test.ts` 2 例失败（预览态 `unit-field` 文本空、默认内容回退空），根因留待十一续；未跑 `vite build`；未提交 git。
+
+## 2026-09-02 十一续 — 修复非复合字段在 contenteditable `<p>` 下文本不渲染
+
+- **目标**：修复十续遗留的 2 个 `DesignerApp.test.ts` 失败（预览态 `unit-field` 文本空、设计态默认内容回退空），达成全绿。
+- **侦察（关键事实）**：data 已到达 `GridFormRenderer` 的 `data` prop（`previewData["单位"]="121"`），且子 `GridSchemaNode`（unit-field）实例 `props.data["单位"]="121"`、`props.node.field="单位"`；`fieldValue(node)` 经临时 `console.log` 确认返回 `"121"`。但渲染出的 `<p>` 为 `<p ...></p>`（**完全无文本节点**）。对照：复合字段 `member-count-field` 在 `.layout-p__input` 内正常渲染 `"10"`，其余**所有非复合字段**（`number-field`/`owner-field`/`wt-loc`…）均空。
+- **根因**：非复合字段的展示值 `{{ fieldValue(node) }}` 是 contenteditable `<p>` 的**直接文本子节点**，且被外层 `<template v-if="isCompositeField(node)">` / `<template v-else>` 配对包裹；当 data **晚于挂载**到达（DesignerApp 先 design 后切 preview，`previewFormData` 在点击时赋值）时，该直接文本子节点**不会被 Vue 重新 patch**（复合字段的值位于内层 `<span>`，故能正常更新）。`P10Acceptance` 因 `mount(GridFormRenderer, { props:{ schema, data } })` 挂载即带 data，走初始渲染路径，故不触发此缺陷、一直绿——这正是两条路径表现分歧的原因。
+- **修复（`GridSchemaNode.vue`）**：把 `<p>` 内部结构压平，去除 `<template v-if>` / `<template v-else>` 包裹，改用 `<p>` 的直接子节点 `v-if`/`v-else-if`/`v-else` 链：
+  1. 前缀 `<span class="layout-p__label">`（v-if）、复合 `<span class="layout-p__input">`（v-if isCompositeField）、非复合 innerBorder `<span class="layout-p__lines" v-once ref="innerLinesEl">`（v-else-if）、**非复合普通值 `<span class="layout-p__value">{{ fieldValue(node) }}</span>`**（v-else）、后缀 `<span>`。
+  2. 展示值 `<span>` 直接作为 `<p>` 的 `v-else` 子项（不再经 `<template v-else>` 包裹），数据晚到时 span 文本随 `fieldValue` 正常刷新。
+  3. CSS 新增 `.layout-p__value { flex:1 1 auto; min-width:0; white-space:pre-wrap; overflow-wrap:anywhere }`（作为 `<p>` 的 flex 子项填充整行，保持版式）。
+- **测试**：`FirstFiveRowsSnapshot` 设计态每个非复合字段新增 `<span class="layout-p__value"></span>`（空值）→ `vitest -u` 重生成（功能生效非回归）；`DesignerApp.test.ts` 27/27。
+- **验证**：`vue-tsc --noEmit` 干净（Exit 0）；`vitest` 全量 **173/173（18 文件）** 通过，无回归；未跑 `vite build`；未提交 git。
+- **经验固化**：contenteditable 元素（`<p>`/容器）的**直接文本插值子节点**在「数据晚于挂载到达」时 Vue 不重新 patch；需把值放进内层 `<span>`（或任何非直接文本子节点）才能可靠刷新。后续改字段 P 渲染结构时勿再把 `{{ fieldValue }}` 直接作为 contenteditable 元素的文本子节点、且勿用 `<template v-else>` 包裹它。

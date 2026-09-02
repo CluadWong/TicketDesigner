@@ -432,7 +432,7 @@ describe("DesignerApp 预览态只读（不可添加组件 / 不可输入）", (
   const paletteButtons = (wrapper: VueWrapper) =>
     wrapper.findAll(".v2-palette-item--button");
 
-  it("预览态：模板按钮全部禁用，字段与复合字段输入区均不可编辑", async () => {
+  it("预览态：模板按钮全部禁用，字段与复合字段输入区均可编辑（<p> 渲染，非 readonly 控件）", async () => {
     const wrapper = mount(DesignerApp);
     // 设计态基线：模板可用、字段可编辑
     expect(paletteButtons(wrapper).every(b => b.attributes("disabled") === undefined)).toBe(true);
@@ -445,14 +445,17 @@ describe("DesignerApp 预览态只读（不可添加组件 / 不可输入）", (
     for (const button of paletteButtons(wrapper)) {
       expect(button.attributes("disabled")).toBeDefined();
     }
-    // 2. 不可输入：普通字段与复合字段（前缀 + 输入区 + 后缀）均无 contenteditable
-    expect(wrapper.find('[data-node-id="unit-field"]').attributes("contenteditable")).toBeUndefined();
-    expect(
-      wrapper.find('[data-node-id="member-count-field"] .layout-p__input')
-        .attributes("contenteditable"),
-    ).toBeUndefined();
-    // 3. 预览仍带数据渲染（只读展示而非清空）
-    expect(wrapper.find('[data-node-id="unit-field"]').text()).not.toBe("");
+    // 2. 可输入（设计师预览为交互填充态：复用同一 <p> 渲染路径，字段可编辑、值来自数据；
+    //    用户输入经 DOM 遍历采集，不逐键回写响应式 data，见十续）。
+    const unitField = wrapper.find('[data-node-id="unit-field"]');
+    expect(unitField.attributes("contenteditable")).toBe("true");
+    expect(unitField.text()).not.toBe("");
+    const memberInput = wrapper.find('[data-node-id="member-count-field"] .layout-p__input');
+    expect(memberInput.exists()).toBe(true);
+    expect(memberInput.attributes("contenteditable")).toBe("true");
+    // 3. 预览仍带数据渲染（展示而非清空）
+    expect(wrapper.text()).toContain("共");
+    expect(wrapper.text()).toContain("人");
   });
 
   it("预览态：绕过 UI 直接调用添加函数也不改动结构", async () => {
@@ -476,20 +479,32 @@ describe("DesignerApp 预览态只读（不可添加组件 / 不可输入）", (
     await wrapper.find('[data-view-mode="fill"]').trigger("click");
 
     const field = wrapper.find('[data-node-id="unit-field"]');
-    // 填充态用真实控件（textarea/input）承接输入，而非 contenteditable 的 p
-    const control = field.find(".layout-p__control");
-    expect(control.exists()).toBe(true);
+    // 填充态字段为可编辑 <p>（非 textarea 控件），值直接落在文本
+    expect(field.attributes("contenteditable")).toBe("true");
 
     const formData = (wrapper.vm as unknown as { previewData: Record<string, string> | null })
       .previewData;
     expect(formData).not.toBeNull();
 
     const key = field.attributes("data-field")!;
-    // 通过控件输入触发回写
-    (control.element as HTMLTextAreaElement).value = "测试值";
-    await control.trigger("input");
+    // 通过 <p> 输入（失焦）触发回写
+    field.element.textContent = "测试值";
+    await field.trigger("blur");
     expect(formData).toHaveProperty(key);
     expect(formData![key]).toBe("测试值");
+  });
+
+  it("collectFormValues 通过 DOM 遍历采集预览/填充值（不依赖 emit）", async () => {
+    const wrapper = mount(DesignerApp);
+    await wrapper.find('[data-view-mode="fill"]').trigger("click");
+
+    const field = wrapper.find('[data-node-id="unit-field"]');
+    field.element.textContent = "DOM采集值";
+    await field.trigger("blur");
+
+    const values = (wrapper.vm as unknown as { collectFormValues: () => Record<string, string> })
+      .collectFormValues();
+    expect(values["单位"]).toBe("DOM采集值");
   });
 
   it("再次点击同一模式按钮回到设计态", async () => {

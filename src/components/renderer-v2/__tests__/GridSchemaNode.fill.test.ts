@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { mount } from "@vue/test-utils";
 import GridSchemaNode from "@/components/renderer-v2/GridSchemaNode.vue";
 
@@ -20,97 +20,92 @@ const compositeNode = {
   underline: true,
 };
 
-describe("GridSchemaNode 填写态数据回写（P9.1b）", () => {
-  it("填写态下字段 P 渲染多行控件（textarea）并回写到 provide 的 formFill", async () => {
-    const formFill = vi.fn();
+describe("GridSchemaNode 填写态数据回写（P9.1b / G15 / 十续）", () => {
+  it("填写态下字段 P 渲染为可编辑 <p>（非 textarea），失焦 emit field-change", async () => {
     const wrapper = mount(GridSchemaNode, {
       props: { node: fieldNode, baseRowHeight: 8, data: { 单位: "初始" } },
-      global: { provide: { formFill } },
     });
 
-    const control = wrapper.find("textarea.layout-p__control");
-    expect(control.exists()).toBe(true);
-    expect((control.element as HTMLTextAreaElement).value).toBe("初始");
+    // 渲染为 <p>（非 textarea），值落在文本中，contenteditable 可编辑
+    expect(wrapper.element.tagName).toBe("P");
+    expect(wrapper.attributes("contenteditable")).toBe("true");
+    expect(wrapper.text()).toContain("初始");
 
-    (control.element as HTMLTextAreaElement).value = "张三";
-    await control.trigger("input");
+    wrapper.element.textContent = "张三";
+    await wrapper.trigger("blur");
 
-    expect(formFill).toHaveBeenCalledTimes(1);
-    expect(formFill).toHaveBeenCalledWith("单位", "张三");
+    const ev = wrapper.emitted("field-change");
+    expect(ev).toBeTruthy();
+    expect(ev?.[0]).toEqual(["单位", "张三"]);
   });
 
-  it("复合字段 P 的填写态输入器为真实控件并回写，前缀/后缀不参与", async () => {
-    const formFill = vi.fn();
+  it("复合字段 P 的填写态输入区为可编辑 <p> 内的 .layout-p__input，失焦 emit，前缀/后缀不参与", async () => {
     const wrapper = mount(GridSchemaNode, {
       props: { node: compositeNode, baseRowHeight: 8, data: { 工作班成员人数: "" } },
-      global: { provide: { formFill } },
     });
 
-    const control = wrapper.find("textarea.layout-p__control");
-    expect(control.exists()).toBe(true);
-    expect((control.element as HTMLTextAreaElement).value).toBe("");
-    (control.element as HTMLTextAreaElement).value = "8";
-    await control.trigger("input");
+    expect(wrapper.element.tagName).toBe("P");
+    const input = wrapper.find(".layout-p__input");
+    expect(input.exists()).toBe(true);
+    expect(input.attributes("contenteditable")).toBe("true");
+    // 初始值
+    expect(input.text()).toBe("");
+    input.element.textContent = "8";
+    await input.trigger("blur");
 
-    expect(formFill).toHaveBeenCalledTimes(1);
-    expect(formFill).toHaveBeenCalledWith("工作班成员人数", "8");
+    const ev = wrapper.emitted("field-change");
+    expect(ev).toBeTruthy();
+    expect(ev?.[0]).toEqual(["工作班成员人数", "8"]);
     // 前缀/后缀为静态标签，不参与字段
     expect(wrapper.text()).toContain("共");
     expect(wrapper.text()).toContain("人");
   });
 
-  it("文本字段填写态默认渲染 textarea（自动换行，字符串类型），不渲染单行 input", async () => {
-    const formFill = vi.fn();
+  it("文本字段填写态渲染为 <p> 文本（非 textarea / input 控件）", async () => {
     const wrapper = mount(GridSchemaNode, {
       props: {
         node: { id: "single", type: "p" as const, mode: "field" as const, field: "编号" },
         baseRowHeight: 8,
         data: { 编号: "A1" },
       },
-      global: { provide: { formFill } },
     });
 
-    expect(wrapper.find("input.layout-p__control").exists()).toBe(false);
-    const control = wrapper.find("textarea.layout-p__control");
-    expect(control.exists()).toBe(true);
-    expect((control.element as HTMLTextAreaElement).value).toBe("A1");
+    expect(wrapper.find("textarea").exists()).toBe(false);
+    expect(wrapper.find("input").exists()).toBe(false);
+    expect(wrapper.find('[data-field="编号"]').text()).toBe("A1");
   });
 
-  it("设计态（无 data）输入不回写，避免污染填写数据", async () => {
-    const formFill = vi.fn();
+  it("设计态（无 data）输入不 emit，避免污染填写数据", async () => {
     const wrapper = mount(GridSchemaNode, {
       props: { node: fieldNode, baseRowHeight: 8 },
-      global: { provide: { formFill } },
     });
 
-    const el = wrapper.element as HTMLElement;
-    el.textContent = "设计态文本";
-    await wrapper.trigger("input");
+    // 设计态 <p> 可编辑（contenteditable），但非 fillMode → 不回写
+    expect(wrapper.attributes("contenteditable")).toBe("true");
+    wrapper.element.textContent = "设计态文本";
+    await wrapper.trigger("blur");
 
-    expect(formFill).not.toHaveBeenCalled();
+    expect(wrapper.emitted("field-change")).toBeFalsy();
   });
 
-  it("只读预览（data + readonly）：带数据渲染，但不可编辑且不回写", async () => {
-    const formFill = vi.fn();
+  it("只读预览（data + readonly）：带数据渲染为 <p> 文本，不可编辑且不 emit", async () => {
     const wrapper = mount(GridSchemaNode, {
       props: { node: fieldNode, baseRowHeight: 8, data: { 单位: "云鹿检修班" }, readonly: true },
-      global: { provide: { formFill } },
     });
 
-    // 数据照常渲染
-    expect(wrapper.text()).toBe("云鹿检修班");
-    // 但字段不可编辑
+    // 预览复用同一 <p> 渲染路径，值落在文本（而非 textarea.value）；readonly 不可编辑
+    expect(wrapper.element.tagName).toBe("P");
     expect(wrapper.attributes("contenteditable")).toBeUndefined();
+    expect(wrapper.text()).toContain("云鹿检修班");
 
-    const el = wrapper.element as HTMLElement;
-    el.textContent = "篡改";
-    await wrapper.trigger("input");
+    // 只读字段无法触发回写
+    wrapper.element.textContent = "篡改";
+    await wrapper.trigger("blur");
 
-    expect(formFill).not.toHaveBeenCalled();
+    expect(wrapper.emitted("field-change")).toBeFalsy();
   });
 
   it("只读预览下复合字段 P 的输入区同样不可编辑", async () => {
-    const formFill = vi.fn();
     const wrapper = mount(GridSchemaNode, {
       props: {
         node: compositeNode,
@@ -118,27 +113,28 @@ describe("GridSchemaNode 填写态数据回写（P9.1b）", () => {
         data: { 工作班成员人数: "8" },
         readonly: true,
       },
-      global: { provide: { formFill } },
     });
 
+    // 预览复用同一 <p> / .layout-p__input 渲染路径，仅 readonly 差异（contenteditable 未设置）
+    expect(wrapper.element.tagName).toBe("P");
     const input = wrapper.find(".layout-p__input");
     expect(input.attributes("contenteditable")).toBeUndefined();
     expect(input.text()).toBe("8");
+    expect(wrapper.text()).toContain("共");
+    expect(wrapper.text()).toContain("人");
 
     input.element.textContent = "99";
-    await input.trigger("input");
-    expect(formFill).not.toHaveBeenCalled();
+    await input.trigger("blur");
+    expect(wrapper.emitted("field-change")).toBeFalsy();
   });
 
-  it("填写态下固定文字（text 节点）不可编辑，不回写", async () => {
-    const formFill = vi.fn();
+  it("填写态下固定文字（text 节点）不可编辑，不 emit", async () => {
     const wrapper = mount(GridSchemaNode, {
       props: {
         node: { id: "title", type: "text" as const, text: "标题" },
         baseRowHeight: 8,
         data: {},
       },
-      global: { provide: { formFill } },
     });
 
     expect(wrapper.attributes("contenteditable")).toBeUndefined();
@@ -146,6 +142,6 @@ describe("GridSchemaNode 填写态数据回写（P9.1b）", () => {
     el.textContent = "篡改";
     await wrapper.trigger("input");
 
-    expect(formFill).not.toHaveBeenCalled();
+    expect(wrapper.emitted("field-change")).toBeFalsy();
   });
 });

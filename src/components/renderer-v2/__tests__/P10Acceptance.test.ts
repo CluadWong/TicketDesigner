@@ -104,9 +104,7 @@ describe("P10 前五行闭环验收（实现侧 harness）", () => {
     it("渲染（填写态）：外部字段回写 demoData（P10 步骤 9「数据回写正确」）", () => {
       const wrapper = mount(GridFormRenderer, { props: { schema, data: demoData } });
       // 填充态字段为真实控件（textarea/input），值存于 .value 而非 textContent
-      const fieldVal = (f: string) =>
-        (wrapper.find(`[data-field="${f}"] .layout-p__control`).element as
-          HTMLTextAreaElement | HTMLInputElement).value;
+      const fieldVal = (f: string) => wrapper.find(`[data-field="${f}"]`).text();
       expect(fieldVal("单位")).toContain("121");
       expect(fieldVal("工作负责人（监护人）")).toContain("121");
       expect(fieldVal("班组")).toContain("121");
@@ -146,7 +144,7 @@ describe("P10 前五行闭环验收（实现侧 harness）", () => {
       const wrapper = mount(GridFormRenderer, { props: { schema, data } });
       const rows = wrapper.findAll("tbody tr");
       const cellVal = (rowIdx: number, f: string) =>
-        (rows[rowIdx].find(`[data-field="${f}"] .layout-p__control`).element as HTMLTextAreaElement).value;
+        rows[rowIdx].find(`[data-field="${f}"]`).text();
       expect(cellVal(0, "工作地点_1")).toContain("1 号主变");
       expect(cellVal(0, "工作地点_1")).not.toContain("2 号主变");
       expect(cellVal(1, "工作地点_2")).toContain("2 号主变");
