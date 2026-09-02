@@ -73,6 +73,17 @@ describe("Grid 单元格间距 gap", () => {
     wrapper.unmount();
   });
 
+  it("gap + border=all：列/行间距生效且所有 cell 均渲染（边框归属修正不丢 cell）", () => {
+    const wrapper = mount(GridFormRenderer, { props: { schema: makeGridSchema(4) } });
+    const cells = wrapper.findAll(".layout-grid__cell");
+    expect(cells.length).toBe(4); // 2 行 × 2 列
+    const rowEl = wrapper.find(".layout-grid__row").element as HTMLElement;
+    expect(rowEl.style.columnGap).toBe("4mm");
+    // 内部垂直分隔线现已归属「非末列 cell 的右边框」、水平线归属「非末行 cell 的下边框」，
+    // gap 下每条线紧贴该列/行自身边缘，留白落在外侧，不再出现前一格视觉无边框的错觉。
+    wrapper.unmount();
+  });
+
   it("嵌套 Grid 也继承自身 gap（独立计算）", () => {
     const outer = makeGridSchema(4);
     // 内部 Grid（无 gap）嵌进 outer 的 c1

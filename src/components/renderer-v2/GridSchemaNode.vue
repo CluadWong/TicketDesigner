@@ -638,11 +638,13 @@ function onImgError(): void {
   overflow: hidden;
 }
 
-/* 单边归属规则（P4.3）：外框仅由 Grid 容器绘制；内部水平分隔线画在
-   非首行 cell 的上边框、内部垂直分隔线画在非首列 cell 的左边框。
-   这样每条线只被一个元素拥有，嵌套 Grid、以及 Grid 与 Table 相邻时
-   都不会出现双边框——旧规则让每格画 right/bottom，导致最外列/行与
-   容器外框叠加成 2px（见 §17「嵌套边框变粗」）。
+/* 单边归属规则（P4.3 / 十四续 gap 修正）：外框仅由 Grid 容器绘制；
+   内部水平分隔线画在「非末行」cell 的下边框、内部垂直分隔线画在「非末列」cell 的右边框。
+   这样每条内部线都落在「拥有它的那个 cell」自身边缘上——gap>0 时线紧贴该列/行的右/下边界，
+   留白落在外侧，不会出现「前一列看起来没有右边框、与 gap 融为一体」的错觉（旧规则把线画在
+   下一格的 left/top 上，gap 会把线推到 gap 中间，导致前一格视觉上无边框）。
+   同时每条线只被一个元素拥有（非末列画 right、末列不画；非末行画 bottom、末行不画），
+   与容器外框不重叠，嵌套 Grid / Table 相邻也不会出现双边框。
    border 语义：all = 外框 + 内部线；outer = 仅外框（不画内部线）；
    inner = 仅内部线（无外框，由外层 Grid 承担）；none = 无。 */
 .layout-grid--all,
@@ -666,18 +668,20 @@ function onImgError(): void {
   border-left: none;
 }
 
-/* 内部水平分隔线：非首行的 cell 上边框 = 上一行的下边界。
-   仅 all / inner 绘制；outer（仅外框）与 none 不画内部线。 */
-.layout-grid--all > .layout-grid__row:not(:first-child) > .layout-grid__cell,
-.layout-grid--inner > .layout-grid__row:not(:first-child) > .layout-grid__cell {
-  border-top: 1px solid #111827;
+/* 内部水平分隔线：非末行的 cell 下边框 = 本行的下边界。
+   仅 all / inner 绘制；outer（仅外框）与 none 不画内部线。
+   gap>0 时线紧贴本行下边缘，留白（row-gap）落在外侧，行与行不粘连。 */
+.layout-grid--all > .layout-grid__row:not(:last-child) > .layout-grid__cell,
+.layout-grid--inner > .layout-grid__row:not(:last-child) > .layout-grid__cell {
+  border-bottom: 1px solid #111827;
 }
 
-/* 内部垂直分隔线：非首列的 cell 左边框 = 左一列的右边界。
-   仅 all / inner 绘制；outer（仅外框）与 none 不画内部线。 */
-.layout-grid--all > .layout-grid__row > .layout-grid__cell:not(:first-child),
-.layout-grid--inner > .layout-grid__row > .layout-grid__cell:not(:first-child) {
-  border-left: 1px solid #111827;
+/* 内部垂直分隔线：非末列的 cell 右边框 = 本列的右边界。
+   仅 all / inner 绘制；outer（仅外框）与 none 不画内部线。
+   gap>0 时线紧贴本列右边缘，留白（column-gap）落在外侧，列与列不粘连。 */
+.layout-grid--all > .layout-grid__row > .layout-grid__cell:not(:last-child),
+.layout-grid--inner > .layout-grid__row > .layout-grid__cell:not(:last-child) {
+  border-right: 1px solid #111827;
 }
 
 .layout-p {

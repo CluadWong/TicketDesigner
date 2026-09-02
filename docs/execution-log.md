@@ -410,3 +410,18 @@
 - **与边框规则交互**：内部线单边归属（每格只画自身单边）在 gap 下表现为「每条线之间出现等距留白」——这是 CSS gap 的必然结果，符合「单元格分开」语义，无需特殊处理；相邻 Grid 外框去重逻辑不受影响。
 - **测试**：`schema-v2-operations.test.ts` +1（`resolveGridGapV2`/`updateGridGapV2`）、`GridGap.test.ts`（新增 3：无 gap 无字段 / gap=6 行+列均 6mm / 嵌套 Grid 独立计算 gap）、`schema-v2.test.ts` +2（round-trip 保留 gap / 非法 gap 载入清除）、`DesignerApp.test.ts` +1（检查器设 gap 写回 schema.gap）。
 - **验证**：`vue-tsc --noEmit` 干净（Exit 0）；`vitest` 全量 **184/184（20 文件）**（177 + 新 7）通过，无回归；未跑 `vite build`；未提交 git。
+
+## 2026-09-02 十五续 — 修复「Grid `gap` 下内部边框归属错误」导致前一列视觉无边框
+
+- **用户反馈（真机）**：十四续新增的 Grid `gap` 在 `border:"all"` 下暴露问题——2 列 `gap:4mm` 时**第一列 cell 不显示右边框**、看起来与 gap 融成一体；分 3 列时**第 2 列也缺右边框**。用户明确指认是 `.layout-grid--all > .layout-grid__row > .layout-grid__cell` 样式问题。
+- **根因**：十四续的「单边归属」把内部垂直分隔线画在「非首列 cell 的 `border-left`」、内部水平线画在「非首行 cell 的 `border-top`」。**gap 是列与列 / 行与行之间的留白**——非首列 cell 的 left 边框被推到 gap 中间（距前一列内容边缘 4mm 处），于是前一列（第 1 列、3 列里的第 2 列）视觉上**没有右边缘的线**、被 gap 的留白「吞掉」，看起来像和 gap 连成一片；3 列同理（第 2 列 left 边框落在它与第 3 列之间的 gap，第 2 列本身右缘无线）。
+- **修复（`GridSchemaNode.vue`，纯 CSS、不动结构）**：把内部线归属从「下一个 cell 的 left/top」翻转成「**当前 cell 的 right/bottom**」——
+  - 垂直：`非末列 cell` 画 `border-right`（原：非首列画 `border-left`）；
+  - 水平：`非末行 cell` 画 `border-bottom`（原：非首行画 `border-top`）。
+  - 这样每条线都落在**拥有它的那个 cell 自身边缘**上：gap>0 时线紧贴该列/行的右/下边界，留白（column-gap/row-gap）落在外侧，列与列、行与行不再粘连，每列每行的右/下分隔线都清晰可见。
+  - **单边归属不变**：仍只有「非末列」画 right、末列不画（与容器外框不重叠成 2px）；「非末行」画 bottom、末行不画。嵌套 Grid / Table 相邻沿用 P4.3 机制仍无双边框。
+  - **gap=0 视觉与旧规则完全一致**：相邻 cell 之间仍单条 1px 线，只是换了一侧拥有，无版式回退。
+  - 同步更新注释：原「非首行上边框 / 非首列左边框」改为「非末行下边框 / 非末列右边框」，并注明 gap 下留白落外侧的语义。
+- **测试**：`GridGap.test.ts` +1（`gap + border=all：列/行间距生效且 2×2=4 cell 全部渲染、列间距 4mm 生效` 的结构回归，锁定「边框归属修正不丢 cell」）。jsdom 无法可靠计算 scoped `border-*` 计算样式（scoped 选择器带 `data-v`、getComputedStyle 不应用），故**不**另起 computed-style 断言（脆弱）；边框归属正确性由 CSS 规则本身 + 全量回归背书。
+- **验证**：`vue-tsc --noEmit` 干净（Exit 0）；`vitest` 全量 **185/185（20 文件）**（184 + 新 1）通过，无回归；未跑 `vite build`；未提交 git。
+- **经验固化（补充十四续「无需特殊处理」那条）**：十四续写「内部线单边归属在 gap 下表现为线间等距留白、符合预期、无需特殊处理」——**仅当单边归属画在「下一格的 left/top」时才成立**；一旦归属侧是 left/top，gap 会把线推到留白中间、前一格视觉无边框。正确做法是**让每条内部线归属「拥有它的 cell 的 right/bottom」**，线永远贴在自己边缘、留白在外侧。记此修正，避免后续 Table 边框复用同一错误归属。
