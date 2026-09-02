@@ -254,6 +254,20 @@ function scanNode(
   cellContext: CellWidthContextV2 | undefined,
   insideTableRowTemplate = false,
 ): void {
+  // 未知节点类型：标记为 error（严格解析将抛错；容错解析收集后降级为跳过）。
+  // html 为已知类型（渲染期清洗后展示），此处不校验、不报错，与既有行为一致。
+  const KNOWN_NODE_TYPES = new Set(["text", "p", "grid", "table", "image", "html"]);
+  if (!KNOWN_NODE_TYPES.has(node.type)) {
+    issue(
+      issues,
+      "error",
+      "UNKNOWN_NODE_TYPE",
+      node as unknown as EditorNodeV2,
+      path,
+      `Unknown Schema node type: ${String((node as { type?: unknown }).type)}`,
+    );
+    return;
+  }
   if (node.type === "text") {
     if (cellContext && node.style?.writingMode !== "vertical-rl") {
       const fontSizePx = node.style?.fontSize ?? DEFAULT_P_FONT_SIZE_PX;

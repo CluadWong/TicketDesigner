@@ -103,6 +103,30 @@ describe("字段组件配置：宽度 / 默认内容 / 内部边框", () => {
     expect(control.value).toBe("预设内容");
   });
 
+  it("默认内容：data 存在该键且为空串时不回退 default（字段可被清空，G16）", () => {
+    // 预览态（readonly）：直接取 textContent，应为空而非默认内容
+    const preview = mount(GridSchemaNode, {
+      props: {
+        node: fieldNode({ default: "预设内容" }),
+        baseRowHeight: 8,
+        data: { 测试字段: "" },
+        readonly: true,
+      },
+    });
+    expect(preview.text()).toBe("");
+
+    // 填充态：控件 .value 应为空串（用户主动清空后，回写 "" 不应被 default 覆盖）
+    const fill = mount(GridSchemaNode, {
+      props: {
+        node: fieldNode({ default: "预设内容" }),
+        baseRowHeight: 8,
+        data: { 测试字段: "" },
+      },
+    });
+    const control = fill.find(".layout-p__control").element as HTMLTextAreaElement;
+    expect(control.value).toBe("");
+  });
+
   it("默认内容：未设置且无 data 时渲染为空", () => {
     const wrapper = mount(GridSchemaNode, {
       props: { node: fieldNode(), baseRowHeight: 8 },

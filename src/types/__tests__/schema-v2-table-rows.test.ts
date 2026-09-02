@@ -3,9 +3,10 @@ import {
   bindTableRowCell,
   buildTableRowField,
   collectFieldKeys,
+  collectSchemaFields,
   resolveTableRowCount,
 } from "@/types";
-import type { FormNodeV2, TableNodeV2 } from "@/types";
+import type { FormNodeV2, FormSchemaV2, TableNodeV2 } from "@/types";
 
 /**
  * 表格「动态行」不是 schema 属性，而是渲染期按 data 推导：
@@ -135,5 +136,59 @@ describe("collectFieldKeys", () => {
     expect(collectFieldKeys(fieldP("g", "x"))).toEqual(["x"]);
     const table = makeTable(1, [fieldP("p1", "a")], [fieldP("p2", "b")]);
     expect(collectFieldKeys(table).sort()).toEqual(["a", "b"]);
+  });
+});
+
+function makeSchema(children: FormNodeV2[]): FormSchemaV2 {
+  return {
+    version: 2,
+    paper: { size: "A4", orientation: "portrait" },
+    baseRowHeight: 8,
+    pages: [
+      {
+        id: "page-1",
+        type: "page",
+        mode: "fixed",
+        margin: { top: 10, right: 10, bottom: 10, left: 10 },
+        children,
+      },
+    ],
+  };
+}
+
+describe("collectSchemaFields（完整字段清单，G12）", () => {
+  it("非表格字段 + 表格派生字段（无 data 时按 minRows 枚举）", () => {
+    const schema = makeSchema([fieldP("owner", "负责人"), makeTable(2, [fieldP("p1", "")], [fieldP("p2", "")])]);
+    const fields = collectSchemaFields(schema);
+    const keys = fields.map(f => f.key).sort();
+    // 默认 Array.sort 按 UTF-16 码位："col*" 早于中文"负责人"
+    expect(keys).toEqual(["col1_1", "col1_2", "col2_1", "col2_2", "负责人"]);
+    // 普通字段
+    const owner = fields.find(f => f.key === "负责人")!;
+    expect(owner.kind).toBe("field");
+    expect(owner.tableField).toBeUndefined();
+    // 表格派生字段带列 key 与行号
+    const c11 = fields.find(f => f.key === "col1_1")!;
+    expect(c11.kind).toBe("table-field");
+    expect(c11.tableField).toBe("col1");
+    expect(c11.row).toBe(1);
+  });
+
+  it("有 data 时表格行数按 data 推导（超出 minRows 的行也纳入清单）", () => {
+    const schema = makeSchema([makeTable(2, [fieldP("p1", "")], [fieldP("p2", "")])]);
+    const fields = collectSchemaFields(schema, { col1_3: "x" });
+    const keys = fields.map(f => f.key).sort();
+    expect(keys).toEqual(["col1_1", "col1_2", "col1_3", "col2_1", "col2_2", "col2_3"]);
+  });
+
+  it("表格 cell 内嵌 Grid 的字段 P 也派生为 列key_行号（与渲染 bindTableRowCell 一致）", () => {
+    const schema = makeSchema([makeTable(1, [nestedGrid("g1", "")], []), fieldP("tail", "备注")]);
+    const fields = collectSchemaFields(schema);
+    const keys = fields.map(f => f.key).sort();
+    expect(keys).toEqual(["col1_1", "备注"]);
+    const tableField = fields.find(f => f.key === "col1_1")!;
+    expect(tableField.kind).toBe("table-field");
+    expect(tableField.tableField).toBe("col1");
+    expect(tableField.row).toBe(1);
   });
 });

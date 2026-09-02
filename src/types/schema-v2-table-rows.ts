@@ -1,4 +1,4 @@
-import type { FormDataV2, FormNodeV2, TableNodeV2 } from "./schema-v2";
+import type { FormDataV2, FormNodeV2, FormSchemaV2, TableNodeV2 } from "./schema-v2";
 
 /**
  * 表格列内字段的命名规则：`列key_行号`（行号 1-based）。
@@ -106,4 +106,79 @@ export function resolveTableRowCount(
     }
   }
   return Math.max(configured, maxRow);
+}
+
+/**
+ * 单个字段的元信息（供消费页面按字段取数 / 导出 / 校验 / 生成录入页）。
+ * - `kind: "field"`：普通字段 P（非表格），`key` 即手写 field；
+ * - `kind: "table-field"`：表格派生字段，`key` 为 `列key_行号`，并带 `tableField`（列 key）与 `row`（1-based 行号）。
+ * `label` 预留给 G13（字段级元数据），当前 schema 无该字段，恒为 undefined。
+ */
+export interface SchemaFieldInfo {
+  key: string;
+  kind: "field" | "table-field";
+  tableField?: string;
+  row?: number;
+  label?: string;
+}
+
+/**
+ * 收集整张 Schema 的完整字段清单（替代 `collectFieldKeys` 仅收手写 field 的局限）。
+ *
+ * 遍历口径与渲染期 `bindTableRowCell` / `tableTemplate` 完全一致：
+ * - 普通字段 P（不在表格内）→ 直接取 `node.field`；
+ * - 表格 → 对每列 × `resolveTableRowCount(node, data)` 行，按 `template.columnKey` 配对模板单元格，
+ *   生成派生字段 `列key_行号`（kind=table-field）；模板内（含嵌套 Grid）的字段 P 同样绑定到该 `列key_行号`；
+ * - 嵌套 Grid / 嵌套 Table 递归处理（嵌套 Table 独立派生自身列字段）。
+ *
+ * 这是消费页面「按字段取数 / 导出 / 校验」能力的基础——表格主体字段不再遗漏。
+ */
+export function collectSchemaFields(
+  schema: FormSchemaV2,
+  data?: FormDataV2 | null,
+): SchemaFieldInfo[] {
+  const out: SchemaFieldInfo[] = [];
+  const visit = (node: FormNodeV2, tableCtx?: { columnKey: string; rowIndex: number }): void => {
+    if (node.type === "p" && node.mode === "field") {
+      if (tableCtx) {
+        out.push({
+          key: buildTableRowField(tableCtx.columnKey, tableCtx.rowIndex),
+          kind: "table-field",
+          tableField: tableCtx.columnKey,
+          row: tableCtx.rowIndex,
+        });
+      } else if (node.field) {
+        out.push({ key: node.field, kind: "field" });
+      }
+      return;
+    }
+    if (node.type === "table") {
+      const rowCount = resolveTableRowCount(node, data ?? null);
+      for (const column of node.columns) {
+        const template = node.rowTemplate.find(t => t.columnKey === column.key);
+        if (!template) continue;
+        for (let r = 1; r <= rowCount; r += 1) {
+          for (const child of template.children) {
+            visit(child, { columnKey: column.key, rowIndex: r });
+          }
+        }
+      }
+      return;
+    }
+    if (node.type === "grid") {
+      for (const row of node.rows) {
+        for (const cell of row.cells) {
+          for (const child of cell.children) {
+            visit(child, tableCtx);
+          }
+        }
+      }
+    }
+  };
+  for (const page of schema.pages) {
+    for (const child of page.children) {
+      visit(child);
+    }
+  }
+  return out;
 }

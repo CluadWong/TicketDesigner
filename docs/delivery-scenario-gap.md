@@ -107,3 +107,18 @@
 | 表格字段清单口径（G12） | ① 按 `minRows` 固定枚举、行超出时按 data 追加（清单稳定）；② 完全随 data 动态（清单不稳定，只能整体存 JSON） |
 | 渲染组件交付形态（G8） | ① 先只做"可独立运行"的入口与示例（当前范围）；② 同时做库化打包（vite lib + dts，external vue）；③ 源码复制到宿主仓库 |
 | 消费页对接契约（外部 ◇） | 本应用只需暴露：设计器 `v-model:schema` + `@save`、渲染器 props `schema/data/mode/options`、Schema `version` 字段；其余由消费页/服务器自理 |
+
+---
+
+## 5. 整改进度（2026-09-02 五续起，仅本应用须补项 ◆）
+
+> 解密 `DesignerApp.vue` 后启动实际整改；以下 ◆ P0 项已落地并通过全量测试（vitest 165/165、vue-tsc 干净）。
+
+| 编号 | 状态 | 落地内容 | 位置 |
+|---|---|---|---|
+| **G16** | ✅ 已实施 | `fieldValue` 区分「data 中无该键」（回退 default）与「有键但为空串」（返回空，可清空）；修复带默认值字段无法清空 | `renderer-v2/GridSchemaNode.vue` `fieldValue` |
+| **G12** | ✅ 已实施 | 新增 `collectSchemaFields(schema, data?)`：非表格走手写 field；表格按 `列key_行号` × `resolveTableRowCount` 枚举（含嵌套 Grid 内字段 P 派生），输出 `[{key,kind,tableField?,row?}]` | `types/schema-v2-table-rows.ts` |
+| **G5** | ✅ 已实施 | 新增 `parseTolerantFormSchemaV2`（容错解析：JSON 非法 / 结构非法 / 含校验 error 均不抛错，返回 `{schema,issues,ok}`）；严格 `parseFormSchemaV2` 行为不变 | `types/schema-v2-serialization.ts` |
+| **G6** | ✅ 已实施 | `normalizeNode` 未知类型放行（不再整体 throw）；`scanNode` 新增 `UNKNOWN_NODE_TYPE` error 分支（严格解析仍抛错、容错解析收集后降级）；渲染端对未知类型按 `v-else-if` 链跳过（局部降级，未加显式占位框） | `schema-v2-serialization.ts` `normalizeNode` / `schema-v2-validation.ts` `scanNode` / 渲染端 `GridSchemaNode.vue` |
+
+> 待续 ◆ P0：G8（渲染组件独立入口）/ G11（只读与可编辑统一 DOM）/ G15（回写改 emit）。其余 ◆ P1/P2/P3（G9/G10/G14/G4/G7/G13/G17/G18）按 §3 路径推进。

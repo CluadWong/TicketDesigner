@@ -17,7 +17,7 @@
   - P0–P9 功能闭环；P10 八项验收指标中可自动化部分由 `P10Acceptance.test.ts`（11 例）全覆盖，#7「打印尺寸误差 ≤ 0.5mm」与 #8「结构与参考图一致」经用户真机人工核验通过。
   - **P11-1 已完成**：full 样例对齐为**扁平 13 个独立段 grid**（与设计器导出 `ticket-schema-v2-1788315240965.json` 对齐；border 分布 all×3 / outer×9 / none×4，带 `columns`），消除段间 2px 双边框；前五行样例（P10 验收）字段键已同步到同一 JSON 键集（工作负责人（监护人）/ 电站设备 / 工作地点_* / 工作内容_*）。
   - **P11-3 已完成**：A4 整票打印真机核验通过；打印方向改为由纸张尺寸派生（A4 纵向 / A3 横向）；Table 新增边框配置（all/outer/inner/none，与 Grid 对齐）。
-  - **下一步**：P11-2（完整票快照基线，可选）、P11-4（并入推迟项：P7.2e 完整编辑 UI、P9.1c 专用控件、P9.2、P12 清理）。（P7.2d/P7.2f/P9.1d 已于 2026-09-01 完成。）
+  - **下一步**：P11-2（完整票快照基线，可选）、P11-4（并入推迟项：P9.1c 专用控件、P9.2、P12 清理）。（P7.2e 完整编辑 UI 经用户澄清=「设计器人工编排符合参考图结构的整票模板」，已由导出 JSON `ticket-schema-v2-1788315240965.json` + 同步 `yunlv-second-ticket-full.ts` 完成；P7.2d/P7.2f/P9.1d 已于 2026-09-01 完成。）
 - 当前测试基线 **vitest 157/157**，`vue-tsc --noEmit` 干净；每轮详细过程见 **[execution-log.md](./execution-log.md)**。
 
 ### 0.2 任务节点状态（2026-08-31 十续执行后）
@@ -31,13 +31,13 @@
   - ✅ 打印 —— 正常（P10 指标 #7「打印尺寸误差 ≤ 0.5mm」人工侧通过）；
   - ✅ P10 指标 #8「主要结构与参考图一致」 —— 2026-08-31 用户确认通过（与参考图基本一致）。
   - ✅ P11-3 A4 整票打印核验 —— 2026-08-31 用户确认「正常」（尺寸与段线与参考图一致）；同期完成打印方向由尺寸派生 + Table 边框配置。
-- **推迟（按 §2.2，未做，本次继续维持）**：P6.3b/c 的**拖拽**交互形式（已于 2026-09-02 五续以统一拖拽原语实现，并移除配置面板版上移/下移按钮 + 目标下拉；旧 P6.3b/c 配置面板版相应下线）、P7.2e 剩余（rowTemplate 内子组件的完整编辑 UI）、P9.1c（number/date/signature 专用控件，2026-09-01 确认延后）、P9.2 全部、P12 清理。（P7.2d / P9.1d 已于 2026-09-01 以「按 data 动态行数」实现；P7.2f 已确认可行。P11 完整工作票已随 #8 确认解除 §14 闸门，转「可开工」，见下。）
+- **推迟（按 §2.2，未做，本次继续维持）**：P6.3b/c 的**拖拽**交互形式（已于 2026-09-02 五续以统一拖拽原语实现，并移除配置面板版上移/下移按钮 + 目标下拉；旧 P6.3b/c 配置面板版相应下线）、P9.1c（number/date/signature 专用控件，2026-09-01 确认延后）、P9.2 全部、P12 清理。（P7.2e 完整编辑 UI 经用户澄清=「设计器人工编排符合参考图结构的整票模板」，已由导出 JSON `ticket-schema-v2-1788315240965.json` + 同步 `yunlv-second-ticket-full.ts` 完成；P7.2d / P9.1d 已于 2026-09-01 以「按 data 动态行数」实现；P7.2f 已确认可行。P11 完整工作票已随 #8 确认解除 §14 闸门，转「可开工」，见下。）
 - **P11 已解除 §14 闸门（2026-08-31）**：P10 八项指标 #7（打印）与 #8（结构一致）均经用户人工确认通过 → **完整工作票（含 full 样例 4-Grid 对齐）可开工**。
 - **P11 排期（2026-08-31 起，九续后；用户指令「继续排 P11」）**：完整工作票对齐为「1 外层 Grid(`all`) + 各段以嵌套 Grid(`inner`) 放入 cell」，复用九续刚落地的 Grid-in-cell 能力，消除段间 2px 双边框（与首五行对齐同源）。拆分如下，当前先执行 **P11-1**：
   1. **P11-1 full 样例 1-Grid 对齐**：重写 `yunlv-second-ticket-full.ts`——外层 `ticket-layout`(`all`,`columns:["1fr"]`) 含「标题行 + 8 段行」；每段行单行单格嵌一段 `inner` 网格（沿用原 `basicInfoRows`/`workTaskRows`/`safetyRows`/`confirmRows`/`extensionRows`/`completionRows`/`remarkRows` 行数组，边框由 `all`→`inner`）；段行高 = 该段内部行高之和，总高与原 8×`all` 版本一致。`reloadSample()` 当前即载此样例，直接受益。
   2. **P11-2 full 样例验收/快照**：新增 `YunlvSecondTicketFull.test.ts`（`validateFormSchemaV2` 无 error、全部字段节点可索引、渲染出嵌套 Grid、段间仅单线）；可选对完整票出 `toMatchSnapshot` 基线。
   3. **P11-3 真实打印/浏览器核验 + 打印方向派生 + Table 边框配置（✅ 已完成，2026-08-31 十续）**：① 用户真机核验 A4 整票打印尺寸与段线正常；② 打印去掉独立方向选择，方向由纸张尺寸派生（A4→纵向、A3→横向）；③ Table 组件新增边框配置 all/outer/inner/none（与 Grid 对齐，单边绘制不重复外框）。
-  4. **P11-4 推迟项并入**（按用户优先级）：P7.2e 完整编辑 UI、P9.1c 专用控件、P9.2、P12 清理。（P7.2d/P7.2f/P9.1d 已于 2026-09-01 完成；P9.3f 打印验证事实已通过。）
+  4. **P11-4 推迟项并入**（按用户优先级）：P9.1c 专用控件、P9.2、P12 清理。（P7.2e 完整编辑 UI 经用户澄清=设计器人工编排整票模板，已由导出 JSON + 同步 .ts 完成；P7.2d/P7.2f/P9.1d 已于 2026-09-01 完成；P9.3f 打印验证事实已通过。）
 - **源码**：位于 `E:\Project\ssh\TicketDesigner`（有 git；2026-08-31 全部改动已提交至本地 `dev` 分支，未推送远端）。
 
 ### 0.3 已知缺口 / 风险
@@ -48,8 +48,9 @@
 - **P10 放行 P11 的闸门（已解除，2026-08-31）**：§14「前五行闭环未通过前不扩展完整表单」八项指标中可自动化者已全覆盖；#7（打印）与 #8（结构一致）均经用户人工确认通过 → P11 完整工作票可开工。
 - **设计态字段 P 仍 `contenteditable`（已知行为，未改）**：设计态（无 `data`）下字段 P 与其复合输入区允许就地输入，但**不回写 schema**（仅画布临时文本）。若用户认为这是「看起来能改、改了不生效」的陷阱，可后续统一为设计态只读。
 - **分层不符合项（2026-09-02 核对，未整改）**：按「设计器 / 渲染组件 / 填充」三层目标结构核对，共 15 项不符合（A/B/C/D 四类），详见 [architecture-layering-review.md](./architecture-layering-review.md)。其中 **P1 三项**为分层成败关键：① 渲染组件用 `data != null` 推断三态；② 填充态与预览态是两套 DOM 分支；③ 值回写走 `inject("formFill")` 反向依赖设计器。待拍板：设计态 contenteditable 是否下线（与上面「已知行为」条目直接冲突）。**2026-09-02 定案（该文档 §6）：不分化第二个渲染组件**，改为「渲染内核（`renderer-v2`，唯一）+ 设计表面层（选中/拖拽/落点/插入指示，引用内核而非复制）」两层，批次顺序以 §6.5 为准；拖拽重排（A6）的 `dragstart` 走画布事件委托、不进渲染内核。**2026-09-02 五续已按用户「合并为统一拖拽、拖拽实现后移除旧按钮」决策，把拖拽源落在 `GridSchemaNode`、落点判定放在 `DesignerApp`（统一走 `moveNodeToIndexV2`，功能已交付且 vitest 157/157 + vue-tsc 干净绿灯）；A6「表面层分化」列为推迟重构，不在本轮范围**。
-- **`DesignerApp.vue` 工作区文件被加密（2026-09-02 发现）**：文件头为 `%TSD-Header`，非白名单进程读取均为密文（含 `git` 读工作区）；`git show HEAD:` 可读到 2026-08-31 提交的明文版本。**影响**：该文件相关的核对只能基于 HEAD + 当前测试交叉验证，后续改动前需先确认能正常读写。
+- **`DesignerApp.vue` 工作区文件曾被加密（2026-09-02 发现，2026-09-02 五续已解密）**：曾因 `%TSD-Header` 加壳导致非白名单进程读密文；用户已解密，工作区与 `HEAD` 一致（`git diff --stat` 为空），现可正常读写与编辑。
 - **交付场景差距范围已定稿（2026-09-02 第 7 轮澄清，仅核对不改码）**：本应用只含**设计器 + 渲染组件**两块，**服务器 / 消费页面为外部**。差距只落在两处：① 设计器导出的 JSON 是否自洽、可被消费；② 渲染组件能否独立于设计器消费 JSON+data 并正确渲染（含打印）。`delivery-scenario-gap.md` 已将 G1–G19 按 **◆ 本应用须补 / ◇ 外部实现** 标注；◆ 须补项 = G4 G5 G6 G7 G8 G9 G10 G11 G12 G13 G14 G15 G16 G17 G18（P0：G5/G6/G8/G11/G12/G16），◇ 外部实现 = G1 G2 G3 G18b G19（仅备案）。与分层整改 §6.5 第 1–4 批重合，建议合并推进。
+- **交付差距整改已启动（2026-09-02 五续，解密后）**：◆ P0 中 **G16 / G12 / G5 / G6 已落地**——`fieldValue` 区分「键缺失回退 default」与「键为空串可清空」；新增 `collectSchemaFields(schema, data?)` 完整字段清单（含表格派生 `列key_行号` 与嵌套 Grid 字段）；新增 `parseTolerantFormSchemaV2` 容错解析（JSON/结构/校验 error 均不抛错，返回 `{schema,issues,ok}`，严格 `parseFormSchemaV2` 行为不变）；`normalizeNode` 未知类型放行 + `scanNode` 新增 `UNKNOWN_NODE_TYPE` 校验（严格解析仍抛错、容错解析收集后渲染端按未知类型跳过降级）。全量 vitest **165/165**、vue-tsc 干净。剩余 ◆ P0：G8（渲染组件独立入口）/ G11（只读与可编辑统一 DOM）/ G15（回写改 emit）。详见 `delivery-scenario-gap.md` §5。
 
 ### 0.4 最近执行记录
 
@@ -84,6 +85,7 @@
 | 2026-09-02 续 | P11 full 样例对齐设计器导出 JSON | `yunlv-second-ticket-full.ts` 由「1 外层 Grid + 7 段嵌套 inner」重写为**扁平 13 个独立段 grid**（与设计器导出 `ticket-schema-v2-1788315240965.json` 对齐：border 分布 all×3/outer×9/none×4，带 `columns`）；占位键改有意义（`字段`→`工作班成员人数`，表模板列 key 由渲染期派生 `工作地点_行号`/`工作内容_行号`）；连带 `YunlvSecondTicketFull.test.ts`（+4 例：边框分布断言 / 全字段可索引 / 内嵌表逐行键 / 段 grid id）+ `demoData.ts`（两套键并集，服务 P10 与 P11） | vue-tsc 干净；vitest 全量 **159/159** 通过（154 + 5），无回归 |
 | 2026-09-02 再续 | 字段键统一（前五行样例 → JSON 键） | 前五行样例表 `columns` `location`/`content` → `工作地点`/`工作内容`；同步 `P10Acceptance.test.ts`（`工作负责人_监护人`→`工作负责人（监护人）`、逐行 field 与填写态 data 键改为 `工作地点_*`/`工作内容_*`）、`demoData.ts`（收敛为单一 JSON 对齐键集、删旧键）、`FirstFiveRowsSnapshot` 快照 `-u` 重生成 | vue-tsc 干净；vitest 全量 **159/159** 通过（16 文件），无回归 |
 | 2026-09-02 四续 | 交付场景差距范围重聚焦（仅核对） | 据用户第 7 轮定稿澄清改 `delivery-scenario-gap.md`：链路重述为 `设计器导出JSON →(服务器透明存储·外部)→ 消费页引用渲染器+json+data → 打印`；新增 §0.1 范围澄清 + G1–G19 **◆本应用须补 / ◇外部实现** 标注；同步 `README.md` 索引与 §0.3 指针。无代码改动 | 无测试运行；文档已回写结论 |
+| 2026-09-02 五续 | 交付差距整改启动（解密后实际改码） | ◆ P0：G16 `fieldValue` 清空修复；G12 新增 `collectSchemaFields(schema,data?)`（含表格派生字段）；G5 新增 `parseTolerantFormSchemaV2` 容错解析；G6 `normalizeNode` 未知类型放行 + `scanNode` `UNKNOWN_NODE_TYPE` 校验（渲染端跳过降级）。配套单测：G16×1 / G12×3 / G5·G6×4。不动严格 `parseFormSchemaV2` | vitest 全量 **165/165**（原 159 + 新 8）、vue-tsc 干净；`DesignerApp.vue` 加密风险解除（工作区=HEAD） |
 
 | 2026-09-02 五续 | 拖拽重排已有节点（P9）收尾 + drop 回归修复 | 统一拖拽原语（格内排序/跨格移动/跨 Grid 合并为 moveNodeToIndexV2 单一路经）：GridSchemaNode.onNodeDragStart 加 stopPropagation() 修复 dragstart 冒泡致祖先覆盖 dataTransfer；两处递归 @node-drag-start emit 补 id:string 类型；FirstFiveRowsSnapshot 因设计态新增 draggable 与插入指示锚点 -u 重生成；旧的「上移/下移按钮 + 移动到目标格下拉」UI 已移除 | vue-tsc 干净；vitest 全量 **157/157**（16 文件）通过（+2 拖拽用例：跨格移动 + 同格重排），无回归 |
 
@@ -117,7 +119,7 @@
 | 打印方向选择 | ✅ 已去除，方向由纸张尺寸派生（A4 纵向 / A3 横向） |
 | Table 边框配置 | ✅ `border: all/outer/inner/none`，单边绘制不与外层 Grid 重复 |
 | 完整票快照基线 | ⏳ P11-2（可选；现有 `YunlvSecondTicketFull.test.ts` 已做结构校验） |
-| 推迟项（P7.2e 完整编辑 UI、P9.1c 专用控件、P9.2、P6.3 拖拽形式、P12 清理） | ⏳ P11-4，按用户优先级并入（P7.2d/P7.2f/P9.1d 已完成） |
+| 推迟项（P9.1c 专用控件、P9.2、P12 清理） | ⏳ P11-4，按用户优先级并入（P7.2e 完整编辑 UI 经用户澄清=设计器人工编排整票模板，已完成；P7.2d/P7.2f/P9.1d 已完成） |
 
 历史状态快照（2026-08-27/28 代码核对）与早期能力清单已移至 [archive/status-history.md](./archive/status-history.md)。
 

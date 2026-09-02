@@ -271,10 +271,19 @@ function onFillInput(field: string | undefined, event: Event): void {
   formFill(field, readEditableText(event.target as HTMLElement));
 }
 
-/** 字段展示值：优先 data 中的填写值，为空时回退到节点配置的默认内容（`default`）。 */
+/**
+ * 字段展示值：优先 data 中的填写值。
+ * - data 为 null/undefined（设计态）或 data 中**不存在该键**（未填写）→ 回退 `default`；
+ * - data 中**存在该键但为空串 `""`**（用户主动清空）→ 返回空串，**不回退 default**，
+ *   否则带默认值的字段将无法被清空（G16：清空 → 回写 "" → 回退 default → 又显示默认内容）。
+ * - data 中键值为 `null`（显式空）→ 视为未填写，回退 `default`。
+ */
 function fieldValue(node: PNodeV2): string {
-  const raw = props.data?.[node.field];
-  if (raw == null || raw === "") return node.default ?? "";
+  const data = props.data;
+  if (data == null) return node.default ?? "";
+  if (!(node.field in data)) return node.default ?? "";
+  const raw = data[node.field];
+  if (raw == null) return node.default ?? "";
   return String(raw);
 }
 

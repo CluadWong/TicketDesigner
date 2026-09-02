@@ -61,7 +61,10 @@ function normalizeNode(value: unknown): RecordValue {
   }
   if (node.type === "html") return { ...node, html: node.html ?? "" };
   if (node.type === "image") return { ...node, objectFit: node.objectFit ?? "contain" };
-  throw new SchemaV2SerializationError(`Unknown Schema node type: ${node.type}`);
+  // 未知节点类型：放行（不再整体 throw），保留原样交由校验标记为 UNKNOWN_NODE_TYPE；
+  // 严格解析（parseFormSchemaV2）仍会因该校验 error 抛错，容错解析（parseTolerantFormSchemaV2）
+  // 收集 issues 后返回 schema，渲染端对未知类型按 v-else-if 链跳过（G6 降级为占位/跳过）。
+  return { ...node };
 }
 
 function normalizeRow(value: unknown): RecordValue {
@@ -154,4 +157,65 @@ export function parseFormSchemaV2(input: string | unknown): FormSchemaV2 {
   const errors = issues.filter(issue => issue.level === "error");
   if (errors.length) throw new SchemaV2SerializationError("Schema V2 validation failed", errors);
   return schema;
+}
+
+/**
+ * 容错解析结果：渲染端 / 消费页使用。
+ * - `schema`：能还原出 schema 则为非 null（即便含 error，也已尽力归一化）；
+ * - `issues`：JSON 解析 / 结构 / 校验阶段收集的全部问题（含 error 与 warning）；
+ * - `ok`：是否至少成功还原出一份 schema（JSON 非法或结构不可用则为 false）。
+ */
+export interface ParseResultV2 {
+  schema: FormSchemaV2 | null;
+  issues: SchemaIssueV2[];
+  ok: boolean;
+}
+
+/**
+ * 容错解析（渲染端 / 消费页使用，对照严格的 `parseFormSchemaV2`）：
+ * JSON 解析失败、结构非法、或含校验 error 时**均不抛错**，而是返回 schema（能还原则非 null）
+ * 与收集到的 issues。坏节点（如未知类型，被校验标记为 `UNKNOWN_NODE_TYPE`）渲染端按未知类型跳过，
+ * 实现「局部降级」而非整张表单打不开——满足消费页容忍设计器导出小瑕疵 / 新版本模板的需求（G5）。
+ * 设计器保存 / 发布请继续使用严格的 `parseFormSchemaV2`（error 即抛）。
+ */
+export function parseTolerantFormSchemaV2(input: string | unknown): ParseResultV2 {
+  let value: unknown = input;
+  if (typeof input === "string") {
+    try {
+      value = JSON.parse(input) as unknown;
+    } catch (error) {
+      return {
+        schema: null,
+        issues: [
+          {
+            level: "error",
+            code: "INVALID_JSON",
+            message: `Invalid Schema JSON: ${error instanceof Error ? error.message : String(error)}`,
+          },
+        ],
+        ok: false,
+      };
+    }
+  }
+  let schema: FormSchemaV2;
+  try {
+    schema = normalizeFormSchemaV2(value);
+  } catch (error) {
+    if (error instanceof SchemaV2SerializationError) {
+      return { schema: null, issues: error.issues, ok: false };
+    }
+    return {
+      schema: null,
+      issues: [
+        {
+          level: "error",
+          code: "NORMALIZE_FAILED",
+          message: error instanceof Error ? error.message : String(error),
+        },
+      ],
+      ok: false,
+    };
+  }
+  const issues = validateFormSchemaV2(schema);
+  return { schema, issues, ok: true };
 }

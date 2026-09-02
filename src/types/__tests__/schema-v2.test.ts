@@ -5,6 +5,7 @@ import { validateFormSchemaV2 } from "@/types/schema-v2-validation";
 import {
   normalizeFormSchemaV2,
   parseFormSchemaV2,
+  parseTolerantFormSchemaV2,
   SchemaV2SerializationError,
   serializeFormSchemaV2,
 } from "@/types/schema-v2-serialization";
@@ -290,6 +291,39 @@ describe("Schema V2 serialization", () => {
     expect(() => serializeFormSchemaV2({ ...makeSchema(), baseRowHeight: 0 })).toThrow(SchemaV2SerializationError);
     expect(() => normalizeFormSchemaV2({ version: 2, pages: "invalid" })).toThrow(SchemaV2SerializationError);
     expect(() => parseFormSchemaV2({ ...makeSchema(), pages: [{ ...makeSchema().pages[0], children: [{ id: "unknown", type: "unknown" }] }] })).toThrow(SchemaV2SerializationError);
+  });
+
+  it("容错解析（G5/G6）：未知节点类型不抛错，返回 schema + UNKNOWN_NODE_TYPE issue", () => {
+    const result = parseTolerantFormSchemaV2({
+      ...makeSchema(),
+      pages: [{ ...makeSchema().pages[0], children: [{ id: "unknown", type: "unknown" } as never] }],
+    });
+    expect(result.ok).toBe(true);
+    expect(result.schema).not.toBeNull();
+    expect(result.schema!.pages[0].children.some(node => (node as { type?: string }).type === "unknown")).toBe(true);
+    expect(result.issues.some(issue => issue.code === "UNKNOWN_NODE_TYPE" && issue.level === "error")).toBe(true);
+  });
+
+  it("容错解析（G5）：非法 JSON 返回 ok=false + INVALID_JSON issue，schema 为 null", () => {
+    const result = parseTolerantFormSchemaV2("{ not valid json");
+    expect(result.ok).toBe(false);
+    expect(result.schema).toBeNull();
+    expect(result.issues.some(issue => issue.code === "INVALID_JSON")).toBe(true);
+  });
+
+  it("容错解析（G5）：结构非法（pages 非数组）返回 ok=false，不抛错", () => {
+    const result = parseTolerantFormSchemaV2({ version: 2, pages: "invalid" });
+    expect(result.ok).toBe(false);
+    expect(result.schema).toBeNull();
+  });
+
+  it("容错解析（G5）：含校验 warning 的合法 schema 仍返回 ok=true 且不抛错", () => {
+    const schema = makeSchema();
+    schema.pages[0].children.push({ id: "text-1", type: "text", text: "" } as never); // EMPTY_STATIC_TEXT warning
+    const result = parseTolerantFormSchemaV2(schema);
+    expect(result.ok).toBe(true);
+    expect(result.schema).not.toBeNull();
+    expect(result.issues.some(issue => issue.code === "EMPTY_STATIC_TEXT")).toBe(true);
   });
 
   it("serializes HTML and image nodes and never emits trusted/bindings flags", () => {

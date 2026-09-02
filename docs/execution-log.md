@@ -269,3 +269,26 @@
   7. **架构备注（A6 冲突，未改）**：`architecture-layering-review.md` §6 将「拖拽源/落点」归为**设计表面层**（建议 `CanvasSurface` 画布事件委托，`GridSchemaNode` 不加 `draggable`/`@dragstart`）。但本实现按用户「合并为统一拖拽、拖拽实现后移除旧按钮」决策，直接把拖拽源落在 `GridSchemaNode`、落点判定在 `DesignerApp`。功能已交付且绿灯；A6 表面层分化列为**推迟重构**，不在本轮范围。
   8. **清理核对**：旧的 `moveSelectedNode`/`moveSelectedNodeToTarget`/`moveTargetId`/`dropTargets`/`selectedPosition` 及 `data-move-target`/`node-move="` UI 符号已全部从 `DesignerApp.vue` 移除；`listDropTargetsV2` 定义保留（仍被 `schema-v2-operations.test.ts` 单元测试引用），仅移除其在设计器的使用；`moveNodeV2`/`moveNodeWithinParentV2` 定义保留（仍被单元测试引用），仅移除设计器 UI 引用。预览态 `previewMode` 与 `readonly`/`fillMode` 双重闸门禁用拖拽。
 
+
+
+- **本轮（2026-09-02 三续）P7.2e 状态澄清：完整编辑 UI = 已完成（用户确认）**：
+  1. **用户澄清**：P7.2e「完整编辑 UI」若指「通过人工方式（设计器 UI）实现符合参考图片结构的工作票模板」，则**已完成**——证据为设计器手动编排出整票并导出 `src/dev/ticket-schema-v2-1788315240965.json`，且 `yunlv-second-ticket-full.ts` 已与之同步（扁平 13 段 grid、字段键与设计器导出一致）。
+  2. **核查**：`yunlv-second-ticket-full.ts` 含导出 JSON 的全部特征字段（工作负责人（监护人）/ 电站设备 / 工作地点·工作内容 表列 / 安措备注 / 延期工作负责人签名日期 / 工作票终结日期 / 工作负责人签名-终结 等）与 13 个段 grid id，确认 .ts 与导出 JSON 对齐。
+  3. **文档动作**：`development-plan.md` 中 P7.2e 从「推迟项」移除并记为已完成——§0.1 下一步、§0.2 推迟列表、§0.1 P11-4 排期、§2.1 状态表四处同步；保留其对「设计器人工编排整票模板」的释义。当前剩余推迟项：P9.1c 专用控件、P9.2、P12 清理（P6.3b/c 拖拽已于 2026-09-02 五续以统一拖拽原语完成）。
+  4. **基线**：当前 `vitest` 全量 **157/157（16 文件）** 通过（与计划 §0 当前基线一致），`vue-tsc` 干净；本轮仅文档状态更新，无代码改动、未提交 git。
+
+---
+
+## 2026-09-02 六续 — 交付差距整改启动（DesignerApp.vue 解密后实际改码）
+
+- **前提**：用户确认 `DesignerApp.vue` 已解密（工作区 = `HEAD`，可编辑）；此前核对基于 `git HEAD` 版本 + 测试交叉验证，现已能直接读写。
+- **侦察发现**：解密后工作区 `DesignerApp.vue` 已含完整拖拽重排（P9）——`DRAG_MIME` / `onCanvasDragOver` / `computeInsertionIndex` / `onCanvasDrop → moveNodeToIndexV2` / `onCanvasNodeDragStart` 画布事件委托（行 518–732，模板 1470–1482），与 §6.5「拖拽走画布事件委托、不进渲染内核」一致。故本次「继续」的落点为定稿清单的 ◆ P0 整改，而非重做拖拽。
+- **实施（◆ P0 四项，全量 vitest 165/165、vue-tsc 干净）**：
+  1. **G16 空值/default 语义修复**：`renderer-v2/GridSchemaNode.vue` `fieldValue` 区分「data 中无该键（回退 default）」与「有键但为空串（返回空，可清空）」——修复带默认值字段无法清空。
+  2. **G12 完整字段清单**：`types/schema-v2-table-rows.ts` 新增 `collectSchemaFields(schema, data?)`，非表格走手写 field，表格按 `列key_行号` × `resolveTableRowCount` 枚举（含嵌套 Grid 内字段 P 派生），输出 `[{key,kind,tableField?,row?}]`；表格主体字段不再遗漏。
+  3. **G5 容错解析**：`types/schema-v2-serialization.ts` 新增 `parseTolerantFormSchemaV2`（JSON 非法 / 结构非法 / 含校验 error 均不抛错，返回 `{schema,issues,ok}`）；严格 `parseFormSchemaV2` 行为不变（消费页可容忍设计器瑕疵 / 新版本模板）。
+  4. **G6 未知类型降级**：`normalizeNode` 未知类型放行（不再整体 throw）；`schema-v2-validation.ts` `scanNode` 新增 `UNKNOWN_NODE_TYPE` error 分支（严格解析仍抛错、容错解析收集后降级）；渲染端对未知类型按 `v-else-if` 链跳过（局部降级，未加显式占位框）。
+- **测试新增**：`FieldPConfig.test.ts` G16×1、`schema-v2-table-rows.test.ts` G12×3、`schema-v2.test.ts` G5/G6×4（共 +8，基线 159→165）。
+- **同步文档**：`delivery-scenario-gap.md` 追加 §5 整改进度；`development-plan.md` §0.3 加密风险标记解除 + 整改启动指针、§0.4 补执行行；`README.md` 无需改。
+- **未提交 git**（沿用约定，未经允许不提交）。
+- **下一步 ◆ P0**：G8（渲染组件独立入口 `preview` + props 收敛 `schema/data/mode/options`）/ G11（只读与可编辑统一 DOM）/ G15（回写 `inject("formFill")` 改 `emit`）；其余 ◆ P1/P2/P3（G9/G10/G14/G4/G7/G13/G17/G18）按 §3 路径推进。G6 渲染端显式占位框可后续补。
