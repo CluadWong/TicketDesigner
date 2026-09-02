@@ -29,16 +29,13 @@ import {
   setGridColumnWidthV2,
   mergeGridCellsV2,
   splitGridCellV2,
-  moveNodeV2,
-  moveNodeWithinParentV2,
-  listDropTargetsV2,
+  moveNodeToIndexV2,
+  NODE_MOVE_MIME,
   updateGridBorderV2,
   updateTableBorderV2,
   updateGridCellDefaultsV2,
   updateSchemaNodeV2,
   updateTableMinRowsV2,
-  updateTableHeaderHeightV2,
-  updateTableRowHeightV2,
   addTableColumnV2,
   removeTableColumnV2,
   renameTableColumnKeyV2,
@@ -79,18 +76,32 @@ const issues = computed(() => validateFormSchemaV2(schema.value));
 const warningCount = computed(() => issues.value.length);
 const nodeIndex = computed(() => buildEditorNodeIndexV2(schema.value));
 // 单元格（grid-cell）作为「仅样式可编辑」实体可被选中，但不可删除、不进入节点树。
-function isStyleEditableNode(node: EditorNodeV2 | undefined): node is EditorNodeV2 {
-  return node !== undefined && (isSelectableSchemaNodeV2(node) || node.type === "grid-cell");
+/** 节点是否位于某个 Table 的行模板内（含嵌套 Grid）。表格内节点不可单独选中/配置，
+ *  其字段 P 由列配置派生，故选中时归到所属 Table。 */
+function isInsideTable(id: string): boolean {
+  let cursor = nodeIndex.value.get(id)?.parent ?? null;
+  while (cursor) {
+    if (cursor.type === "table") return true;
+    cursor = nodeIndex.value.get(cursor.id)?.parent ?? null;
+  }
+  return false;
+}
+
+/** 节点是否可作为独立组件选中并配置。Table 行模板内的节点（字段 P 等）不可选中。 */
+function isStyleEditableNodeId(id: string): boolean {
+  const node = nodeIndex.value.get(id)?.node;
+  if (!node) return false;
+  if (isInsideTable(id)) return false;
+  return isSelectableSchemaNodeV2(node) || node.type === "grid-cell";
 }
 const selectedNode = computed<EditorNodeV2 | null>(() => {
   const id = selectedNodeId.value;
-  const node = id ? nodeIndex.value.get(id)?.node : undefined;
-  return isStyleEditableNode(node) ? node : null;
+  return id && isStyleEditableNodeId(id) ? (nodeIndex.value.get(id)?.node ?? null) : null;
 });
 const selectedPath = computed<EditorNodeV2[]>(() => {
   return selectionPathIds.value
     .map((id) => nodeIndex.value.get(id)?.node)
-    .filter(isStyleEditableNode);
+    .filter((n): n is EditorNodeV2 => n != null && isStyleEditableNodeId(n.id));
 });
 const selectedNodeType = computed(() => selectedNode.value?.type ?? "未选择");
 const selectedOwnerCell = computed(() =>
@@ -100,7 +111,9 @@ const selectedOwnerCell = computed(() =>
 );
 // 选中单元格（grid-cell）时，取其所属 Grid 以计算生效值与「清除覆盖」。
 const selectedCell = computed(() =>
-  selectedNode.value?.type === "grid-cell" ? (selectedNode.value as GridCellV2) : null,
+  selectedNode.value?.type === "grid-cell"
+    ? (selectedNode.value as GridCellV2)
+    : null,
 );
 const selectedOwnerGridOfCell = computed<GridNodeV2 | null>(() => {
   const id = selectedNodeId.value;
@@ -127,12 +140,15 @@ const selectedCellContext = computed<{
   const id = selectedNodeId.value;
   if (!id) return null;
   const entry = nodeIndex.value.get(id);
-  if (entry?.node.type !== "grid-cell" || entry.parent?.type !== "grid-row") return null;
+  if (entry?.node.type !== "grid-cell" || entry.parent?.type !== "grid-row")
+    return null;
   const row = entry.parent as GridRowV2;
   const rowIndex = (nodeIndex.value.get(row.id)?.node as GridRowV2 | undefined)
-    ? (selectedOwnerGridOfCell.value?.rows ?? []).findIndex(r => r.id === row.id)
+    ? (selectedOwnerGridOfCell.value?.rows ?? []).findIndex(
+        (r) => r.id === row.id,
+      )
     : -1;
-  const columnIndex = row.cells.findIndex(cell => cell.id === id);
+  const columnIndex = row.cells.findIndex((cell) => cell.id === id);
   if (columnIndex < 0) return null;
   return {
     rowIndex,
@@ -141,48 +157,9 @@ const selectedCellContext = computed<{
     canSplit: (entry.node.colspan ?? 1) > 1,
   };
 });
-/** 选中节点是否位于某个 Table 的行模板内（行模板内可用 `{row}` 行号占位符）。 */
-const selectedInTableRowTemplate = computed(() => {
-  const id = selectedNodeId.value;
-  if (!id) return false;
-  let cursor = nodeIndex.value.get(id)?.parent ?? null;
-  while (cursor) {
-    if (cursor.type === "table") return true;
-    cursor = nodeIndex.value.get(cursor.id)?.parent ?? null;
-  }
-  return false;
-});
-/** 选中组件在父容器（格 / 行模板 / 页）中的位置，用于「格内排序」（P6.3b）。 */
-const selectedPosition = computed<{ canMoveUp: boolean; canMoveDown: boolean } | null>(() => {
-  const id = selectedNodeId.value;
-  if (!id) return null;
-  const parent = nodeIndex.value.get(id)?.parent;
-  if (!parent) return null;
-  const children =
-    parent.type === "grid-cell" || parent.type === "table-cell-template" || parent.type === "page"
-      ? parent.children
-      : null;
-  if (!children) return null;
-  const at = children.findIndex(child => child.id === id);
-  if (at < 0) return null;
-  return { canMoveUp: at > 0, canMoveDown: at < children.length - 1 };
-});
-/**
- * 跨格移动（P6.3c）的目标投放点与当前选择。
- * 目标列表排除「选中节点当前所在格」与「其自身后代容器」——选自身格不产生位移，
- * 却会把节点拆下再追加到同格末尾，反复操作会在原格堆积空位。
- */
-const dropTargets = computed(() =>
-  listDropTargetsV2(schema.value, selectedNodeId.value ?? undefined),
-);
-const moveTargetId = ref("");
-// 切换选中节点后清空目标，避免沿用上一个节点的目标格。
-watch(
-  () => selectedNodeId.value,
-  () => {
-    moveTargetId.value = "";
-  },
-);
+// 选中组件位置信息现由拖拽重排（P9）在 drop 时通过 moveNodeToIndexV2 处理，不再维护 canMoveUp/Down 计算。
+// 拖拽重排（P9）：跨格 / 跨 Grid 移动的目标投放点由 onCanvasNodeDragStart 在拖拽起始时
+// 计算（legalDropCellIds），不再维护独立下拉列表；同格重排也允许（仅排除自身后代容器）。
 
 const insertionSlot = computed(() => {
   const slotId = selectedInsertionSlotId.value;
@@ -197,23 +174,34 @@ function selectableChildrenOf(node: EditorNodeV2): EditorNodeV2[] {
   if (node.type === "page") return node.children;
   if (node.type === "grid") {
     const out: EditorNodeV2[] = [];
-    for (const row of node.rows) for (const cell of row.cells) out.push(...cell.children);
+    for (const row of node.rows)
+      for (const cell of row.cells) out.push(...cell.children);
     return out;
   }
-  if (node.type === "table") return node.rowTemplate.flatMap(template => template.children);
+  if (node.type === "table")
+    // 表格内字段 P 由列配置派生、不可作为独立组件选中/配置，故结构树不展开其子节点。
+    return [];
   return [];
 }
 
 function nodeLabel(node: EditorNodeV2): string {
   switch (node.type) {
-    case "page": return "页面";
-    case "grid": return node.id;
-    case "text": return node.text ? `“${node.text}”` : "(空文本)";
-    case "p": return `字段:${node.field}`;
-    case "table": return node.field ? `表格:${node.field}` : "表格";
-    case "image": return "图片";
-    case "html": return "HTML 模块";
-    default: return node.type;
+    case "page":
+      return "页面";
+    case "grid":
+      return node.id;
+    case "text":
+      return node.text ? `“${node.text}”` : "(空文本)";
+    case "p":
+      return `字段:${node.field}`;
+    case "table":
+      return node.field ? `表格:${node.field}` : "表格";
+    case "image":
+      return "图片";
+    case "html":
+      return "HTML 模块";
+    default:
+      return node.type;
   }
 }
 
@@ -226,7 +214,9 @@ function buildTreeNode(node: EditorNodeV2): TreeNode {
   };
 }
 
-const nodeTree = computed(() => schema.value.pages.map(page => buildTreeNode(page)));
+const nodeTree = computed(() =>
+  schema.value.pages.map((page) => buildTreeNode(page)),
+);
 
 const STORAGE_KEY = "ticket-designer-schema-v2";
 const MAX_HISTORY = 100;
@@ -255,7 +245,8 @@ const previewData = computed<FormDataV2 | null>(() => previewFormData.value);
  * 响应式 previewFormData，从而满足 P9.1b「数据回写正确」。设计态与只读预览态不调用。
  */
 provide("formFill", (field: string, value: string) => {
-  if (previewFormData.value && !readonlyMode.value) previewFormData.value[field] = value;
+  if (previewFormData.value && !readonlyMode.value)
+    previewFormData.value[field] = value;
 });
 
 /** 在「设计 / 预览 / 填充」之间切换；再次点击同一模式则回到设计态。 */
@@ -525,6 +516,11 @@ function addNodeToSelectedCell(
 
 // ── 拖拽生成：从模板拖到画布指定格 ──
 const DRAG_MIME = "application/x-ticket-node-kind";
+/** 拖拽重排（P9）：当前被拖拽的已有节点 id 与合法投放格集合。 */
+const draggedNodeId = ref<string | null>(null);
+const dragOverCellId = ref<string | null>(null);
+const dragOverIndex = ref<number>(-1);
+const legalDropCellIds = ref<Set<string>>(new Set());
 let dragTargetEl: HTMLElement | null = null;
 
 function setDropHighlight(cell: HTMLElement | null): void {
@@ -556,39 +552,103 @@ function startPaletteDrag(
 function onCanvasDragOver(event: DragEvent): void {
   const dt = event.dataTransfer;
   if (!dt) return;
-  if (previewMode.value || !Array.from(dt.types).includes(DRAG_MIME)) return;
-  event.preventDefault();
-  const cell = (event.target as HTMLElement).closest<HTMLElement>("[data-layout-id]");
-  setDropHighlight(cell ?? null);
+  const hasPalette = Array.from(dt.types).includes(DRAG_MIME);
+  const hasMove = Array.from(dt.types).includes(NODE_MOVE_MIME);
+  if (previewMode.value || (!hasPalette && !hasMove)) return;
+  if (hasPalette) {
+    event.preventDefault();
+    const cell = (event.target as HTMLElement).closest<HTMLElement>(
+      "[data-layout-id]",
+    );
+    setDropHighlight(cell ?? null);
+    dragOverCellId.value = null;
+    dragOverIndex.value = -1;
+    return;
+  }
+  // 已有节点拖拽重排：仅在合法投放格上允许投放，并显示插入指示线。
+  setDropHighlight(null);
+  const cell = (event.target as HTMLElement).closest<HTMLElement>(
+    "[data-layout-id]",
+  );
+  const cellId = cell?.dataset.layoutId ?? null;
+  if (cell && cellId && legalDropCellIds.value.has(cellId)) {
+    event.preventDefault();
+    dragOverCellId.value = cellId;
+    dragOverIndex.value = computeInsertionIndex(cell, event.clientY);
+  } else {
+    dragOverCellId.value = null;
+    dragOverIndex.value = -1;
+  }
+}
+
+/** 按指针 Y 计算在目标格 children 中的插入下标：取第一个「中点低于指针」的子节点下标；
+ *  若全部在中点之上，则追加到末尾（children.length）。 */
+function computeInsertionIndex(cellEl: HTMLElement, clientY: number): number {
+  const childEls = Array.from(cellEl.children).filter(
+    (el): el is HTMLElement => el instanceof HTMLElement && el.hasAttribute("data-node-id"),
+  );
+  for (let i = 0; i < childEls.length; i += 1) {
+    const rect = childEls[i].getBoundingClientRect();
+    if (clientY < rect.top + rect.height / 2) return i;
+  }
+  return childEls.length;
 }
 
 function onCanvasDragLeave(event: DragEvent): void {
   const related = event.relatedTarget as HTMLElement | null;
   if (!related || !related.closest("[data-layout-id]")) {
     clearDropHighlight();
+    dragOverCellId.value = null;
+    dragOverIndex.value = -1;
   }
 }
 
 function onCanvasDrop(event: DragEvent): void {
   if (previewMode.value) return;
-  const kind = (event.dataTransfer?.getData(DRAG_MIME) ?? "") as
+  const dt = event.dataTransfer;
+  if (!dt) return;
+  clearDropHighlight();
+  event.preventDefault();
+  const kind = (dt.getData(DRAG_MIME) ?? "") as
     | "text"
     | "field"
     | "table"
     | "html"
     | "image"
     | "grid";
-  clearDropHighlight();
-  if (!kind) return;
-  event.preventDefault();
-  const cell = (event.target as HTMLElement).closest<HTMLElement>("[data-layout-id]");
-  const cellId = cell?.dataset.layoutId;
-  if (!cellId) return;
-  const slot = nodeIndex.value.get(cellId)?.node;
-  if (!slot || (slot.type !== "grid-cell" && slot.type !== "table-cell-template")) return;
-  const child = createNodeByKind(kind);
-  commit(appendNodeToCellV2(schema.value, cellId, child));
-  selectedNodeId.value = child.id;
+  if (kind) {
+    // 模板拖拽生成新节点（既有逻辑）
+    const cell = (event.target as HTMLElement).closest<HTMLElement>(
+      "[data-layout-id]",
+    );
+    const cellId = cell?.dataset.layoutId;
+    if (!cellId) return;
+    const slot = nodeIndex.value.get(cellId)?.node;
+    if (
+      !slot ||
+      (slot.type !== "grid-cell" && slot.type !== "table-cell-template")
+    )
+      return;
+    const child = createNodeByKind(kind);
+    commit(appendNodeToCellV2(schema.value, cellId, child));
+    selectedNodeId.value = child.id;
+    return;
+  }
+  // 已有节点拖拽重排（P9）：跨格 / 跨 Grid / 格内排序统一走 moveNodeToIndexV2
+  const moveId = dt.getData(NODE_MOVE_MIME) ?? "";
+  const cellId = dragOverCellId.value;
+  const idx = dragOverIndex.value;
+  const legal = legalDropCellIds.value;
+  dragOverCellId.value = null;
+  dragOverIndex.value = -1;
+  draggedNodeId.value = null;
+  legalDropCellIds.value = new Set();
+  if (!moveId || !cellId || idx < 0) return;
+  if (!legal.has(cellId)) return;
+  const next = moveNodeToIndexV2(schema.value, moveId, cellId, idx);
+  if (next === schema.value) return; // 原位 / 非法：不产生新结构
+  commit(next, "move:" + moveId);
+  selectedNodeId.value = moveId;
 }
 
 function removeSelectedNode(): void {
@@ -607,7 +667,7 @@ function mergeSelectedCellRight(): void {
   const id = selectedNodeId.value;
   const ctx = selectedCellContext.value;
   if (!id || !ctx || !ctx.hasNextSibling) return;
-  const row = (nodeIndex.value.get(id)?.parent as GridRowV2 | undefined);
+  const row = nodeIndex.value.get(id)?.parent as GridRowV2 | undefined;
   if (!row) return;
   const rightId = row.cells[ctx.columnIndex + 1].id;
   commit(mergeGridCellsV2(schema.value, id, rightId), `merge:${id}`);
@@ -624,22 +684,53 @@ function splitSelectedCell(): void {
 
 // ── 格内排序 / 跨格移动（P6.3b / P6.3c）──
 // UI 拖拽推迟；此处用「配置面板按钮 + 目标下拉」替代，底层结构纯函数与拖拽版一致。
-function moveSelectedNode(direction: "up" | "down"): void {
-  const id = selectedNodeId.value;
-  if (!id) return;
-  commit(moveNodeWithinParentV2(schema.value, id, direction), `reorder:${id}`);
+// ── 拖拽重排已有节点（P9）──
+// 取代旧的「上/下排序按钮 + 移动到目标格下拉」：选中即同步到拖拽源，
+// 跨格 / 跨 Grid / 格内排序统一由 moveNodeToIndexV2 在 drop 时提交。
+function onCanvasNodeDragStart(id: string): void {
+  if (previewMode.value) return;
+  draggedNodeId.value = id;
   selectedNodeId.value = id;
+  // 合法投放格：排除被移动节点自身及其后代容器（含嵌套 Grid / Table 内部格），
+  // 但允许其「当前所在格」（用于格内排序）。语义与旧 listDropTargetsV2 一致。
+  const index = buildEditorNodeIndexV2(schema.value);
+  const legal: string[] = [];
+  const isDescendantOfDragged = (cellId: string): boolean => {
+    let cursor: string | undefined = cellId;
+    while (cursor) {
+      if (cursor === id) return true;
+      cursor = index.get(cursor)?.parent?.id;
+    }
+    return false;
+  };
+  schema.value.pages.forEach((page) => {
+    const walk = (children: FormNodeV2[]): void => {
+      children.forEach((child) => {
+        if (child.type === "grid") {
+          child.rows.forEach((row) =>
+            row.cells.forEach((cell) => {
+              if (!isDescendantOfDragged(cell.id)) legal.push(cell.id);
+              walk(cell.children);
+            }),
+          );
+        } else if (child.type === "table") {
+          child.rowTemplate.forEach((tpl) => {
+            if (!isDescendantOfDragged(tpl.id)) legal.push(tpl.id);
+          });
+        }
+      });
+    };
+    walk(page.children);
+  });
+  legalDropCellIds.value = new Set(legal);
 }
 
-function moveSelectedNodeToTarget(): void {
-  const id = selectedNodeId.value;
-  const target = moveTargetId.value;
-  if (!id || !target) return;
-  const next = moveNodeV2(schema.value, id, target);
-  // 目标非法（移入自身后代）或与当前位置相同（自身所在格）时 moveNodeV2 原样返回。
-  if (next === schema.value) return;
-  commit(next, `move:${id}`);
-  selectedNodeId.value = id;
+function onCanvasDragEnd(): void {
+  draggedNodeId.value = null;
+  legalDropCellIds.value = new Set();
+  dragOverCellId.value = null;
+  dragOverIndex.value = -1;
+  clearDropHighlight();
 }
 
 function selectNode(event: MouseEvent): void {
@@ -656,7 +747,7 @@ function selectNode(event: MouseEvent): void {
       cursor.parentElement?.closest<HTMLElement>("[data-node-id]") ?? null;
   }
   const selectableIds = ids.filter((id) => {
-    return isStyleEditableNode(nodeIndex.value.get(id)?.node);
+    return isStyleEditableNodeId(id);
   });
   const leafId = selectableIds[0] ?? null;
   if (!leafId) {
@@ -781,6 +872,39 @@ function updateSelectedSuffix(event: Event): void {
   );
 }
 
+function updateSelectedWidth(event: Event): void {
+  const value = (event.target as HTMLInputElement).value;
+  updateSelectedNode(
+    (node) =>
+      node.type === "p" && node.mode === "field"
+        ? { ...node, width: value.trim() || undefined }
+        : node,
+    selectedNodeId.value ? `edit:${selectedNodeId.value}` : undefined,
+  );
+}
+
+function updateSelectedDefault(event: Event): void {
+  const value = (event.target as HTMLTextAreaElement).value;
+  updateSelectedNode(
+    (node) =>
+      node.type === "p" && node.mode === "field"
+        ? { ...node, default: value || undefined }
+        : node,
+    selectedNodeId.value ? `edit:${selectedNodeId.value}` : undefined,
+  );
+}
+
+function updateSelectedInnerBorder(event: Event): void {
+  const checked = (event.target as HTMLInputElement).checked;
+  updateSelectedNode(
+    (node) =>
+      node.type === "p" && node.mode === "field"
+        ? { ...node, innerBorder: checked || undefined }
+        : node,
+    selectedNodeId.value ? `edit:${selectedNodeId.value}` : undefined,
+  );
+}
+
 function updateGridBorder(event: Event): void {
   if (selectedNode.value?.type !== "grid") return;
   commit(
@@ -822,28 +946,6 @@ function updateTableRows(event: Event): void {
   if (selectedNode.value?.type !== "table") return;
   commit(
     updateTableMinRowsV2(
-      schema.value,
-      selectedNode.value.id,
-      Number((event.target as HTMLInputElement).value),
-    ),
-  );
-}
-
-function updateTableHeaderHeight(event: Event): void {
-  if (selectedNode.value?.type !== "table") return;
-  commit(
-    updateTableHeaderHeightV2(
-      schema.value,
-      selectedNode.value.id,
-      Number((event.target as HTMLInputElement).value),
-    ),
-  );
-}
-
-function updateTableRowHeight(event: Event): void {
-  if (selectedNode.value?.type !== "table") return;
-  commit(
-    updateTableRowHeightV2(
       schema.value,
       selectedNode.value.id,
       Number((event.target as HTMLInputElement).value),
@@ -910,7 +1012,10 @@ function updateGridColumnWidth(columnIndex: number, event: Event): void {
 
 // ── 单元格（grid-cell）样式：仅覆盖，可清除回归 Grid 默认 ──
 function updateSelectedCellPadding(event: Event): void {
-  const value = Math.max(0, Number((event.target as HTMLInputElement).value) || 0);
+  const value = Math.max(
+    0,
+    Number((event.target as HTMLInputElement).value) || 0,
+  );
   updateSelectedNode(
     (node) => (node.type === "grid-cell" ? { ...node, padding: value } : node),
     selectedNodeId.value ? `cellpad:${selectedNodeId.value}` : undefined,
@@ -933,9 +1038,22 @@ function updateSelectedCellVerticalAlign(event: Event): void {
   updateSelectedNode(
     (node) =>
       node.type === "grid-cell"
-        ? { ...node, verticalAlign: (raw || undefined) as GridCellV2["verticalAlign"] }
+        ? {
+            ...node,
+            verticalAlign: (raw || undefined) as GridCellV2["verticalAlign"],
+          }
         : node,
     selectedNodeId.value ? `cellvalign:${selectedNodeId.value}` : undefined,
+  );
+}
+
+function updateSelectedCellRowHeight(event: Event): void {
+  const raw = (event.target as HTMLInputElement).value;
+  const value = raw === "" ? undefined : Math.max(0, Math.floor(Number(raw)));
+  updateSelectedNode(
+    (node) =>
+      node.type === "grid-cell" ? { ...node, rowHeight: value } : node,
+    selectedNodeId.value ? `cellrowh:${selectedNodeId.value}` : undefined,
   );
 }
 
@@ -943,7 +1061,13 @@ function clearCellOverride(): void {
   updateSelectedNode(
     (node) =>
       node.type === "grid-cell"
-        ? { ...node, padding: undefined, align: undefined, verticalAlign: undefined }
+        ? {
+            ...node,
+            padding: undefined,
+            align: undefined,
+            verticalAlign: undefined,
+            rowHeight: undefined,
+          }
         : node,
     selectedNodeId.value ? `cellclear:${selectedNodeId.value}` : undefined,
   );
@@ -1135,12 +1259,14 @@ function updateSelectedSafetyField(event: Event): void {
       const params: Record<string, string> = { ...(node.actionParams ?? {}) };
       if (raw) params.matchField = raw;
       else delete params.matchField;
-      return { ...node, actionParams: Object.keys(params).length ? params : undefined };
+      return {
+        ...node,
+        actionParams: Object.keys(params).length ? params : undefined,
+      };
     },
     selectedNodeId.value ? `actionParams:${selectedNodeId.value}` : undefined,
   );
 }
-
 </script>
 
 <template>
@@ -1341,15 +1467,19 @@ function updateSelectedSafetyField(event: Event): void {
         class="v2-canvas"
         :class="{ 'v2-canvas--preview': previewMode }"
         @click="selectNode"
-        @dragover.prevent="onCanvasDragOver"
+        @dragover="onCanvasDragOver"
         @dragleave="onCanvasDragLeave"
         @drop="onCanvasDrop"
+        @dragend="onCanvasDragEnd"
       >
         <GridSchemaRenderer
           :schema="schema"
           :selected-node-id="previewMode ? null : selectedNodeId"
           :data="previewData"
           :readonly="readonlyMode"
+          :drag-over-cell-id="dragOverCellId"
+          :drag-over-index="dragOverIndex"
+          @node-drag-start="onCanvasNodeDragStart"
         />
       </main>
 
@@ -1361,7 +1491,11 @@ function updateSelectedSafetyField(event: Event): void {
           <button
             class="v2-inspector__delete"
             type="button"
-            :disabled="!selectedNodeId || selectedNode?.type === 'page' || selectedNode?.type === 'grid-cell'"
+            :disabled="
+              !selectedNodeId ||
+              selectedNode?.type === 'page' ||
+              selectedNode?.type === 'grid-cell'
+            "
             @click="removeSelectedNode"
           >
             删除
@@ -1393,53 +1527,14 @@ function updateSelectedSafetyField(event: Event): void {
           <span>Schema 版本</span>
           <strong>{{ schema.version }}</strong>
         </div>
-        <template v-if="selectedPosition">
-          <div class="v2-sidebar__subheading">位置（格内排序 / 跨格移动）</div>
-          <div class="v2-toolbar v2-toolbar--row">
-            <button
-              class="v2-toolbar__button"
-              type="button"
-              data-node-move="up"
-              :disabled="!selectedPosition.canMoveUp"
-              @click="moveSelectedNode('up')"
-            >
-              上移
-            </button>
-            <button
-              class="v2-toolbar__button"
-              type="button"
-              data-node-move="down"
-              :disabled="!selectedPosition.canMoveDown"
-              @click="moveSelectedNode('down')"
-            >
-              下移
-            </button>
+        <template
+          v-if="selectedNode && selectedNode.type !== 'page' && selectedNode.type !== 'grid-cell'"
+        >
+          <div class="v2-sidebar__subheading">位置（拖拽重排）</div>
+          <div class="v2-inspector-row v2-inspector-row--hint">
+            在设计画布中拖拽节点即可重排：同格内拖动调整顺序；拖到其它格 / 嵌套 Grid 即跨格移动。整段可编辑字段请按住
+            Alt 再拖拽。
           </div>
-          <label class="v2-control">
-            <span>移动到其它格</span>
-            <select
-              v-model="moveTargetId"
-              data-move-target="true"
-            >
-              <option value="">选择目标…</option>
-              <option
-                v-for="target in dropTargets"
-                :key="target.id"
-                :value="target.id"
-              >
-                {{ target.label }}
-              </option>
-            </select>
-          </label>
-          <button
-            class="v2-toolbar__button"
-            type="button"
-            data-node-move="target"
-            :disabled="!moveTargetId"
-            @click="moveSelectedNodeToTarget"
-          >
-            移动到此格
-          </button>
         </template>
         <template v-if="selectedNode?.type === 'grid'">
           <div class="v2-grid-dimensions">
@@ -1476,58 +1571,62 @@ function updateSelectedSafetyField(event: Event): void {
             </select>
           </label>
           <div class="v2-sidebar__subheading">列宽（mm / fr / auto）</div>
-          <label
-            v-for="(cell, columnIndex) in selectedNode.rows[0].cells"
-            :key="columnIndex"
-            class="v2-control v2-control--inline"
-          >
-            <span>第 {{ columnIndex + 1 }} 列</span>
-            <input
-              :value="selectedNode.columns?.[columnIndex] ?? cell.width ?? 24"
-              @change="updateGridColumnWidth(columnIndex, $event)"
-            />
-          </label>
+          <div class="v2-grid-dimensions">
+            <label
+              v-for="(cell, columnIndex) in selectedNode.rows[0].cells"
+              :key="columnIndex"
+              class="v2-control v2-control--inline"
+            >
+              <span>第 {{ columnIndex + 1 }} 列</span>
+              <input
+                :value="selectedNode.columns?.[columnIndex] ?? cell.width ?? 24"
+                @change="updateGridColumnWidth(columnIndex, $event)"
+              />
+            </label>
+          </div>
           <div class="v2-sidebar__subheading">单元格默认（padding / 对齐）</div>
-          <label class="v2-control v2-control--inline">
-            <span>默认内边距(mm)</span>
-            <input
-              type="number"
-              min="0"
-              step="1"
-              data-cell-default="padding"
-              :value="selectedNode.cellPadding ?? ''"
-              @change="updateGridCellDefault('cellPadding', $event)"
-            />
-          </label>
-          <label class="v2-control v2-control--inline">
-            <span>默认水平对齐</span>
-            <select
-              data-cell-default="align"
-              :value="selectedNode.cellAlign ?? ''"
-              @change="updateGridCellDefault('cellAlign', $event)"
-            >
-              <option value="">左（默认）</option>
-              <option value="left">左</option>
-              <option value="center">居中</option>
-              <option value="right">右</option>
-            </select>
-          </label>
-          <label class="v2-control v2-control--inline">
-            <span>默认垂直对齐</span>
-            <select
-              data-cell-default="valign"
-              :value="selectedNode.cellVerticalAlign ?? ''"
-              @change="updateGridCellDefault('cellVerticalAlign', $event)"
-            >
-              <option value="">居中（默认）</option>
-              <option value="top">顶部</option>
-              <option value="middle">居中</option>
-              <option value="bottom">底部</option>
-            </select>
-          </label>
+          <div class="v2-grid-dimensions">
+            <label class="v2-control v2-control--inline">
+              <span>默认内边距(mm)</span>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                data-cell-default="padding"
+                :value="selectedNode.cellPadding ?? ''"
+                @change="updateGridCellDefault('cellPadding', $event)"
+              />
+            </label>
+            <label class="v2-control v2-control--inline">
+              <span>默认水平对齐</span>
+              <select
+                data-cell-default="align"
+                :value="selectedNode.cellAlign ?? ''"
+                @change="updateGridCellDefault('cellAlign', $event)"
+              >
+                <option value="">左（默认）</option>
+                <option value="left">左</option>
+                <option value="center">居中</option>
+                <option value="right">右</option>
+              </select>
+            </label>
+            <label class="v2-control v2-control--inline v2-control--full">
+              <span>默认垂直对齐</span>
+              <select
+                data-cell-default="valign"
+                :value="selectedNode.cellVerticalAlign ?? ''"
+                @change="updateGridCellDefault('cellVerticalAlign', $event)"
+              >
+                <option value="">居中（默认）</option>
+                <option value="top">顶部</option>
+                <option value="middle">居中</option>
+                <option value="bottom">底部</option>
+              </select>
+            </label>
+          </div>
         </template>
         <template v-else-if="selectedNode?.type === 'text'">
-          <label class="v2-control">
+          <label class="v2-control v2-control--full">
             <span>文本内容</span>
             <textarea
               class="v2-textarea"
@@ -1577,35 +1676,37 @@ function updateSelectedSafetyField(event: Event): void {
               />
             </label>
           </div>
-          <label class="v2-control">
-            <span>水平对齐</span>
-            <select
-              :value="selectedNode.style?.align ?? 'left'"
-              @change="updateSelectedAlign"
-            >
-              <option value="left">左</option>
-              <option value="center">居中</option>
-              <option value="right">右</option>
-            </select>
-          </label>
-          <label class="v2-control">
-            <span>垂直对齐</span>
-            <select
-              :value="selectedNode.style?.verticalAlign ?? 'middle'"
-              @change="updateSelectedVerticalAlign"
-            >
-              <option value="top">顶部</option>
-              <option value="middle">居中</option>
-              <option value="bottom">底部</option>
-            </select>
-          </label>
-          <label class="v2-control">
-            <span>字体</span>
-            <input
-              :value="selectedNode.style?.fontFamily ?? ''"
-              @input="updateSelectedFontFamily"
-            />
-          </label>
+          <div class="v2-grid-dimensions">
+            <label class="v2-control">
+              <span>水平对齐</span>
+              <select
+                :value="selectedNode.style?.align ?? 'left'"
+                @change="updateSelectedAlign"
+              >
+                <option value="left">左</option>
+                <option value="center">居中</option>
+                <option value="right">右</option>
+              </select>
+            </label>
+            <label class="v2-control">
+              <span>垂直对齐</span>
+              <select
+                :value="selectedNode.style?.verticalAlign ?? 'middle'"
+                @change="updateSelectedVerticalAlign"
+              >
+                <option value="top">顶部</option>
+                <option value="middle">居中</option>
+                <option value="bottom">底部</option>
+              </select>
+            </label>
+            <label class="v2-control v2-control--full">
+              <span>字体</span>
+              <input
+                :value="selectedNode.style?.fontFamily ?? ''"
+                @input="updateSelectedFontFamily"
+              />
+            </label>
+          </div>
         </template>
 
         <template v-else-if="selectedNode?.type === 'p'">
@@ -1613,24 +1714,22 @@ function updateSelectedSafetyField(event: Event): void {
             <span>字段名</span>
             <input :value="selectedNode.field" @input="updateSelectedField" />
           </label>
-          <p v-if="selectedInTableRowTemplate" class="v2-hint">
-            表格行模板：<code>{row}</code> 会替换为行号，如
-            <code>工作任务_{row}_1</code> 在第 2 行绑定为 <code>工作任务_2_1</code>。
-          </p>
-          <label class="v2-control">
-            <span>前标签（可选）</span>
-            <input
-              :value="selectedNode.prefix ?? ''"
-              @input="updateSelectedPrefix"
-            />
-          </label>
-          <label class="v2-control">
-            <span>后标签（可选）</span>
-            <input
-              :value="selectedNode.suffix ?? ''"
-              @input="updateSelectedSuffix"
-            />
-          </label>
+          <div class="v2-grid-dimensions">
+            <label class="v2-control">
+              <span>前标签（可选）</span>
+              <input
+                :value="selectedNode.prefix ?? ''"
+                @input="updateSelectedPrefix"
+              />
+            </label>
+            <label class="v2-control">
+              <span>后标签（可选）</span>
+              <input
+                :value="selectedNode.suffix ?? ''"
+                @input="updateSelectedSuffix"
+              />
+            </label>
+          </div>
           <label class="v2-control">
             <span>外部组件（action）</span>
             <select
@@ -1644,7 +1743,10 @@ function updateSelectedSafetyField(event: Event): void {
               <option value="safetyGraphic">图形安措</option>
             </select>
           </label>
-          <label v-if="selectedNode.action === 'safetyGraphic'" class="v2-control">
+          <label
+            v-if="selectedNode.action === 'safetyGraphic'"
+            class="v2-control"
+          >
             <span>安措匹配字段</span>
             <input
               type="text"
@@ -1693,39 +1795,71 @@ function updateSelectedSafetyField(event: Event): void {
               />
             </label>
           </div>
-          <label class="v2-control">
-            <span>水平对齐</span>
-            <select
-              :value="selectedNode.style?.align ?? 'left'"
-              @change="updateSelectedAlign"
-            >
-              <option value="left">左</option>
-              <option value="center">居中</option>
-              <option value="right">右</option>
-            </select>
+          <div class="v2-grid-dimensions">
+            <label class="v2-control">
+              <span>水平对齐</span>
+              <select
+                :value="selectedNode.style?.align ?? 'left'"
+                @change="updateSelectedAlign"
+              >
+                <option value="left">左</option>
+                <option value="center">居中</option>
+                <option value="right">右</option>
+              </select>
+            </label>
+            <label class="v2-control">
+              <span>垂直对齐</span>
+              <select
+                :value="selectedNode.style?.verticalAlign ?? 'middle'"
+                @change="updateSelectedVerticalAlign"
+              >
+                <option value="top">顶部</option>
+                <option value="middle">居中</option>
+                <option value="bottom">底部</option>
+              </select>
+            </label>
+            <label class="v2-control v2-control--full">
+              <span>字体</span>
+              <input
+                :value="selectedNode.style?.fontFamily ?? ''"
+                @input="updateSelectedFontFamily"
+              />
+            </label>
+          </div>
+          <label class="v2-control v2-control--full">
+            <span>默认内容</span>
+            <textarea
+              class="v2-textarea"
+              rows="3"
+              data-field-default="true"
+              :value="selectedNode.default ?? ''"
+              @input="updateSelectedDefault"
+            ></textarea>
           </label>
-          <label class="v2-control">
-            <span>垂直对齐</span>
-            <select
-              :value="selectedNode.style?.verticalAlign ?? 'middle'"
-              @change="updateSelectedVerticalAlign"
-            >
-              <option value="top">顶部</option>
-              <option value="middle">居中</option>
-              <option value="bottom">底部</option>
-            </select>
-          </label>
-          <label class="v2-control">
-            <span>字体</span>
-            <input
-              :value="selectedNode.style?.fontFamily ?? ''"
-              @input="updateSelectedFontFamily"
-            />
-          </label>
+          <div class="v2-grid-dimensions">
+            <label class="v2-control">
+              <span>输入区宽度（mm / 1px / %）</span>
+              <input
+                data-field-width="true"
+                :value="selectedNode.width ?? ''"
+                @input="updateSelectedWidth"
+              />
+            </label>
+            <label class="v2-control">
+              <span>内部边框</span>
+              <input
+                type="checkbox"
+                data-field-inner-border="true"
+                :checked="selectedNode.innerBorder ?? false"
+                @change="updateSelectedInnerBorder"
+              />
+            </label>
+          </div>
         </template>
         <template v-else-if="selectedNode?.type === 'grid-cell'">
           <p class="v2-sidebar__hint">
-            单元格仅可设置内边距与对齐；删除已禁用，请删除所在 Grid 或先清空内容。
+            单元格仅可设置内边距与对齐；删除已禁用，请删除所在 Grid
+            或先清空内容。
           </p>
           <div class="v2-sidebar__subheading">合并 / 拆分</div>
           <div class="v2-toolbar v2-toolbar--row">
@@ -1748,46 +1882,79 @@ function updateSelectedSafetyField(event: Event): void {
               拆分此格（colspan {{ selectedNode.colspan ?? 1 }}）
             </button>
           </div>
-          <label class="v2-control">
-            <span>内边距(padding, mm)</span>
-            <input
-              type="number"
-              min="0"
-              step="1"
-              data-cell-padding="true"
-              :value="selectedNode.padding ?? ''"
-              @change="updateSelectedCellPadding"
-            />
-          </label>
-          <label class="v2-control">
-            <span>水平对齐{{ selectedCellBox ? `（生效：${selectedCellBox.align}）` : '' }}</span>
-            <select :value="selectedNode.align ?? ''" @change="updateSelectedCellAlign">
-              <option value="">默认（继承 Grid）</option>
-              <option value="left">左</option>
-              <option value="center">居中</option>
-              <option value="right">右</option>
-            </select>
-          </label>
-          <label class="v2-control">
-            <span>垂直对齐{{ selectedCellBox ? `（生效：${selectedCellBox.verticalAlign}）` : '' }}</span>
-            <select :value="selectedNode.verticalAlign ?? ''" @change="updateSelectedCellVerticalAlign">
-              <option value="">默认（继承 Grid）</option>
-              <option value="top">顶部</option>
-              <option value="middle">居中</option>
-              <option value="bottom">底部</option>
-            </select>
-          </label>
+          <div class="v2-grid-dimensions">
+            <label class="v2-control">
+              <span>内边距(padding, mm)</span>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                data-cell-padding="true"
+                :value="selectedNode.padding ?? ''"
+                @change="updateSelectedCellPadding"
+              />
+            </label>
+            <label class="v2-control">
+              <span>行高倍数</span>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                :value="selectedNode.rowHeight ?? ''"
+                @change="updateSelectedCellRowHeight"
+              />
+            </label>
+            <label class="v2-control">
+              <span
+                >水平对齐{{
+                  selectedCellBox ? `（生效：${selectedCellBox.align}）` : ""
+                }}</span
+              >
+              <select
+                :value="selectedNode.align ?? ''"
+                @change="updateSelectedCellAlign"
+              >
+                <option value="">默认（继承 Grid）</option>
+                <option value="left">左</option>
+                <option value="center">居中</option>
+                <option value="right">右</option>
+              </select>
+            </label>
+            <label class="v2-control">
+              <span
+                >垂直对齐{{
+                  selectedCellBox
+                    ? `（生效：${selectedCellBox.verticalAlign}）`
+                    : ""
+                }}</span
+              >
+              <select
+                :value="selectedNode.verticalAlign ?? ''"
+                @change="updateSelectedCellVerticalAlign"
+              >
+                <option value="">默认（继承 Grid）</option>
+                <option value="top">顶部</option>
+                <option value="middle">居中</option>
+                <option value="bottom">底部</option>
+              </select>
+            </label>
+          </div>
           <button
             class="v2-toolbar__button"
             type="button"
-            :disabled="!selectedNode.padding && !selectedNode.align && !selectedNode.verticalAlign"
+            :disabled="
+              !selectedNode.padding &&
+              !selectedNode.align &&
+              !selectedNode.verticalAlign &&
+              !selectedNode.rowHeight
+            "
             @click="clearCellOverride"
           >
             清除覆盖（恢复 Grid 默认）
           </button>
         </template>
         <template v-else-if="selectedNode?.type === 'html'">
-          <label class="v2-control">
+          <label class="v2-control v2-control--full">
             <span>HTML 片段（不含脚本）</span>
             <textarea
               class="v2-textarea"
@@ -1796,7 +1963,7 @@ function updateSelectedSafetyField(event: Event): void {
               @input="updateSelectedHtml"
             ></textarea>
           </label>
-          <label class="v2-control">
+          <label class="v2-control v2-control--full">
             <span>CSS（仅 Shadow DOM 内生效）</span>
             <textarea
               class="v2-textarea"
@@ -1812,20 +1979,22 @@ function updateSelectedSafetyField(event: Event): void {
           </p>
         </template>
         <template v-else-if="selectedNode?.type === 'image'">
-          <label class="v2-control">
-            <span>图片地址 / Base64</span>
-            <input
-              :value="selectedNode.src ?? ''"
-              @input="updateSelectedImageSrc"
-            />
-          </label>
-          <label class="v2-control">
-            <span>数据字段（可选，填充态覆盖 src）</span>
-            <input
-              :value="selectedNode.field ?? ''"
-              @input="updateSelectedImageField"
-            />
-          </label>
+          <div class="v2-grid-dimensions">
+            <label class="v2-control">
+              <span>图片地址 / Base64</span>
+              <input
+                :value="selectedNode.src ?? ''"
+                @input="updateSelectedImageSrc"
+              />
+            </label>
+            <label class="v2-control">
+              <span>数据字段（可选，填充态覆盖 src）</span>
+              <input
+                :value="selectedNode.field ?? ''"
+                @input="updateSelectedImageField"
+              />
+            </label>
+          </div>
           <div class="v2-grid-dimensions">
             <label class="v2-control">
               <span>宽(mm)</span>
@@ -1859,45 +2028,30 @@ function updateSelectedSafetyField(event: Event): void {
           </label>
         </template>
         <template v-else-if="selectedNode?.type === 'table'">
-          <label class="v2-control">
-            <span>表头高度（行高倍数）</span>
-            <input
-              type="number"
-              min="0"
-              step="1"
-              :value="selectedNode.headerHeight"
-              @change="updateTableHeaderHeight"
-            />
-          </label>
-          <label class="v2-control">
-            <span>行高（行高倍数）</span>
-            <input
-              type="number"
-              min="0"
-              step="1"
-              :value="selectedNode.rowHeight"
-              @change="updateTableRowHeight"
-            />
-          </label>
-          <label class="v2-control">
-            <span>最小行数</span>
-            <input
-              type="number"
-              min="0"
-              step="1"
-              :value="selectedNode.minRows"
-              @change="updateTableRows"
-            />
-          </label>
-          <label class="v2-control">
-            <span>边框</span>
-            <select :value="selectedNode.border ?? 'all'" @change="updateTableBorder">
-              <option value="all">外框 + 内部</option>
-              <option value="outer">仅外框</option>
-              <option value="inner">仅内部</option>
-              <option value="none">无边框</option>
-            </select>
-          </label>
+          <div class="v2-grid-dimensions">
+            <label class="v2-control">
+              <span>最小行数</span>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                :value="selectedNode.minRows"
+                @change="updateTableRows"
+              />
+            </label>
+            <label class="v2-control">
+              <span>边框</span>
+              <select
+                :value="selectedNode.border ?? 'all'"
+                @change="updateTableBorder"
+              >
+                <option value="all">外框 + 内部</option>
+                <option value="outer">仅外框</option>
+                <option value="inner">仅内部</option>
+                <option value="none">无边框</option>
+              </select>
+            </label>
+          </div>
           <div class="v2-sidebar__subheading">列配置</div>
           <div class="v2-col-table">
             <!-- 表头 -->
@@ -1935,6 +2089,11 @@ function updateSelectedSafetyField(event: Event): void {
               </button>
             </div>
           </div>
+          <p class="v2-hint">
+            表格内字段由列配置自动生成，格式为「列key_行号」（1-based）：列
+            <code>工作地点</code> 第 2 行绑定为 <code>工作地点_2</code>。表格内
+            字段不可单独选中或配置，增删列即增删对应字段。
+          </p>
           <button
             class="v2-toolbar__button v2-add-col"
             type="button"
@@ -2411,6 +2570,20 @@ function updateSelectedSafetyField(event: Event): void {
   font-size: 12px;
 }
 
+/* 复选框不套用文本框的全宽边框样式：保持上下结构（标签在上、勾选框在下）并左对齐 */
+.v2-control input[type="checkbox"] {
+  width: 16px;
+  min-height: 16px;
+  height: 16px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  align-self: flex-start;
+  accent-color: #2563eb;
+  cursor: pointer;
+}
+
 .v2-textarea {
   width: 100%;
   min-height: 30px;
@@ -2426,22 +2599,33 @@ function updateSelectedSafetyField(event: Event): void {
 }
 
 .v2-control--inline {
-  flex-direction: row;
-  align-items: center;
-  gap: 8px;
+  /* 统一为上下结构：标签在上、输入在下（与 .v2-control 一致） */
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  margin: 0;
 }
 
 .v2-control--inline input {
-  flex: 1 1 auto;
-  width: auto;
-  min-height: 28px;
-  padding: 0 6px;
+  width: 100%;
+  min-height: 30px;
+  padding: 0 8px;
   border: 1px solid #cbd5e1;
   border-radius: 4px;
   box-sizing: border-box;
   color: #1e293b;
   background: #fff;
   font-size: 12px;
+}
+
+/* 长文本控件独占一整行（在 2 列网格中横跨两列） */
+.v2-control--full {
+  grid-column: 1 / -1;
+}
+
+/* 网格容器内的控件去掉上下外边距，由网格 gap 控制间距 */
+.v2-grid-dimensions .v2-control {
+  margin: 0;
 }
 
 .v2-issues {

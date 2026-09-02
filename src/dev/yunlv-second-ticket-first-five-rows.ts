@@ -175,7 +175,7 @@ export function makeYunlvSecondTicketFirstFiveRowsSchema(): FormSchemaV2 {
   mergeRightThree("ticket-layout", 4);
 
   schema = appendNodeToCellV2(schema, "cell-o-l", textNode("owner-label", "工作负责人（监护人）："));
-  schema = appendNodeToCellV2(schema, "cell-o-l", fieldP("owner-field", "工作负责人_监护人"));
+  schema = appendNodeToCellV2(schema, "cell-o-l", fieldP("owner-field", "工作负责人（监护人）"));
   schema = appendNodeToCellV2(schema, "cell-o-l", textNode("team-label", "班组："));
   schema = appendNodeToCellV2(schema, "cell-o-l", fieldP("team-field", "班组"));
 
@@ -188,21 +188,22 @@ export function makeYunlvSecondTicketFirstFiveRowsSchema(): FormSchemaV2 {
   }));
 
   schema = appendNodeToCellV2(schema, "cell-s-l", textNode("station-label", "工作的变、配电站名称及设备名称："));
-  schema = appendNodeToCellV2(schema, "cell-s-l", fieldP("station-field", "变配电站名称"));
+  schema = appendNodeToCellV2(schema, "cell-s-l", fieldP("station-field", "电站设备"));
 
   const workTaskTable: TableNodeV2 = {
     ...createTableNodeV2(),
     id: "work-task-table",
     field: "工作任务",
     columns: [
-      { key: "location", title: "工作地点或地段", width: "1fr", align: "center" },
-      { key: "content", title: "工作内容", width: "1fr", align: "center" },
+      { key: "工作地点", title: "工作地点或地段", width: "1fr", align: "center" },
+      { key: "工作内容", title: "工作内容", width: "1fr", align: "center" },
     ],
-    // `{row}` 为行号占位符：minRows 生成的第 r 行绑定到 `工作任务_r_1` / `工作任务_r_2`，
-    // 与 demoData / acceptance-row-spec 的 8 个逐行键一致（P10「数据回写正确」）。
+    // 行模板内字段由渲染期按「列key_行号」自动派生（见 schema-v2-table-rows.ts 的
+    // `bindTableRowCell`），故此处 field 留空；两列 工作地点/工作内容 第 r 行的字段即
+    // `工作地点_r` / `工作内容_r`，与 demoData 的内嵌表键一致（P10「数据回写正确」）。
     rowTemplate: [
-      tableTemplate("wt-loc-tpl", "location", fieldP("wt-loc", "工作任务_{row}_1")),
-      tableTemplate("wt-con-tpl", "content", fieldP("wt-con", "工作任务_{row}_2")),
+      tableTemplate("wt-loc-tpl", "工作地点", fieldP("wt-loc", "")),
+      tableTemplate("wt-con-tpl", "工作内容", fieldP("wt-con", "")),
     ],
   };
   schema = appendNodeToCellV2(schema, "cell-wt-r1", workTaskTable);

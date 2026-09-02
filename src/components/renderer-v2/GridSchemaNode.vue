@@ -14,13 +14,15 @@ import type {
 } from "@/types";
 import HtmlBlock from "./HtmlBlock.vue";
 import {
-  bindRowPlaceholder,
+  bindTableRowCell,
   resolveCellBoxV2,
   resolveTableRowCount,
-  ROW_PLACEHOLDER,
+  NODE_MOVE_MIME,
 } from "@/types";
 
 defineOptions({ name: "GridSchemaNodeV2" });
+
+const emit = defineEmits<{ (e: "node-drag-start", id: string): void }>();
 
 const props = defineProps<{
   node: FormNodeV2;
@@ -37,19 +39,34 @@ const props = defineProps<{
    * 由父级（页面竖向堆叠 / 单元格横向排布）传入需要隐藏的边框侧，避免重叠成 2px。
    * 仅隐藏「后一个」Grid 的引导侧（页面级 top / 单元格级 left），保留前者的拖尾侧单线。
    */
-  suppressBorders?: { top?: boolean; right?: boolean; bottom?: boolean; left?: boolean };
+  suppressBorders?: {
+    top?: boolean;
+    right?: boolean;
+    bottom?: boolean;
+    left?: boolean;
+  };
+  /** 拖拽重排（P9）：当前悬停的合法投放格 id 与插入下标，用于渲染插入指示线。 */
+  dragOverCellId?: string | null;
+  dragOverIndex?: number | null;
 }>();
 
 /** 该节点是否为绘制外框（all/outer）的 Grid。 */
 function drawsOuterFrame(node: FormNodeV2): boolean {
-  return node.type === "grid" && (node.border === "all" || node.border === "outer");
+  return (
+    node.type === "grid" && (node.border === "all" || node.border === "outer")
+  );
 }
 
 /**
  * 单元格内子节点横向（flex row）排布：相邻且都绘制外框的 Grid，
  * 抑制后一个 Grid 的左边框（保留前一个的右边框单线）。非 Grid / 非外框节点返回 undefined。
  */
-function cellSiblingSuppressBorders(children: FormNodeV2[], index: number): { top?: boolean; right?: boolean; bottom?: boolean; left?: boolean } | undefined {
+function cellSiblingSuppressBorders(
+  children: FormNodeV2[],
+  index: number,
+):
+  | { top?: boolean; right?: boolean; bottom?: boolean; left?: boolean }
+  | undefined {
   const node = children[index];
   if (!drawsOuterFrame(node)) return undefined;
   const prev = children[index - 1];
@@ -72,7 +89,7 @@ function gridRowStyle(node: GridNodeV2, rowIndex: number): CSSProperties {
   const tracks =
     node.columns && node.columns.length > 0
       ? node.columns
-      : row.cells.map(cell => cell.width);
+      : row.cells.map((cell) => cell.width);
   return {
     gridTemplateColumns: tracks.map(track).join(" "),
     minHeight: `${row.height * props.baseRowHeight}mm`,
@@ -83,6 +100,10 @@ function cellStyle(cell: GridCellV2, grid: GridNodeV2): CSSProperties {
   const box = resolveCellBoxV2(cell, grid);
   return {
     gridColumn: cell.colspan ? `span ${cell.colspan}` : undefined,
+    // 单元格行高倍数：设置时覆盖所在 Grid 行高（行容器按最高单元格撑开）。
+    minHeight: cell.rowHeight
+      ? `${cell.rowHeight * props.baseRowHeight}mm`
+      : undefined,
     padding: `${box.padding}mm`,
     alignItems:
       box.verticalAlign === "top"
@@ -91,14 +112,22 @@ function cellStyle(cell: GridCellV2, grid: GridNodeV2): CSSProperties {
           ? "flex-end"
           : "center",
     justifyContent:
-      box.align === "center" ? "center" : box.align === "right" ? "flex-end" : "flex-start",
+      box.align === "center"
+        ? "center"
+        : box.align === "right"
+          ? "flex-end"
+          : "flex-start",
   };
 }
 
 function textCss(style?: TextStyleV2): CSSProperties {
   return {
     justifyContent:
-      style?.align === "center" ? "center" : style?.align === "right" ? "flex-end" : "flex-start",
+      style?.align === "center"
+        ? "center"
+        : style?.align === "right"
+          ? "flex-end"
+          : "flex-start",
     alignItems:
       style?.verticalAlign === "top"
         ? "flex-start"
@@ -118,7 +147,22 @@ function textCss(style?: TextStyleV2): CSSProperties {
 
 function pStyle(node: PNodeV2): CSSProperties {
   // 字段 P 默认允许换行（内容超过宽度时自动换行），不再依赖 multiline 配置。
-  return { ...textCss(node.style), whiteSpace: "pre-wrap" };
+  // 宽度作用于「可输入区域」：无前/后标签时整个 <p> 即输入区，故 width 作用于组件整体；
+  // 有前/后标签（复合字段）时，宽度只作用于输入区（见 fieldInputStyle，挂在内层 span/控件），
+  // 此时 <p> 不加 width，避免把前缀/后缀也算进宽度。
+  return {
+    ...textCss(node.style),
+    whiteSpace: "pre-wrap",
+    width: isCompositeField(node) ? undefined : node.width,
+  };
+}
+
+/** 复合字段（有前/后标签）可输入区域的宽度样式：仅复合字段且配置了 width 时生效，
+ *  挂在内层 `.layout-p__input`（设计态）或 `.layout-p__control`（填充态）。
+ *  flexGrow:0 确保显式宽度不被 flex 拉伸（.layout-p__input / .layout-p__control 默认 flex 可增长）。 */
+function fieldInputStyle(node: PNodeV2): CSSProperties {
+  if (!isCompositeField(node) || !node.width) return {};
+  return { width: node.width, flexGrow: 0 };
 }
 
 function textStyle(node: TextNodeV2): CSSProperties {
@@ -127,47 +171,36 @@ function textStyle(node: TextNodeV2): CSSProperties {
 
 function tableColumnStyle(columns: TableColumnV2[]): CSSProperties {
   return {
-    gridTemplateColumns: columns.map(column => track(column.width)).join(" "),
+    gridTemplateColumns: columns.map((column) => track(column.width)).join(" "),
   };
 }
 
 function tableCellStyle(column: TableColumnV2): CSSProperties {
   return {
     justifyContent:
-      column.align === "center" ? "center" : column.align === "right" ? "flex-end" : "flex-start",
+      column.align === "center"
+        ? "center"
+        : column.align === "right"
+          ? "flex-end"
+          : "flex-start",
   };
 }
 
 function tableTemplate(node: TableNodeV2, columnKey: string) {
-  return node.rowTemplate.find(template => template.columnKey === columnKey);
+  return node.rowTemplate.find((template) => template.columnKey === columnKey);
 }
 
 /**
- * 实例化表格行模板：把节点及其后代 `field` 中的 `{row}` 替换为实际行号。
+ * 实例化表格行模板：把单元格内字段 P 的 `field` 绑定到 `列key_行号`（渲染期派生，
+ * 见 schema-v2-table-rows.ts 的 `bindTableRowCell`）。
  *
- * 每一行复用同一份 rowTemplate，若字段键写死则多行共用同一数据键、
- * 无法区分行。用占位符（如 `工作任务_{row}_1`）可让第 r 行绑定到 `工作任务_r_1`，
- * 从而与 demoData 的逐行键一致，满足 P10「数据回写正确 —— 键与 demoData 一致无错位」。
- * 不含占位符时原样返回同一引用，不产生额外对象。
+ * 每一行复用同一份 rowTemplate，但字段名按列配置 + 行号自动生成
+ * （如第 r 行列 `工作地点` 绑定 `工作地点_r`），逐行不冲突，满足
+ * P10「数据回写正确 —— 键与逐行数据一致无错位」。行模板内手写 field 会被覆盖，
+ * 故无需（也不应在）schema 中写死字段名。
  */
-function withRowIndex(node: FormNodeV2, rowIndex: number): FormNodeV2 {
-  const bound =
-    "field" in node && typeof node.field === "string" && node.field.includes(ROW_PLACEHOLDER)
-      ? ({ ...node, field: bindRowPlaceholder(node.field, rowIndex) } as FormNodeV2)
-      : node;
-  if (bound.type === "grid") {
-    return {
-      ...bound,
-      rows: bound.rows.map(row => ({
-        ...row,
-        cells: row.cells.map(cell => ({
-          ...cell,
-          children: cell.children.map(child => withRowIndex(child, rowIndex)),
-        })),
-      })),
-    };
-  }
-  return bound;
+function bindRowCell(node: FormNodeV2, columnKey: string, rowIndex: number): FormNodeV2 {
+  return bindTableRowCell(node, columnKey, rowIndex);
 }
 
 function isCompositeField(node: PNodeV2): boolean {
@@ -181,11 +214,46 @@ function isEditable(node: PNodeV2): "true" | undefined {
     : undefined;
 }
 
+/** 该组件在设计态（非只读、非填充）下可作为拖拽源；预览 / 填充态禁用拖拽。 */
+const nodeDraggable = computed(() => !props.readonly && !fillMode.value);
+
+/**
+ * 拖拽重排（P9）起点：把节点 id 写入 dataTransfer 并向上 emit 同步选中态。
+ * - 表格（含嵌套 Grid）内的节点不可作为独立组件拖拽（字段由列配置派生，不单独选中 / 配置）。
+ * - 设计态整段可编辑字段（contenteditable）：仅按住 Alt 才允许整节点拖拽，
+ *   否则放行文本编辑 / 选择，避免误触拖拽。
+ */
+function onNodeDragStart(node: FormNodeV2, event: DragEvent): void {
+  // 阻止 DOM dragstart 冒泡到祖先节点（grid/page 等也绑定了 @dragstart），
+  // 否则祖先的 onNodeDragStart 会覆盖 dataTransfer 并误把自身当作被拖拽节点。
+  event.stopPropagation();
+  const hostEl = event.currentTarget as HTMLElement | null;
+  const tableEl = hostEl?.closest(".layout-table") ?? null;
+  // 表格自身的根 <table> 也带 .layout-table，需排除自身（仅拦「祖先」表格内的节点）。
+  if (tableEl && tableEl !== hostEl) {
+    event.preventDefault();
+    return;
+  }
+  if (node.type === "p" && isEditable(node) && !event.altKey) {
+    event.preventDefault();
+    return;
+  }
+  const dt = event.dataTransfer;
+  if (!dt) return;
+  dt.setData(NODE_MOVE_MIME, node.id);
+  dt.setData("text/plain", node.id);
+  dt.effectAllowed = "move";
+  emit("node-drag-start", node.id);
+}
+
 /**
  * 填写态输入回调：仅当 fillMode 且字段存在时，把文本回写到上层 provide 的
  * formFill（响应式 data），满足 P9.1b「数据回写正确」。设计态不回写。
  */
-const formFill = inject<(field: string, value: string) => void>("formFill", () => {});
+const formFill = inject<(field: string, value: string) => void>(
+  "formFill",
+  () => {},
+);
 /**
  * 读取可编辑区域的文本，保留换行：优先用 innerText（浏览器按渲染返回带 \n 的文本），
  * jsdom 等无 innerText 实现时回退 textContent。满足「字段 P 允许多行」。
@@ -203,11 +271,18 @@ function onFillInput(field: string | undefined, event: Event): void {
   formFill(field, readEditableText(event.target as HTMLElement));
 }
 
-/** 字段展示值：优先 data 中的填写值，为空时回退到空字符串（不再使用节点 default）。 */
+/** 字段展示值：优先 data 中的填写值，为空时回退到节点配置的默认内容（`default`）。 */
 function fieldValue(node: PNodeV2): string {
   const raw = props.data?.[node.field];
-  if (raw == null || raw === "") return "";
+  if (raw == null || raw === "") return node.default ?? "";
   return String(raw);
+}
+
+/** 内部边框：将字段值按换行拆成逐行文本，供静态/预览/打印态渲染为每行一个 <div>，
+ *  使 `.layout-p--inner-border :deep(div)` 的底边框规则在打印态也能命中
+ *  （设计态 contenteditable 回车生成的 div 同样走该规则）。空值返回 [""] → 至少一行。 */
+function fieldLines(node: PNodeV2): string[] {
+  return fieldValue(node).split("\n");
 }
 
 /** 填充态控件：字段统一为字符串类型，全部用 `<textarea>`（默认自动换行）。 */
@@ -228,8 +303,12 @@ const imageSrc = computed<string>(() => {
   if (imgError.value) return BROKEN_PLACEHOLDER;
   if (props.node.type !== "image") return BROKEN_PLACEHOLDER;
   const fromData =
-    fillMode.value && props.node.field ? props.data?.[props.node.field] : undefined;
-  return fromData != null ? String(fromData) : (props.node.src ?? BROKEN_PLACEHOLDER);
+    fillMode.value && props.node.field
+      ? props.data?.[props.node.field]
+      : undefined;
+  return fromData != null
+    ? String(fromData)
+    : (props.node.src ?? BROKEN_PLACEHOLDER);
 });
 watch(
   () => [
@@ -262,6 +341,8 @@ function onImgError(): void {
       },
     ]"
     :data-node-id="node.id"
+    :draggable="nodeDraggable"
+    @dragstart="onNodeDragStart(node, $event)"
   >
     <div
       v-for="(row, rowIndex) in node.rows"
@@ -279,16 +360,32 @@ function onImgError(): void {
         :data-layout-id="cell.id"
         :data-node-id="cell.id"
       >
-        <GridSchemaNode
+        <template
           v-for="(child, childIndex) in cell.children"
           :key="child.id"
-          :node="child"
-          :base-row-height="baseRowHeight"
-          :selected-node-id="selectedNodeId"
-          :data="data"
-          :readonly="props.readonly"
-          :suppress-borders="cellSiblingSuppressBorders(cell.children, childIndex)"
-        />
+        >
+          <div
+            v-if="dragOverCellId === cell.id && dragOverIndex === childIndex"
+            class="v2-insertion-line"
+          ></div>
+          <GridSchemaNode
+            :node="child"
+            :base-row-height="baseRowHeight"
+            :selected-node-id="selectedNodeId"
+            :data="data"
+            :readonly="props.readonly"
+            :suppress-borders="
+              cellSiblingSuppressBorders(cell.children, childIndex)
+            "
+            :drag-over-cell-id="dragOverCellId"
+            :drag-over-index="dragOverIndex"
+            @node-drag-start="(id: string) => emit('node-drag-start', id)"
+          />
+        </template>
+        <div
+          v-if="dragOverCellId === cell.id && dragOverIndex === cell.children.length"
+          class="v2-insertion-line"
+        ></div>
       </div>
     </div>
   </div>
@@ -299,7 +396,11 @@ function onImgError(): void {
     :class="{ 'layout-node--selected': selectedNodeId === node.id }"
     :style="textStyle(node)"
     :data-node-id="node.id"
-  >{{ node.text }}</div>
+    :draggable="nodeDraggable"
+    @dragstart="onNodeDragStart(node, $event)"
+  >
+    {{ node.text }}
+  </div>
 
   <p
     v-else-if="node.type === 'p'"
@@ -308,37 +409,57 @@ function onImgError(): void {
       'layout-p--field': true,
       'layout-p--composite': isCompositeField(node),
       'layout-p--underline': node.underline && !isCompositeField(node),
+      'layout-p--inner-border': node.innerBorder,
       'layout-node--selected': selectedNodeId === node.id,
     }"
     :style="pStyle(node)"
     :contenteditable="canFill ? undefined : isEditable(node)"
     :data-field="node.field"
     :data-node-id="node.id"
+    :draggable="nodeDraggable"
+    @dragstart="onNodeDragStart(node, $event)"
   >
     <template v-if="isCompositeField(node)">
       <template v-if="canFill">
-        <span v-if="node.prefix" class="layout-p__label">{{ node.prefix }}</span>
+        <span v-if="node.prefix" class="layout-p__label">{{
+          node.prefix
+        }}</span>
         <component
           :is="useTextarea(node) ? 'textarea' : 'input'"
           class="layout-p__control"
           :class="{ 'layout-p--underline': node.underline }"
+          :style="fieldInputStyle(node)"
           :type="inputElType(node)"
           :value="fieldValue(node)"
           :data-field="node.field"
           @input="onFillInput(node.field, $event)"
         ></component>
-        <span v-if="node.suffix" class="layout-p__label">{{ node.suffix }}</span>
+        <span v-if="node.suffix" class="layout-p__label">{{
+          node.suffix
+        }}</span>
       </template>
       <template v-else>
-        <span v-if="node.prefix" class="layout-p__label">{{ node.prefix }}</span>
+        <span v-if="node.prefix" class="layout-p__label">{{
+          node.prefix
+        }}</span>
         <span
           class="layout-p__input"
           :class="{ 'layout-p--underline': node.underline }"
+          :style="fieldInputStyle(node)"
           :contenteditable="props.readonly ? undefined : 'true'"
           :data-field="node.field"
           @input="onFillInput(node.field, $event)"
-        >{{ fieldValue(node) }}</span>
-        <span v-if="node.suffix" class="layout-p__label">{{ node.suffix }}</span>
+          ><template v-if="node.innerBorder"
+            ><div
+              v-for="(line, li) in fieldLines(node)"
+              :key="li"
+              class="layout-p__line"
+            >{{ line }}</div></template
+          ><template v-else>{{ fieldValue(node) }}</template></span
+        >
+        <span v-if="node.suffix" class="layout-p__label">{{
+          node.suffix
+        }}</span>
       </template>
     </template>
 
@@ -354,6 +475,13 @@ function onImgError(): void {
           @input="onFillInput(node.field, $event)"
         ></component>
       </template>
+      <template v-else-if="node.innerBorder">
+        <div
+          v-for="(line, li) in fieldLines(node)"
+          :key="li"
+          class="layout-p__line"
+        >{{ line }}</div>
+      </template>
       <template v-else>{{ fieldValue(node) }}</template>
     </template>
   </p>
@@ -367,11 +495,16 @@ function onImgError(): void {
     ]"
     :data-node-id="node.id"
     :data-field="node.field"
+    :draggable="nodeDraggable"
+    @dragstart="onNodeDragStart(node, $event)"
   >
     <thead>
       <tr
         class="layout-table__row layout-table__header"
-        :style="[tableColumnStyle(node.columns), { minHeight: `${node.headerHeight * baseRowHeight}mm` }]"
+        :style="[
+          tableColumnStyle(node.columns),
+          { minHeight: `${baseRowHeight}mm` },
+        ]"
       >
         <th
           v-for="column in node.columns"
@@ -388,7 +521,10 @@ function onImgError(): void {
         v-for="rowIndex in resolveTableRowCount(node, data)"
         :key="rowIndex"
         class="layout-table__row"
-        :style="[tableColumnStyle(node.columns), { minHeight: `${node.rowHeight * baseRowHeight}mm` }]"
+        :style="[
+          tableColumnStyle(node.columns),
+          { minHeight: `${baseRowHeight}mm` },
+        ]"
       >
         <td
           v-for="column in node.columns"
@@ -397,15 +533,36 @@ function onImgError(): void {
           :style="tableCellStyle(column)"
           :data-layout-id="tableTemplate(node, column.key)?.id"
         >
-          <GridSchemaNode
+          <template
             v-for="child in tableTemplate(node, column.key)?.children ?? []"
             :key="`${child.id}-${rowIndex}`"
-            :node="withRowIndex(child, rowIndex)"
-            :base-row-height="baseRowHeight"
-            :selected-node-id="selectedNodeId"
-            :data="data"
-            :readonly="props.readonly"
-          />
+          >
+            <div
+              v-if="
+                dragOverCellId === tableTemplate(node, column.key)?.id &&
+                dragOverIndex === 0
+              "
+              class="v2-insertion-line"
+            ></div>
+            <GridSchemaNode
+              :node="bindRowCell(child, column.key, rowIndex)"
+              :base-row-height="baseRowHeight"
+              :selected-node-id="selectedNodeId"
+              :data="data"
+              :readonly="props.readonly"
+              :drag-over-cell-id="dragOverCellId"
+              :drag-over-index="dragOverIndex"
+              @node-drag-start="(id: string) => emit('node-drag-start', id)"
+            />
+          </template>
+          <div
+            v-if="
+              dragOverCellId === tableTemplate(node, column.key)?.id &&
+              dragOverIndex ===
+                (tableTemplate(node, column.key)?.children.length ?? 0)
+            "
+            class="v2-insertion-line"
+          ></div>
         </td>
       </tr>
     </tbody>
@@ -416,6 +573,8 @@ function onImgError(): void {
     :node="node"
     :selected-node-id="selectedNodeId"
     :data="data"
+    :draggable="nodeDraggable"
+    @dragstart="onNodeDragStart(node, $event)"
   />
 
   <img
@@ -432,6 +591,8 @@ function onImgError(): void {
       objectFit: node.objectFit,
     }"
     @error="onImgError"
+    :draggable="nodeDraggable"
+    @dragstart="onNodeDragStart(node, $event)"
   />
 </template>
 
@@ -475,10 +636,18 @@ function onImgError(): void {
 /* 相邻 Grid 外框去重（Item 2）：当与相邻兄弟 Grid 都绘制外框时，隐藏本 Grid 的
    引导侧边框（页面级 top / 单元格级 left），仅保留前者拖尾侧单线，避免重叠成 2px。
    这些规则位于 --all/--outer 之后，等特异性下靠源码顺序胜出。 */
-.layout-grid--no-top { border-top: none; }
-.layout-grid--no-right { border-right: none; }
-.layout-grid--no-bottom { border-bottom: none; }
-.layout-grid--no-left { border-left: none; }
+.layout-grid--no-top {
+  border-top: none;
+}
+.layout-grid--no-right {
+  border-right: none;
+}
+.layout-grid--no-bottom {
+  border-bottom: none;
+}
+.layout-grid--no-left {
+  border-left: none;
+}
 
 /* 内部水平分隔线：非首行的 cell 上边框 = 上一行的下边界。
    仅 all / inner 绘制；outer（仅外框）与 none 不画内部线。 */
@@ -496,12 +665,13 @@ function onImgError(): void {
 
 .layout-p {
   display: flex;
+  flex-wrap: wrap;
   width: 100%;
   min-width: 0;
   min-height: 0;
-  align-self: stretch;
-  margin: 0;
-  padding: 0 1mm;
+  align-self: center;
+  margin: 0 1mm;
+  padding: 0;
   align-items: center;
   box-sizing: border-box;
   color: #111827;
@@ -512,12 +682,34 @@ function onImgError(): void {
   outline: none;
 }
 
+/* 设计态直接可编辑的 <p>（无前/后标签）：回车插入的 <div> 默认成为 flex 行内子项、
+   被排成一行，导致多行换行失效（前标签非 null 时用 inline-block 的 .layout-p__input
+   包裹，无此问题）。强制每个插入的 div 占满整行并换行，使多行换行生效，
+   即使空字段下回车也能正常换行。复合字段的可编辑区域在 .layout-p__input（非 <p> 直接子级），
+   故不受影响。
+   注意：contenteditable 插入的 <div> 是浏览器运行时塞入、不带 scoped 的 data-v 属性，
+   普通 `.layout-p > div`（编译为 `.layout-p[data-v] > div[data-v]`）匹配不到——
+   故用 :deep() 去掉子选择器的 scope 属性，才能命中这些运行时 div。 */
+.layout-p :deep(div) {
+  flex: 1 1 100%;
+  width: 100%;
+  min-width: 0;
+}
+
+/* 内部边框（innerBorder）：为 p 标签内每一行画底边框，用于手写表单的「横线」效果。
+   默认不显示（无此类）；勾选后设计态（contenteditable 回车生成的 div）/ 预览（静态
+   逐行 div）/ 打印（静态渲染产出的 div）均保持显示——规则不放在任何 @media 内，
+   且绘制的是真实 border（非背景图），故打印必然命中、不受浏览器「忽略背景图形」影响。 */
+.layout-p--inner-border :deep(div) {
+  border-bottom: 1px solid #111827;
+}
+
 .layout-text {
   display: flex;
   width: 100%;
   min-width: 0;
   min-height: 0;
-  align-self: stretch;
+  align-self: center;
   margin: 0;
   padding: 0 1mm;
   align-items: center;
@@ -536,12 +728,12 @@ function onImgError(): void {
 
 /* 设计态空字段（contenteditable 无内容）时，插入零宽行盒使光标垂直居中，
    避免光标贴着上边框；零宽为伪元素、不可被 contenteditable 删除，故清空文本后光标仍居中。 */
-.layout-p::before {
+/* .layout-p::before {
   content: "\200b";
 }
 .layout-p__input::before {
   content: "\200b";
-}
+} */
 
 .layout-p--composite {
   gap: 1mm;
@@ -586,6 +778,18 @@ function onImgError(): void {
 
 .layout-p__control.layout-p--underline {
   border-bottom: 1px solid #111827;
+}
+
+/* 内部边框逐行：静态/预览/打印态将字段值拆成每行一个 <div class="layout-p__line">，
+   min-height 保证空行也有一行的高度（底边框可见）；通用 `.layout-p :deep(div)` 已让其
+   占满整行换行，`.layout-p--inner-border :deep(div)` 再为每个 div 画底边框（真实边框，
+   打印必然显示，不依赖背景图形）。 */
+.layout-p__line {
+  min-height: 1.35em;
+  width: 100%;
+  text-align: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .layout-p--underline {
@@ -663,6 +867,17 @@ function onImgError(): void {
   z-index: 2;
   background-color: rgb(37 99 235 / 12%) !important;
   box-shadow: inset 0 0 0 2px #2563eb !important;
+}
+
+.v2-insertion-line {
+  flex: 0 0 auto;
+  width: 100%;
+  height: 2px;
+  margin: 1px 0;
+  background: #2563eb;
+  box-shadow: 0 0 0 1px rgb(37 99 235 / 40%);
+  border-radius: 1px;
+  pointer-events: none;
 }
 
 @media print {

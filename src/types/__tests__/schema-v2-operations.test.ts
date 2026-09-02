@@ -20,8 +20,6 @@ import {
   splitGridRowV2,
   updateGridRowHeightV2,
   updateTableMinRowsV2,
-  updateTableHeaderHeightV2,
-  updateTableRowHeightV2,
   addTableColumnV2,
   removeTableColumnV2,
   updateTableColumnV2,
@@ -35,6 +33,7 @@ import {
   copyGridRowV2,
   mergeGridCellsV2,
   moveNodeV2,
+  moveNodeToIndexV2,
   moveNodeWithinParentV2,
   listDropTargetsV2,
   splitGridCellV2,
@@ -66,10 +65,11 @@ describe("Schema V2 operations", () => {
 
     expect(table.rowTemplate).toHaveLength(table.columns.length);
     expect(table.rowTemplate.map(template => template.children)).toEqual(
-      table.columns.map(column => [expect.objectContaining({
+      table.columns.map(() => [expect.objectContaining({
         type: "p",
         mode: "field",
-        field: column.key,
+        // 字段名由渲染期按「列key_行号」自动派生，行模板内不写死（见 schema-v2-table-rows.ts）
+        field: "",
       })]),
     );
   });
@@ -244,24 +244,6 @@ describe("Schema V2 operations", () => {
     const table = grid.rows.find(r => r.id === "row-work-task")!.cells[1].children[0];
     if (table.type !== "table") throw new Error("fixture table missing");
     expect(table.minRows).toBe(6);
-  });
-
-  it("updates table header height and row height through the nested tree", () => {
-    const schema = makeYunlvSecondTicketFirstFiveRowsSchema();
-    const headerNext = updateTableHeaderHeightV2(schema, "work-task-table", 2);
-    const rowNext = updateTableRowHeightV2(schema, "work-task-table", 3);
-    const headerGrid = sampleGrid(headerNext, "ticket-layout");
-    const rowGrid = sampleGrid(rowNext, "ticket-layout");
-    const headerTable = headerGrid.rows.find(r => r.id === "row-work-task")!.cells[1].children[0];
-    const rowTable = rowGrid.rows.find(r => r.id === "row-work-task")!.cells[1].children[0];
-    if (headerTable.type !== "table" || rowTable.type !== "table") throw new Error("fixture table missing");
-    expect(headerTable.headerHeight).toBe(2);
-    expect(rowTable.rowHeight).toBe(3);
-    // 源 schema 不被修改
-    const sourceTable = sampleGrid(schema, "ticket-layout").rows.find(r => r.id === "row-work-task")!.cells[1].children[0];
-    if (sourceTable.type !== "table") throw new Error("fixture table missing");
-    expect(sourceTable.headerHeight).toBe(1);
-    expect(sourceTable.rowHeight).toBe(1);
   });
 
   it("adds a table column with matching template without mutating the source", () => {
@@ -650,5 +632,57 @@ describe("P6.3b 格内排序 / P6.3c 跨格移动目标", () => {
     const moved = moveNodeV2(schema, "owner-field", "cell-s-l");
     expect(childrenOf(moved, "cell-o-l")).not.toContain("owner-field");
     expect(childrenOf(moved, "cell-s-l")).toContain("owner-field");
+  });
+
+  it("moveNodeToIndexV2 同格重排到任意下标", () => {
+    const schema = makeYunlvSecondTicketFirstFiveRowsSchema();
+    expect(ownerCellChildren(schema)).toEqual([
+      "owner-label", "owner-field", "team-label", "team-field",
+    ]);
+    // owner-field(原下标1) 移到末尾（下标4 = 数组长度，追加到末位）
+    const reordered = moveNodeToIndexV2(schema, "owner-field", "cell-o-l", 4);
+    expect(ownerCellChildren(reordered)).toEqual([
+      "owner-label", "team-label", "team-field", "owner-field",
+    ]);
+    // team-field(原下标3) 移到最前（下标0）
+    const toFront = moveNodeToIndexV2(schema, "team-field", "cell-o-l", 0);
+    expect(ownerCellChildren(toFront)).toEqual([
+      "team-field", "owner-label", "owner-field", "team-label",
+    ]);
+    // 源 schema 不被修改
+    expect(ownerCellChildren(schema)).toEqual([
+      "owner-label", "owner-field", "team-label", "team-field",
+    ]);
+  });
+
+  it("moveNodeToIndexV2 跨格移动到任意下标", () => {
+    const schema = makeYunlvSecondTicketFirstFiveRowsSchema();
+    const moved = moveNodeToIndexV2(schema, "owner-field", "cell-s-l", 0);
+    expect(ownerCellChildren(moved)).not.toContain("owner-field");
+    const sCell = buildEditorNodeIndexV2(moved).get("cell-s-l")?.node as
+      | { children: Array<{ id: string }> }
+      | undefined;
+    expect(sCell?.children[0].id).toBe("owner-field");
+  });
+
+  it("moveNodeToIndexV2 同格原位 no-op 返回原引用", () => {
+    const schema = makeYunlvSecondTicketFirstFiveRowsSchema();
+    expect(moveNodeToIndexV2(schema, "owner-field", "cell-o-l", 1)).toBe(schema);
+  });
+
+  it("moveNodeToIndexV2 拒绝移入自身后代", () => {
+    const schema = makeYunlvSecondTicketFirstFiveRowsSchema();
+    // 把整个外层 Grid 移进它自己的某个格 → 拒绝，返回原引用
+    expect(moveNodeToIndexV2(schema, "ticket-layout", "cell-o-l", 0)).toBe(schema);
+  });
+
+  it("moveNodeToIndexV2 越界 atIndex 自动 clamp", () => {
+    const schema = makeYunlvSecondTicketFirstFiveRowsSchema();
+    expect(ownerCellChildren(moveNodeToIndexV2(schema, "owner-field", "cell-o-l", 999))).toEqual([
+      "owner-label", "team-label", "team-field", "owner-field",
+    ]);
+    expect(ownerCellChildren(moveNodeToIndexV2(schema, "owner-field", "cell-o-l", -5))).toEqual([
+      "owner-field", "owner-label", "team-label", "team-field",
+    ]);
   });
 });

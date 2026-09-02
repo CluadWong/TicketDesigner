@@ -133,8 +133,6 @@ describe("Schema V2 validation", () => {
         id: "table-1",
         type: "table",
         columns: [{ key: "location", title: "地点" }],
-        headerHeight: 1,
-        rowHeight: 1,
         minRows: 1,
         rowTemplate: [
           {
@@ -228,8 +226,6 @@ describe("Schema V2 validation", () => {
         id: "table-1",
         type: "table",
         columns: [{ key: "location", title: "地点", width: 10 }],
-        headerHeight: 1,
-        rowHeight: 1,
         minRows: 1,
         rowTemplate: [
           {

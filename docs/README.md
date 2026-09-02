@@ -20,6 +20,8 @@
 | [acceptance-row-spec.md](./acceptance-row-spec.md) | 前五行**字段/边框规格表**，是样例 Schema 与验收测试的对齐依据 | **生效中**（被代码注释引用，勿移动/改名） |
 | [prd.md](./prd.md) | 表单打印纸张尺寸说明 | 稳定 |
 | [table-column-config-overview.md](./table-column-config-overview.md) | Table 列配置能力改动概览 | 参考 |
+| [architecture-layering-review.md](./architecture-layering-review.md) | **分层核对（设计器 / 渲染组件 / 填充）**：目标结构、符合项、**不符合项清单 A1–A6 / B1–B4 / C1–C3 / D1–D3**；**§6 决策：不分化第二个渲染组件，改为「渲染内核 + 设计表面」两层**，§6.5 为最新调整顺序 | 调整后回写结论 |
+| [delivery-scenario-gap.md](./delivery-scenario-gap.md) | **交付场景差距分析**（定稿范围：本应用只含设计器+渲染器，服务器/消费页为外部）：链路 `设计器导出JSON→(服务器透明存储)→消费页引用渲染器+json+data→打印`，**G1–G19 按 ◆本应用须补 / ◇外部实现 标注**（P0：解析即崩 / 未知类型崩 / 无字段清单 / 不可独立消费 / 两套DOM / 空值回退缺陷）、最小落地路径 | 调整后回写结论 |
 
 ## 二、归档区 `archive/`
 

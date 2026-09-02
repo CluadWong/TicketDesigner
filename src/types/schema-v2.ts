@@ -75,6 +75,14 @@ export interface FieldPNodeV2 extends SchemaNodeBaseV2 {
   underline?: boolean;
   webUnderline?: boolean;
   printUnderline?: boolean;
+  /** 字段宽度（CSS 长度字符串，支持 mm / px / % 等，如 "30mm"、"120px"、"50%"）。
+   *  缺省时不限制宽度（沿用父容器 100%）。 */
+  width?: string;
+  /** 字段默认内容：无填写数据时的预设文本，支持多行（`\n`）。 */
+  default?: string;
+  /** 内部边框：为 p 标签内每一行（回车生成的 div）显示底边框。
+   *  默认不显示；勾选后设计态 / 预览 / 打印均保持显示。 */
+  innerBorder?: boolean;
   style?: TextStyleV2;
 }
 
@@ -107,6 +115,8 @@ export interface GridCellV2 extends SchemaNodeBaseV2 {
   type: "grid-cell";
   width?: GridTrackV2;
   colspan?: number;
+  /** 单元格行高倍数（覆盖所在 Grid 行的 height）；不设置时继承 Grid 行高。 */
+  rowHeight?: number;
   padding?: number;
   align?: "left" | "center" | "right";
   verticalAlign?: "top" | "middle" | "bottom";
@@ -130,8 +140,6 @@ export interface TableNodeV2 extends SchemaNodeBaseV2 {
   type: "table";
   field?: string;
   columns: TableColumnV2[];
-  headerHeight: number;
-  rowHeight: number;
   minRows: number;
   rowTemplate: TableCellTemplateV2[];
   /** 边框模式（与 Grid 一致）：all=外框+内部线（默认）、inner=仅内部线、outer=仅外框、none=无。 */

@@ -109,27 +109,25 @@ describe("DesignerApp V2 selection and deletion", () => {
     expect(grid.find('[data-layout-id="row-unit-number"]').findAll(":scope > .layout-grid__cell")).toHaveLength(3);
   });
 
-  it("removes a table template default field and inserts a text node in its place", async () => {
+  it("deleting a table column removes its derived field template (table P not individually selectable)", async () => {
     const wrapper = mount(DesignerApp);
-    // 选中表格模板里的默认字段 P
-    const defaultField = wrapper.find("tbody .layout-p");
-    await defaultField.trigger("click");
-    // 右侧面板「删除」按钮移除该默认字段
-    const deleteButton = wrapper.find(".v2-inspector__delete");
-    expect(deleteButton.attributes("disabled")).toBeUndefined();
-    await deleteButton.trigger("click");
+    // 点击表格内的默认字段 P → 因不可单独选中，回退选中所属 Table
+    await wrapper.find("tbody .layout-p").trigger("click");
+    await nextTick();
+    expect(wrapper.find('[data-node-id="work-task-table"]').classes()).toContain(
+      "layout-node--selected",
+    );
 
-    // 点击模板单元格，使其成为插入槽
-    const templateCell = wrapper.find('[data-layout-id="wt-loc-tpl"]');
-    await templateCell.trigger("click");
-    // 左侧「文本 Text」按钮插入固定文本节点（type: text，渲染为 .layout-text）
-    const textButton = wrapper
-      .findAll(".v2-palette-item--button")
-      .find(button => button.text().includes("文本"));
-    await textButton?.trigger("click");
+    // 表格面板列出 2 列（location / content），各有删除按钮
+    expect(wrapper.findAll(".v2-col-table__row")).toHaveLength(3); // 1 表头 + 2 列行
+    const firstColDelete = wrapper.find(".v2-col-table__row .v2-inspector__delete--small");
+    expect(firstColDelete.attributes("disabled")).toBeUndefined();
+    await firstColDelete.trigger("click");
+    await nextTick();
 
-    expect(wrapper.find("tbody .layout-text").exists()).toBe(true);
-    expect(wrapper.find("tbody .layout-text").text()).toBe("固定文本");
+    // 删除后列数减一，渲染层表格只剩 1 列（对应派生字段一并移除）
+    expect(wrapper.findAll(".v2-col-table__row")).toHaveLength(2); // 1 表头 + 1 列行
+    expect(wrapper.findAll("thead th")).toHaveLength(1);
   });
 
   it("selects the overflowing P when its issue entry is clicked", async () => {
@@ -251,22 +249,30 @@ describe("DesignerApp V2 selection and deletion", () => {
     expect(splitGrid.rows.find(r => r.id === "row-unit-number")!.cells[0].colspan).toBeUndefined();
   });
 
-  it("shows the {row} hint only for P nodes inside a table row template", async () => {
+  it("clicking a table-internal P selects the table and shows the derived-field hint", async () => {
     const wrapper = mount(DesignerApp);
 
+    // 普通字段（unit-field）不在表格内，选中后不显示表格提示
     await wrapper.find('[data-node-id="unit-field"]').trigger("click");
+    await nextTick();
     expect(wrapper.find(".v2-hint").exists()).toBe(false);
 
+    // 表格内的 P（wt-loc）不可单独选中，点击回退选中所属 Table
     await wrapper.find('[data-node-id="wt-loc"]').trigger("click");
+    await nextTick();
+    expect(wrapper.find('[data-node-id="work-task-table"]').classes()).toContain(
+      "layout-node--selected",
+    );
+
+    // 表格面板显示「列key_行号」派生字段提示，且不含单独字段名控件
     const hint = wrapper.find(".v2-hint");
     expect(hint.exists()).toBe(true);
-    expect(hint.text()).toContain("{row}");
+    expect(hint.text()).toContain("列key_行号");
 
-    const fieldInput = wrapper
+    const fieldNameControl = wrapper
       .findAll(".v2-control")
-      .find(control => control.text().includes("字段名"))
-      ?.find("input");
-    expect((fieldInput?.element as HTMLInputElement | undefined)?.value).toBe("工作任务_{row}_1");
+      .find((c) => c.text().includes("字段名"));
+    expect(fieldNameControl).toBeUndefined();
   });
 });
 
@@ -321,80 +327,104 @@ describe("DesignerApp 把 Grid 放进 / 拖进 cell（Grid 嵌套，九续）", 
   });
 });
 
-describe("DesignerApp 格内排序与跨格移动（P6.3b / P6.3c）", () => {
-  /** 规范样例「工作负责人（监护人）/班组」合并格内的子节点顺序。 */
-  const ownerCellChildren = (wrapper: VueWrapper): string[] => {
-    const grid = gridById(schemaOf(wrapper), "ticket-layout");
-    return grid.rows.find(r => r.id === "row-owner-team")!.cells[0].children.map(c => c.id);
+describe("DesignerApp 拖拽重排已有节点（P9）", () => {
+  /** 模拟 HTML5 DataTransfer：jsdom 未实现，自建最小实现供拖拽测试使用。 */
+  class MockDataTransfer {
+    private store = new Map<string, string>();
+    types: string[] = [];
+    effectAllowed = "";
+    dropEffect = "";
+    setData(type: string, value: string): void {
+      this.store.set(type, value);
+      this.types = Array.from(this.store.keys());
+    }
+    getData(type: string): string {
+      return this.store.get(type) ?? "";
+    }
+    setDragImage(): void {}
+  }
+
+  const dispatchDrag = (
+    el: Element,
+    type: "dragstart" | "dragover" | "drop",
+    dt: MockDataTransfer,
+    opts: { altKey?: boolean; clientY?: number } = {},
+  ): void => {
+    const event = new Event(type, { bubbles: true, cancelable: true });
+    Object.defineProperty(event, "dataTransfer", { value: dt });
+    if (opts.altKey !== undefined)
+      Object.defineProperty(event, "altKey", { value: opts.altKey });
+    if (opts.clientY !== undefined)
+      Object.defineProperty(event, "clientY", { value: opts.clientY });
+    el.dispatchEvent(event);
   };
 
-  it("上移 / 下移调整格内子节点顺序（P6.3b，替代拖拽排序）", async () => {
+  const ownerCellOrder = (wrapper: VueWrapper): string[] => {
+    const grid = gridById(schemaOf(wrapper), "ticket-layout");
+    return grid.rows
+      .find((r) => r.id === "row-owner-team")!
+      .cells[0].children.map((c) => c.id);
+  };
+
+  it("拖拽把组件跨格移动到其它单元格（格内排序 / 跨格移动统一原语）", async () => {
     const wrapper = mount(DesignerApp);
-    expect(ownerCellChildren(wrapper)).toEqual([
+    expect(ownerCellOrder(wrapper)).toEqual([
       "owner-label",
       "owner-field",
       "team-label",
       "team-field",
     ]);
 
-    await wrapper.find('[data-node-id="owner-field"]').trigger("click");
-    await wrapper.find('[data-node-move="up"]').trigger("click");
-    expect(ownerCellChildren(wrapper)).toEqual([
-      "owner-field",
-      "owner-label",
-      "team-label",
-      "team-field",
-    ]);
-
-    // 选中态保持在被移动的节点上，可直接继续下移
-    await wrapper.find('[data-node-move="down"]').trigger("click");
-    expect(ownerCellChildren(wrapper)).toEqual([
-      "owner-label",
-      "owner-field",
-      "team-label",
-      "team-field",
-    ]);
-  });
-
-  it("边界处禁用对应方向按钮", async () => {
-    const first = mount(DesignerApp);
-    await first.find('[data-node-id="owner-label"]').trigger("click");
-    expect(first.find('[data-node-move="up"]').attributes("disabled")).toBeDefined();
-    expect(first.find('[data-node-move="down"]').attributes("disabled")).toBeUndefined();
-
-    const last = mount(DesignerApp);
-    await last.find('[data-node-id="team-field"]').trigger("click");
-    expect(last.find('[data-node-move="down"]').attributes("disabled")).toBeDefined();
-    expect(last.find('[data-node-move="up"]').attributes("disabled")).toBeUndefined();
-  });
-
-  it("通过目标下拉把组件跨格移动到其它单元格（P6.3c）", async () => {
-    const wrapper = mount(DesignerApp);
-    await wrapper.find('[data-node-id="owner-field"]').trigger("click");
-
-    const targetSelect = wrapper.find('select[data-move-target="true"]');
-    expect(targetSelect.exists()).toBe(true);
-    await targetSelect.setValue("cell-u-f");
-    await wrapper.find('[data-node-move="target"]').trigger("click");
+    const dt = new MockDataTransfer();
+    dispatchDrag(
+      wrapper.find('[data-node-id="owner-field"]').element,
+      "dragstart",
+      dt,
+      { altKey: true },
+    );
+    await nextTick();
+    const targetCell = wrapper.find('[data-layout-id="cell-u-f"]').element;
+    dispatchDrag(targetCell, "dragover", dt, { clientY: 0 });
+    await nextTick();
+    dispatchDrag(targetCell, "drop", dt);
+    await nextTick();
 
     const grid = gridById(schemaOf(wrapper), "ticket-layout");
-    const ownerCell = grid.rows.find(r => r.id === "row-owner-team")!.cells[0];
-    const unitFieldCell = grid.rows.find(r => r.id === "row-unit-number")!.cells[1];
-    expect(ownerCell.children.map(c => c.id)).not.toContain("owner-field");
-    expect(unitFieldCell.children.map(c => c.id)).toContain("owner-field");
+    const ownerCell = grid.rows.find((r) => r.id === "row-owner-team")!.cells[0];
+    const unitFieldCell = grid.rows.find((r) => r.id === "row-unit-number")!.cells[1];
+    expect(ownerCell.children.map((c) => c.id)).not.toContain("owner-field");
+    expect(unitFieldCell.children.map((c) => c.id)).toContain("owner-field");
   });
 
-  it("目标下拉不含被移动节点当前所在的格（P6.3c 验收反馈）", async () => {
+  it("同格内拖拽调整顺序（末尾落点 → 移到最后）", async () => {
     const wrapper = mount(DesignerApp);
-    await wrapper.find('[data-node-id="owner-field"]').trigger("click");
+    expect(ownerCellOrder(wrapper)).toEqual([
+      "owner-label",
+      "owner-field",
+      "team-label",
+      "team-field",
+    ]);
 
-    const options = wrapper
-      .find('select[data-move-target="true"]')
-      .findAll("option")
-      .map(option => option.attributes("value"));
-    // owner-field 位于 cell-o-l，不应出现在可选目标中
-    expect(options).not.toContain("cell-o-l");
-    expect(options).toContain("cell-u-f");
+    const dt = new MockDataTransfer();
+    dispatchDrag(
+      wrapper.find('[data-node-id="owner-field"]').element,
+      "dragstart",
+      dt,
+      { altKey: true },
+    );
+    await nextTick();
+    const ownCell = wrapper.find('[data-layout-id="cell-o-l"]').element;
+    dispatchDrag(ownCell, "dragover", dt, { clientY: 0 });
+    await nextTick();
+    dispatchDrag(ownCell, "drop", dt);
+    await nextTick();
+
+    expect(ownerCellOrder(wrapper)).toEqual([
+      "owner-label",
+      "team-label",
+      "team-field",
+      "owner-field",
+    ]);
   });
 });
 
@@ -486,5 +516,71 @@ describe("DesignerApp 排列方向配置隐藏（text/p 分支不再暴露 writi
     const wrapper = mount(DesignerApp);
     await wrapper.find('[data-node-id="unit-field"]').trigger("click");
     expect(wrapper.text()).not.toContain("排列方向");
+  });
+});
+
+describe("DesignerApp 字段组件配置：宽度 / 默认内容 / 内部边框", () => {
+  /** 取 fixture 中指定 id 的字段节点（p 节点，每次重新读取以反映最新 schema）。 */
+  function fieldNodeById(schema: FormSchemaV2, id: string) {
+    const owner = findOwnerCellOfField(schema, id);
+    if (!owner) throw new Error(`fixture field missing: ${id}`);
+    const node = owner.cell.children.find(c => c.id === id);
+    if (node?.type !== "p") throw new Error(`not a field node: ${id}`);
+    return node;
+  }
+
+  it("宽度：输入 mm/px/% 等自由长度字符串并写入 schema", async () => {
+    const wrapper = mount(DesignerApp);
+    await wrapper.find('[data-node-id="unit-field"]').trigger("click");
+
+    const widthInput = wrapper.find("input[data-field-width]");
+    expect(widthInput.exists()).toBe(true);
+
+    await widthInput.setValue("30mm");
+    expect(fieldNodeById(schemaOf(wrapper), "unit-field").width).toBe("30mm");
+
+    await wrapper.find("input[data-field-width]").setValue("50%");
+    expect(fieldNodeById(schemaOf(wrapper), "unit-field").width).toBe("50%");
+
+    // 清空时移除该属性（回落为不限制宽度）
+    await wrapper.find("input[data-field-width]").setValue("");
+    expect(fieldNodeById(schemaOf(wrapper), "unit-field").width).toBeUndefined();
+  });
+
+  it("默认内容：文本域输入并写入 schema，渲染层无 data 时回退该值", async () => {
+    const wrapper = mount(DesignerApp);
+    await wrapper.find('[data-node-id="unit-field"]').trigger("click");
+
+    const defaultInput = wrapper.find("textarea[data-field-default]");
+    expect(defaultInput.exists()).toBe(true);
+
+    await defaultInput.setValue("预设内容");
+    await nextTick();
+
+    expect(fieldNodeById(schemaOf(wrapper), "unit-field").default).toBe("预设内容");
+    // 画布上该字段应渲染出默认内容
+    expect(wrapper.find('[data-node-id="unit-field"]').text()).toContain("预设内容");
+  });
+
+  it("内部边框：勾选写入 innerBorder=true，取消勾选移除", async () => {
+    const wrapper = mount(DesignerApp);
+    await wrapper.find('[data-node-id="unit-field"]').trigger("click");
+
+    const checkbox = wrapper.find("input[data-field-inner-border]");
+    expect(checkbox.exists()).toBe(true);
+    expect(fieldNodeById(schemaOf(wrapper), "unit-field").innerBorder).toBeUndefined();
+
+    await checkbox.setValue(true);
+    expect(fieldNodeById(schemaOf(wrapper), "unit-field").innerBorder).toBe(true);
+    // 渲染层同步加修饰类（设计态即可见底边框）
+    expect(
+      wrapper.find('[data-node-id="unit-field"]').classes(),
+    ).toContain("layout-p--inner-border");
+
+    await wrapper.find("input[data-field-inner-border]").setValue(false);
+    expect(fieldNodeById(schemaOf(wrapper), "unit-field").innerBorder).toBeUndefined();
+    expect(
+      wrapper.find('[data-node-id="unit-field"]').classes(),
+    ).not.toContain("layout-p--inner-border");
   });
 });

@@ -6,6 +6,8 @@ import GridSchemaNode from "./GridSchemaNode.vue";
 
 defineOptions({ name: "GridFormRenderer" });
 
+const emit = defineEmits<{ (e: "node-drag-start", id: string): void }>();
+
 const props = defineProps<{
   schema: FormSchemaV2;
   selectedNodeId?: string | null;
@@ -17,6 +19,9 @@ const props = defineProps<{
    * 区别只在于是否允许编辑。
    */
   readonly?: boolean;
+  /** 拖拽重排（P9）：当前悬停投放格与插入下标，透传给渲染树绘制插入指示线。 */
+  dragOverCellId?: string | null;
+  dragOverIndex?: number | null;
 }>();
 
 const paperSize = computed(() => {
@@ -70,6 +75,9 @@ function pageSiblingSuppressBorders(children: FormNodeV2[], index: number): { to
         :data="data"
         :readonly="props.readonly"
         :suppress-borders="pageSiblingSuppressBorders(page.children, index)"
+        :drag-over-cell-id="dragOverCellId"
+        :drag-over-index="dragOverIndex"
+        @node-drag-start="(id) => emit('node-drag-start', id)"
       />
     </main>
   </div>

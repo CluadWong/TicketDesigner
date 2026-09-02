@@ -106,7 +106,8 @@ function minNodeHeightMm(node: FormNodeV2, baseRowHeight: number): number {
   }
   if (node.type === "p") return baseRowHeight;
   if (node.type === "table") {
-    return Math.max(0, node.headerHeight + node.minRows * node.rowHeight) * baseRowHeight;
+    // 表头与数据行均固定为 1× 基准行高（表头高度 / 行高倍数配置已移至单元格）。
+    return Math.max(0, 1 + node.minRows) * baseRowHeight;
   }
   if (node.type === "image") return Math.max(0, node.height ?? 0);
   return 0;
@@ -227,9 +228,6 @@ function validateTable(node: TableNodeV2, path: Array<string | number>, issues: 
       issue(issues, "error", "INVALID_TABLE_COLUMN_WIDTH", node, columnPath, `Invalid width for table column ${column.key}`);
     }
   });
-  if (!isPositiveNumber(node.headerHeight) || !isPositiveNumber(node.rowHeight)) {
-    issue(issues, "error", "INVALID_TABLE_ROW_HEIGHT", node, path, "Table headerHeight and rowHeight must be positive");
-  }
   if (!Number.isInteger(node.minRows) || node.minRows < 0) {
     issue(issues, "error", "INVALID_TABLE_MIN_ROWS", node, path, "Table minRows must be a non-negative integer");
   }
@@ -254,6 +252,7 @@ function scanNode(
   issues: SchemaIssueV2[],
   fields: Map<string, string>,
   cellContext: CellWidthContextV2 | undefined,
+  insideTableRowTemplate = false,
 ): void {
   if (node.type === "text") {
     if (cellContext && node.style?.writingMode !== "vertical-rl") {
@@ -276,7 +275,9 @@ function scanNode(
     }
   } else if (node.type === "p") {
     validatePWidthOverflow(node, cellContext, path, issues);
-    if (node.mode === "field") {
+    // 表格行模板内字段 P 的 field 由列配置派生（列key_行号），schema 中不手写，
+    // 故跳过 EMPTY_FIELD / DUPLICATE_FIELD 命名检查（避免派生型字段误报）。
+    if (node.mode === "field" && !insideTableRowTemplate) {
       if (!node.field.trim()) {
         issue(issues, "warning", "EMPTY_FIELD", node, path, "Field P has an empty field name");
       } else if (fields.has(node.field)) {
@@ -301,7 +302,7 @@ function scanNode(
             ? { widthMm, paddingMm: cell.padding ?? node.cellPadding ?? 0 }
             : undefined;
         cell.children.forEach((child, childIndex) =>
-          scanNode(child, [...path, "rows", rowIndex, "cells", cellIndex, "children", childIndex], issues, fields, context),
+          scanNode(child, [...path, "rows", rowIndex, "cells", cellIndex, "children", childIndex], issues, fields, context, insideTableRowTemplate),
         );
         startColumn += span;
       });
@@ -315,7 +316,7 @@ function scanNode(
           ? { widthMm: column.width, paddingMm: 0 }
           : undefined;
       template.children.forEach((child, childIndex) =>
-        scanNode(child, [...path, "rowTemplate", templateIndex, "children", childIndex], issues, fields, context),
+        scanNode(child, [...path, "rowTemplate", templateIndex, "children", childIndex], issues, fields, context, true),
       );
     });
   } else if (node.type === "image") {

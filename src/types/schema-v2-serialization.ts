@@ -47,8 +47,6 @@ function normalizeNode(value: unknown): RecordValue {
     return {
       ...node,
       columns,
-      headerHeight: node.headerHeight ?? 1,
-      rowHeight: node.rowHeight ?? 1,
       minRows: node.minRows ?? 0,
       rowTemplate: Array.isArray(node.rowTemplate)
         ? node.rowTemplate.map(template => normalizeTemplate(template))

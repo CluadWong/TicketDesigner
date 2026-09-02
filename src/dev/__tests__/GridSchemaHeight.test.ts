@@ -21,8 +21,6 @@ describe("GridSchemaNode row sizing", () => {
                 id: "table",
                 type: "table",
                 columns: [{ key: "content", title: "content", width: "1fr" }],
-                headerHeight: 1,
-                rowHeight: 1,
                 minRows: 6,
                 rowTemplate: [],
               }],

@@ -294,26 +294,6 @@ export function updateTableMinRowsV2(
   );
 }
 
-export function updateTableHeaderHeightV2(
-  schema: FormSchemaV2,
-  tableId: string,
-  headerHeight: number,
-): FormSchemaV2 {
-  return updateSchemaNodeV2(schema, tableId, node =>
-    node.type === "table" ? { ...node, headerHeight: Math.max(0, Math.floor(headerHeight)) } : node,
-  );
-}
-
-export function updateTableRowHeightV2(
-  schema: FormSchemaV2,
-  tableId: string,
-  rowHeight: number,
-): FormSchemaV2 {
-  return updateSchemaNodeV2(schema, tableId, node =>
-    node.type === "table" ? { ...node, rowHeight: Math.max(0, Math.floor(rowHeight)) } : node,
-  );
-}
-
 /**
  * 新增一列：同时向 columns 追加列定义，并向 rowTemplate 追加一个对应的单元格模板
  * （默认放入一个字段 P），保证渲染层 tableTemplate() 能按 columnKey 命中。
@@ -348,7 +328,9 @@ export function addTableColumnV2(
           id: createSchemaNodeIdV2(`${node.id}-${key}-p`),
           type: "p",
           mode: "field",
-          field: key,
+          // 字段名由渲染期按「列key_行号」自动派生（见 schema-v2-table-rows.ts），
+          // 行模板内不手写 field；校验层对表格内字段跳过命名检查。
+          field: "",
           underline: true,
         },
       ],
@@ -563,24 +545,11 @@ export function wrapCellChildrenWithGridV2(schema: FormSchemaV2, cellId: string)
   });
 }
 
-export function moveNodeV2(
+/** 从 schema 中拆下指定节点，返回拆下后的 schema 与被拆下的节点（找不到则返回原 schema + undefined）。 */
+function detachNodeV2(
   schema: FormSchemaV2,
   nodeId: string,
-  targetCellId: string,
-): FormSchemaV2 {
-  const index = buildEditorNodeIndexV2(schema);
-  const source = index.get(nodeId);
-  const target = index.get(targetCellId);
-  if (!source || !target || (target.node.type !== "grid-cell" && target.node.type !== "table-cell-template")) return schema;
-  if (source.node.type === "page" || source.node.type === "grid-row" || source.node.type === "grid-cell" || source.node.type === "table-cell-template") return schema;
-  // 目标就是自身当前所在格：无实际位移，直接原样返回，避免「拆下再追加」把节点
-  // 挪到同格末尾、反复操作后在原格堆积空位（见 P6.3c 验收反馈）。
-  if (source.parent?.id === targetCellId) return schema;
-  let ancestor = target.parent;
-  while (ancestor) {
-    if (ancestor.id === nodeId) return schema;
-    ancestor = index.get(ancestor.id)?.parent ?? null;
-  }
+): { schema: FormSchemaV2; node?: FormNodeV2 } {
   let moved: FormNodeV2 | undefined;
   const detach = (node: FormNodeV2): FormNodeV2 => {
     if (node.type === "grid") {
@@ -614,12 +583,89 @@ export function moveNodeV2(
   };
   const detached = {
     ...schema,
-    pages: schema.pages.map(page => ({ ...page, children: page.children.filter(child => {
-      if (child.id === nodeId) { moved = child; return false; }
-      return true;
-    }).map(detach) })),
+    pages: schema.pages.map(page => ({
+      ...page,
+      children: page.children.filter(child => {
+        if (child.id === nodeId) { moved = child; return false; }
+        return true;
+      }).map(detach),
+    })),
   };
-  return moved ? appendNodeToCellV2(detached, targetCellId, moved) : schema;
+  return { schema: detached, node: moved };
+}
+
+export function moveNodeV2(
+  schema: FormSchemaV2,
+  nodeId: string,
+  targetCellId: string,
+): FormSchemaV2 {
+  const index = buildEditorNodeIndexV2(schema);
+  const source = index.get(nodeId);
+  const target = index.get(targetCellId);
+  if (!source || !target || (target.node.type !== "grid-cell" && target.node.type !== "table-cell-template")) return schema;
+  if (source.node.type === "page" || source.node.type === "grid-row" || source.node.type === "grid-cell" || source.node.type === "table-cell-template") return schema;
+  // 目标就是自身当前所在格：无实际位移，直接原样返回，避免「拆下再追加」把节点
+  // 挪到同格末尾、反复操作后在原格堆积空位（见 P6.3c 验收反馈）。
+  if (source.parent?.id === targetCellId) return schema;
+  let ancestor = target.parent;
+  while (ancestor) {
+    if (ancestor.id === nodeId) return schema;
+    ancestor = index.get(ancestor.id)?.parent ?? null;
+  }
+  const { schema: detached, node } = detachNodeV2(schema, nodeId);
+  return node ? appendNodeToCellV2(detached, targetCellId, node) : schema;
+}
+
+/** 拖拽已有节点重排时写入 dataTransfer 的 MIME（与模板生成用的 DRAG_MIME 区分）。 */
+export const NODE_MOVE_MIME = "application/x-ticket-node-move";
+
+/**
+ * P9（拖拽重排）核心操作：把节点从当前位置拆下，插入到目标格（grid-cell / table-cell-template）
+ * 的任意下标 `atIndex`，同时覆盖「格内排序」与「跨格 / 跨 Grid 移动」两种场景。
+ *
+ * - `atIndex` 由 UI 按「可见 children + 指针命中」计算：同格时相对含该节点的当前数组，
+ *   跨格时相对目标格当前数组；函数内部对同格情形做偏移修正（拆下后下标 -1）。
+ * - 拒绝：目标非格/列模板、节点自身为非可选容器（page/row/cell/template）、目标位于节点自身或其内部。
+ * - 原位（同格且 atIndex === 原下标）或非法时返回原 schema 引用，避免产生无意义撤销记录。
+ * - `atIndex` 越界自动 clamp 到 [0, 目标格 children 长度]。
+ */
+export function moveNodeToIndexV2(
+  schema: FormSchemaV2,
+  nodeId: string,
+  targetCellId: string,
+  atIndex: number,
+): FormSchemaV2 {
+  const index = buildEditorNodeIndexV2(schema);
+  const source = index.get(nodeId);
+  const target = index.get(targetCellId);
+  if (!source || !target) return schema;
+  if (target.node.type !== "grid-cell" && target.node.type !== "table-cell-template") return schema;
+  if (source.node.type === "page" || source.node.type === "grid-row" || source.node.type === "grid-cell" || source.node.type === "table-cell-template") return schema;
+  // 目标位于被移动节点自身或其内部（移入自身后代）→ 拒绝。
+  let ancestor = target.parent;
+  while (ancestor) {
+    if (ancestor.id === nodeId) return schema;
+    ancestor = index.get(ancestor.id)?.parent ?? null;
+  }
+  const fromCell = source.parent;
+  const fromCellChildren =
+    fromCell && (fromCell.type === "grid-cell" || fromCell.type === "table-cell-template")
+      ? fromCell.children
+      : null;
+  const fromIndex = fromCellChildren ? fromCellChildren.findIndex(c => c.id === nodeId) : -1;
+  const sameCell = fromCell?.id === targetCellId;
+  // 同格原位：无位移，直接返回原 schema 引用。
+  if (sameCell && fromIndex >= 0 && atIndex === fromIndex) return schema;
+  const { schema: detached, node } = detachNodeV2(schema, nodeId);
+  if (!node) return schema;
+  let idx = Number.isFinite(atIndex) ? Math.trunc(atIndex) : 0;
+  // 同格重排：UI 传入的 atIndex 相对含该节点的当前数组，拆下后需把偏移修正一位。
+  if (sameCell && fromIndex >= 0 && idx > fromIndex) idx -= 1;
+  return updateSchemaNodeV2(detached, targetCellId, cell => {
+    if (cell.type !== "grid-cell" && cell.type !== "table-cell-template") return cell;
+    const i = Math.max(0, Math.min(idx, cell.children.length));
+    return { ...cell, children: [...cell.children.slice(0, i), node, ...cell.children.slice(i)] };
+  });
 }
 
 /**
@@ -1108,12 +1154,10 @@ export function createTableNodeV2(): TableNodeV2 {
     { key: "col1", title: "列 1", width: "1fr" },
     { key: "col2", title: "列 2", width: "1fr" },
   ];
-  return {
+    return {
     id,
     type: "table",
     columns,
-    headerHeight: 1,
-    rowHeight: 1,
     minRows: 4,
     rowTemplate: columns.map(column => ({
       id: createSchemaNodeIdV2(`${id}-${column.key}`),
@@ -1123,7 +1167,9 @@ export function createTableNodeV2(): TableNodeV2 {
         id: createSchemaNodeIdV2(`${id}-${column.key}-p`),
         type: "p" as const,
         mode: "field" as const,
-        field: column.key,
+        // 字段名由渲染期按「列key_行号」自动派生（见 schema-v2-table-rows.ts），
+        // 行模板内不手写 field；校验层对表格内字段跳过命名检查。
+        field: "",
         underline: true,
       }],
     })),

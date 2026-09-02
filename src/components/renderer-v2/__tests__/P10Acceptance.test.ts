@@ -108,7 +108,7 @@ describe("P10 前五行闭环验收（实现侧 harness）", () => {
         (wrapper.find(`[data-field="${f}"] .layout-p__control`).element as
           HTMLTextAreaElement | HTMLInputElement).value;
       expect(fieldVal("单位")).toContain("121");
-      expect(fieldVal("工作负责人_监护人")).toContain("121");
+      expect(fieldVal("工作负责人（监护人）")).toContain("121");
       expect(fieldVal("班组")).toContain("121");
       const count = wrapper.find('[data-field="工作班成员人数"]');
       expect(count.exists()).toBe(true);
@@ -125,10 +125,10 @@ describe("P10 前五行闭环验收（实现侧 harness）", () => {
         row.findAll("[data-field]").map(cell => cell.attributes("data-field")),
       );
       expect(fields).toEqual([
-        ["工作任务_1_1", "工作任务_1_2"],
-        ["工作任务_2_1", "工作任务_2_2"],
-        ["工作任务_3_1", "工作任务_3_2"],
-        ["工作任务_4_1", "工作任务_4_2"],
+        ["工作地点_1", "工作内容_1"],
+        ["工作地点_2", "工作内容_2"],
+        ["工作地点_3", "工作内容_3"],
+        ["工作地点_4", "工作内容_4"],
       ]);
       // 逐行键必须在验收数据里存在，否则填写态取不到值（指标「键与 demoData 一致无错位」）。
       for (const field of fields.flat()) {
@@ -139,19 +139,19 @@ describe("P10 前五行闭环验收（实现侧 harness）", () => {
     it("填写态：内嵌表按行独立回写（改一行不影响其他行）", () => {
       const data = {
         ...demoData,
-        工作任务_1_1: "1 号主变",
-        工作任务_2_1: "2 号主变",
-        工作任务_2_2: "清扫检查",
+        "工作地点_1": "1 号主变",
+        "工作地点_2": "2 号主变",
+        "工作内容_2": "清扫检查",
       };
       const wrapper = mount(GridFormRenderer, { props: { schema, data } });
       const rows = wrapper.findAll("tbody tr");
       const cellVal = (rowIdx: number, f: string) =>
         (rows[rowIdx].find(`[data-field="${f}"] .layout-p__control`).element as HTMLTextAreaElement).value;
-      expect(cellVal(0, "工作任务_1_1")).toContain("1 号主变");
-      expect(cellVal(0, "工作任务_1_1")).not.toContain("2 号主变");
-      expect(cellVal(1, "工作任务_2_1")).toContain("2 号主变");
-      expect(cellVal(1, "工作任务_2_2")).toContain("清扫检查");
-      expect(cellVal(2, "工作任务_3_1").trim()).toBe("");
+      expect(cellVal(0, "工作地点_1")).toContain("1 号主变");
+      expect(cellVal(0, "工作地点_1")).not.toContain("2 号主变");
+      expect(cellVal(1, "工作地点_2")).toContain("2 号主变");
+      expect(cellVal(1, "工作内容_2")).toContain("清扫检查");
+      expect(cellVal(2, "工作地点_3").trim()).toBe("");
     });
 
     it("无意外溢出：校验无 CONTENT_OVERFLOW / PAPER_OVERFLOW（P10 指标「无意外溢出」）", () => {

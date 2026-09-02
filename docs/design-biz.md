@@ -127,7 +127,7 @@ Table 用于规则明细，不用于整张表单排版。
 - 新建 Table 时，每个列模板默认包含一个 Field P，渲染结构为 `tbody > tr > td > p`；删除默认 P 后可以放置其他组件。
 
 设计态根据 minRows 重复 rowTemplate 作为空数据占位。填写态渲染行数 = `max(minRows, data 中实际出现的最大行号)`：
-行模板字段用 `{row}` 占位符（如 `工作内容_{row}_2`），data 含 `工作内容_5_2` 即补渲染第 5 行；中间未填行留空，保证 data 完整可见（非 repeatable 配置属性）。
+行模板字段名由渲染期按「列key_行号」自动派生（列 `工作地点` 第 r 行即 `工作地点_r`），data 含 `工作地点_5` 即补渲染第 5 行；中间未填行留空，保证 data 完整可见（非 repeatable 配置属性）。表格内字段不可单独选中/配置，增删列即增删字段。
 
 ## 7. HTML 与 Image
 
@@ -225,7 +225,7 @@ interface FormPreviewProps {
 
 - static P 不访问 data。
 - field P 读取和回写 data[field]。
-- Table 数据行数由 data 推导（非 schema 属性）：渲染行数 = `max(minRows, 行模板字段 data 键中最大行号)`，行模板字段用 `{row}` 占位符与 data 逐行键对应。
+- Table 数据行数由 data 推导（非 schema 属性）：渲染行数 = `max(minRows, data 键中最大行号)`；行模板字段名由渲染期按「列key_行号」自动派生，与 data 逐行键对应。
 - readonly 禁止编辑但保留内容。
 - hidden 默认隐藏内容并保留固定版式空间，完全折叠需要显式 layoutHidden 规则。
 - required 在预览中标记，并在提交时校验。

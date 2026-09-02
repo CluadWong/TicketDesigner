@@ -240,7 +240,7 @@ interface TableCellTemplate {
 - 默认 Table 为 `thead > tr > th` 加 `tbody > tr > td > p`；每个数据列模板默认放置一个 Field P。
 - 用户可以删除某个默认 P，再在对应 `td` 中放置其他组件，以覆盖特殊单元格需求。
 - minRows 确保空数据时仍有可手写/填写的固定行数。
-- 动态行数由 data 推导（非 schema 属性）：渲染行数 = `max(minRows, data 中实际出现的最大行号)`，行模板字段以 `{row}` 占位符绑定（如 `工作内容_{row}_2`），data 含 `工作内容_5_2` 即补渲染第 5 行；中间未填行留空，保证 data 完整可见。详见 `src/types/schema-v2-table-rows.ts`。
+- 动态行数由 data 推导（非 schema 属性）：渲染行数 = `max(minRows, data 中实际出现的最大行号)`；行模板字段名由渲染期按「列key_行号」自动派生（`bindTableRowCell`：列 `工作地点` 第 r 行即 `工作地点_r`），data 含 `工作地点_5` 即补渲染第 5 行；中间未填行留空，保证 data 完整可见。表格内字段不可单独选中/配置，增删列即增删字段。详见 `src/types/schema-v2-table-rows.ts`。
 - 一个单元格需要多个元素时，children 中直接放多个节点或一个子 Grid。
 - 静态表单外框、签名区和说明区不使用 Table，统一使用 Grid。
 
@@ -324,7 +324,7 @@ type RulesMap = Record<string, FieldRule>
 
 - static P 显示 text。
 - field P 读取并回写 data[field]。
-- Table 数据行数由 data 推导（非 schema 属性）：渲染行数 = `max(minRows, 行模板字段 data 键中最大行号)`，行模板字段用 `{row}` 占位符（如 `工作内容_{row}_2`）与 data 逐行键对应；中间未填行留空。
+- Table 数据行数由 data 推导（非 schema 属性）：渲染行数 = `max(minRows, data 键中最大行号)`；行模板字段名由渲染期按「列key_行号」自动派生（列 `工作地点` 第 r 行即 `工作地点_r`），与 data 逐行键对应；中间未填行留空。
 - readonly/hidden/required 由 RulesMap 提供，不写入模板。
 - 重复 field 在设计态给出软警告。
 
