@@ -33,6 +33,7 @@ import {
   updateGridBorderV2,
   updateTableBorderV2,
   updateGridCellDefaultsV2,
+  updateGridGapV2,
   updateSchemaNodeV2,
   updateTableMinRowsV2,
   addTableColumnV2,
@@ -1106,6 +1107,14 @@ function updateGridCellDefault(
   );
 }
 
+/** 设置 Grid 单元格间距（mm，等价于 CSS gap，同时作用于行与列）。 */
+function updateGridGap(event: Event): void {
+  if (selectedNode.value?.type !== "grid") return;
+  const raw = (event.target as HTMLInputElement).value;
+  const gap = raw === "" ? undefined : Math.max(0, Number(raw) || 0);
+  commit(updateGridGapV2(schema.value, selectedNode.value.id, gap), "gridgap");
+}
+
 /** 统一设置 text / p 节点的文本样式字段（字号/粗细/颜色/对齐/字体等）。 */
 function updateSelectedTextStyle(patch: Partial<TextStyleV2>): void {
   updateSelectedNode(
@@ -1601,6 +1610,17 @@ function updateSelectedSafetyField(event: Event): void {
           </div>
           <div class="v2-sidebar__subheading">单元格默认（padding / 对齐）</div>
           <div class="v2-grid-dimensions">
+            <label class="v2-control v2-control--inline">
+              <span>单元格间距(mm)</span>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                data-grid="gap"
+                :value="selectedNode.gap ?? ''"
+                @change="updateGridGap"
+              />
+            </label>
             <label class="v2-control v2-control--inline">
               <span>默认内边距(mm)</span>
               <input
@@ -2673,10 +2693,10 @@ function updateSelectedSafetyField(event: Event): void {
   text-decoration: underline;
 }
 
-@page {
-  size: A4;
-  margin: 0;
-}
+/* 打印纸张尺寸（`@page { size: Wmm Hmm }`）**不在此处写死**：
+   它由渲染内核 `GridFormRenderer` 按 `schema.paper` 运行时注入（见 `page-size-style.ts`）。
+   此前这里硬编码 `@page { size: A4 }`，导致切到 A3 横向后屏幕渲染 420×297mm 正常、
+   打印却仍按 A4 出页、内容被裁切（P11-3 修复）。 */
 
 @media print {
   .v2-toolbar,

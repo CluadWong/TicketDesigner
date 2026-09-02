@@ -1,8 +1,14 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onUnmounted, watch } from "vue";
 import type { CSSProperties } from "vue";
-import type { FormSchemaV2, FormDataV2, FormNodeV2 } from "@/types";
+import {
+  resolvePaperSizeV2,
+  type FormSchemaV2,
+  type FormDataV2,
+  type FormNodeV2,
+} from "@/types";
 import GridSchemaNode from "./GridSchemaNode.vue";
+import { registerPageSizeStyle, setPageSizeStyle } from "./page-size-style";
 
 defineOptions({ name: "GridFormRenderer" });
 
@@ -32,22 +38,28 @@ const props = defineProps<{
   bare?: boolean;
 }>();
 
-const paperSize = computed(() => {
-  const isA4 = props.schema.paper.size === "A4";
-  const shortSide = isA4 ? 210 : 297;
-  const longSide = isA4 ? 297 : 420;
-  // 方向由纸张尺寸派生（去掉方向选择）：A4 → 纵向，A3 → 横向。
-  const orientation = isA4 ? "portrait" : "landscape";
-  return orientation === "portrait"
-    ? { width: shortSide, height: longSide }
-    : { width: longSide, height: shortSide };
-});
+/** 纸张物理尺寸（mm），方向由纸张尺寸派生（A4 纵向 / A3 横向）。
+ *  与打印 `@page`、溢出校验共用 `resolvePaperSizeV2`，避免各处硬编码。 */
+const paperSize = computed(() => resolvePaperSizeV2(props.schema.paper));
+
+/**
+ * 打印纸张尺寸（P11-3 修复）：把当前纸张宽高写入全局 `@page` 规则。
+ * `@page` 是页面级规则，无法写成 scoped 样式也无法用 Vue 绑定，故由内核在运行时注入；
+ * 纸张切换（A4 ↔ A3）时同步更新，实例卸载时释放（见 `page-size-style.ts`）。
+ * 修复前该规则在设计器里写死 `size: A4`，导致选 A3 横向时渲染正常、打印仍按 A4 出页而内容被裁。
+ */
+watch(
+  paperSize,
+  (size) => setPageSizeStyle(size.widthMm, size.heightMm),
+  { immediate: true },
+);
+onUnmounted(registerPageSizeStyle());
 
 function paperStyle(page: FormSchemaV2["pages"][number]): CSSProperties {
   const size = paperSize.value;
   return {
-    width: `${size.width}mm`,
-    minHeight: `${size.height}mm`,
+    width: `${size.widthMm}mm`,
+    minHeight: `${size.heightMm}mm`,
     padding: `${page.margin.top}mm ${page.margin.right}mm ${page.margin.bottom}mm ${page.margin.left}mm`,
   };
 }

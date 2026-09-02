@@ -284,6 +284,31 @@ export function updateGridCellDefaultsV2(
   );
 }
 
+/**
+ * 单元格间距（mm）。同时作用于行间距与列间距，等价于 CSS `gap`；
+ * 传 0 / 负数 / 非数字均视为「无间距」（清除该字段）。
+ */
+export function updateGridGapV2(
+  schema: FormSchemaV2,
+  gridId: string,
+  gap: number | undefined,
+): FormSchemaV2 {
+  const value =
+    typeof gap === "number" && Number.isFinite(gap) && gap > 0 ? gap : undefined;
+  return updateSchemaNodeV2(schema, gridId, node =>
+    node.type === "grid" ? { ...node, gap: value } : node,
+  );
+}
+
+/**
+ * 解析 Grid 的单元格间距（mm）。渲染层与设计器共用，缺省 / 非法值返回 0
+ * （旧数据无 gap 字段时保持「单元格紧贴」的原始版式）。
+ */
+export function resolveGridGapV2(grid: GridNodeV2): number {
+  const gap = grid.gap;
+  return typeof gap === "number" && Number.isFinite(gap) && gap > 0 ? gap : 0;
+}
+
 export function updateTableMinRowsV2(
   schema: FormSchemaV2,
   tableId: string,

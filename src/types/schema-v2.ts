@@ -102,6 +102,12 @@ export interface GridNodeV2 extends SchemaNodeBaseV2 {
   cellAlign?: "left" | "center" | "right";
   /** 单元格默认垂直对齐。子 cell 未单独设置 verticalAlign 时继承此值。 */
   cellVerticalAlign?: "top" | "middle" | "bottom";
+  /**
+   * 单元格间距（mm，非负）：同时作用于**行与行之间**与**列与列之间**，
+   * 等价于 CSS `gap`。缺省为 0（单元格紧贴，分隔线相接）。
+   * 注意：间距会让内部边框线之间出现等距空隙（每格只画自己的单边，间隙留白）。
+   */
+  gap?: number;
 }
 
 export interface GridRowV2 extends SchemaNodeBaseV2 {
@@ -199,4 +205,32 @@ export interface FormSchemaV2 {
   paper: PaperConfigV2;
   baseRowHeight: number;
   pages: PageSchemaV2[];
+}
+
+/** 纸张边长（mm）：short=短边，long=长边。渲染纸张、打印 `@page size`、溢出校验共用同一份，
+ *  避免各处硬编码「A4 = 210×297」（历史上 `@page` 写死 A4，导致选 A3 时打印被裁）。 */
+export const PAPER_SIDE_MM: Record<PaperSizeV2, { short: number; long: number }> = {
+  A4: { short: 210, long: 297 },
+  A3: { short: 297, long: 420 },
+};
+
+export interface ResolvedPaperSizeV2 {
+  size: PaperSizeV2;
+  /** 方向由纸张尺寸派生（无独立方向选择）：A4 → 纵向，A3 → 横向。 */
+  orientation: OrientationV2;
+  widthMm: number;
+  heightMm: number;
+}
+
+/**
+ * 解析纸张物理尺寸（mm）。渲染纸张宽度/最小高度、打印 `@page size`、页面溢出校验
+ * 三处统一调用本函数，保证「屏幕上看到多大纸、打印出来就是多大纸」。
+ */
+export function resolvePaperSizeV2(paper: PaperConfigV2): ResolvedPaperSizeV2 {
+  const size: PaperSizeV2 = paper?.size === "A3" ? "A3" : "A4";
+  const sides = PAPER_SIDE_MM[size];
+  const orientation: OrientationV2 = size === "A3" ? "landscape" : "portrait";
+  return orientation === "portrait"
+    ? { size, orientation, widthMm: sides.short, heightMm: sides.long }
+    : { size, orientation, widthMm: sides.long, heightMm: sides.short };
 }

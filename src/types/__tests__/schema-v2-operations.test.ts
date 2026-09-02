@@ -29,6 +29,8 @@ import {
   updateCellAlignV2,
   updateCellVerticalAlignV2,
   updateGridCellDefaultsV2,
+  updateGridGapV2,
+  resolveGridGapV2,
   cloneNodeWithFreshIdsV2,
   copyGridRowV2,
   mergeGridCellsV2,
@@ -452,6 +454,32 @@ describe("P6.2b cell padding/align cascade", () => {
     const srcGrid = withGrid.pages[0].children[0];
     if (srcGrid.type !== "grid") throw new Error("grid missing");
     expect(srcGrid.cellPadding).toBeUndefined();
+  });
+
+  it("resolves and updates Grid gap (CSS gap, rows + columns)", () => {
+    const source = createEmptyFormSchemaV2();
+    const grid = createGridNodeV2({ rows: 1, columns: 1 });
+    const withGrid = insertRootGridV2(source, grid);
+
+    // 缺省 / 非法解析为 0（旧数据保持单元格紧贴）
+    expect(resolveGridGapV2(withGrid.pages[0].children[0] as GridNodeV2)).toBe(0);
+
+    const next = updateGridGapV2(withGrid, grid.id, 6);
+    const nextGrid = next.pages[0].children[0];
+    if (nextGrid.type !== "grid") throw new Error("grid missing");
+    expect(nextGrid.gap).toBe(6);
+    expect(resolveGridGapV2(nextGrid)).toBe(6);
+
+    // 0 / 负数 / 非数字清除字段
+    const cleared = updateGridGapV2(next, grid.id, 0);
+    const cGrid = cleared.pages[0].children[0];
+    if (cGrid.type !== "grid") throw new Error("grid missing");
+    expect(cGrid.gap).toBeUndefined();
+
+    // 源不被修改
+    const srcGrid = withGrid.pages[0].children[0];
+    if (srcGrid.type !== "grid") throw new Error("grid missing");
+    expect(srcGrid.gap).toBeUndefined();
   });
 });
 

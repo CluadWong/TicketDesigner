@@ -34,9 +34,15 @@ function normalizeNode(value: unknown): RecordValue {
     throw new SchemaV2SerializationError(`Schema node ${node.id} is missing type`);
   }
   if (node.type === "grid") {
+    const rawGap = node.gap;
+    const gap =
+      typeof rawGap === "number" && Number.isFinite(rawGap) && rawGap > 0
+        ? rawGap
+        : undefined;
     return {
       ...node,
       border: node.border ?? "none",
+      gap,
       rows: Array.isArray(node.rows)
         ? node.rows.map(row => normalizeRow(row))
         : [],

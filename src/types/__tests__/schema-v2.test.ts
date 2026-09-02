@@ -275,6 +275,27 @@ describe("Schema V2 serialization", () => {
     expect(restored).toEqual(schema);
   });
 
+  it("round-trips Grid gap (CSS gap, rows + columns)", () => {
+    const schema = makeSchema();
+    const grid = schema.pages[0].children[0];
+    if (grid.type !== "grid") throw new Error("grid missing");
+    grid.gap = 8;
+    const restored = parseFormSchemaV2(serializeFormSchemaV2(schema));
+    const rGrid = restored.pages[0].children[0];
+    if (rGrid.type !== "grid") throw new Error("grid missing");
+    expect(rGrid.gap).toBe(8);
+  });
+
+  it("drops an invalid Grid gap while loading", () => {
+    const schema = makeSchema();
+    const input = JSON.parse(JSON.stringify(schema)) as Record<string, any>;
+    (input.pages[0].children[0] as Record<string, unknown>).gap = "oops";
+    const restored = parseFormSchemaV2(input);
+    const g = restored.pages[0].children[0];
+    if (g.type !== "grid") throw new Error("grid missing");
+    expect(g.gap).toBeUndefined();
+  });
+
   it("fills compatible optional defaults while loading", () => {
     const schema = makeSchema();
     const input = JSON.parse(JSON.stringify(schema)) as Record<string, unknown>;

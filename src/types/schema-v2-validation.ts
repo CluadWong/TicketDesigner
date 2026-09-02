@@ -7,10 +7,10 @@ import type {
   GridRowV2,
   GridTrackV2,
   PageSchemaV2,
-  PaperSizeV2,
   PNodeV2,
   TableNodeV2,
 } from "./schema-v2";
+import { resolvePaperSizeV2 } from "./schema-v2";
 import { buildEditorNodeIndexV2 } from "./schema-v2-index";
 
 export interface SchemaIssueV2 {
@@ -45,11 +45,6 @@ function isValidTrack(value: unknown): boolean {
 const MM_PER_PX = 25.4 / 96;
 const DEFAULT_P_FONT_SIZE_PX = 13;
 const FIELD_P_MIN_INPUT_WIDTH_MM = 12;
-
-const PAPER_SIDE_MM: Record<PaperSizeV2, { short: number; long: number }> = {
-  A4: { short: 210, long: 297 },
-  A3: { short: 297, long: 420 },
-};
 
 function isWideChar(char: string): boolean {
   return /[\u3000-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]/.test(char);
@@ -114,11 +109,9 @@ function minNodeHeightMm(node: FormNodeV2, baseRowHeight: number): number {
 }
 
 function pageUsableHeightMm(schema: FormSchemaV2, page: PageSchemaV2): number {
-  const sides = PAPER_SIDE_MM[schema.paper.size];
-  // 方向由纸张尺寸派生（去掉方向选择）：A4 → 纵向，A3 → 横向。
-  const orientation = schema.paper.size === "A3" ? "landscape" : "portrait";
-  const paperHeightMm = orientation === "portrait" ? sides.long : sides.short;
-  return paperHeightMm - page.margin.top - page.margin.bottom;
+  // 与渲染纸张、打印 @page 共用同一尺寸解析（方向由纸张尺寸派生：A4 纵向 / A3 横向）。
+  const { heightMm } = resolvePaperSizeV2(schema.paper);
+  return heightMm - page.margin.top - page.margin.bottom;
 }
 
 function validatePageOverflow(
@@ -174,6 +167,9 @@ function validateGrid(
     return;
   }
   node.rows.forEach((row, rowIndex) => validateRow(row, node, [...path, "rows", rowIndex], issues));
+  if (node.gap !== undefined && !isPositiveNumber(node.gap)) {
+    issue(issues, "warning", "INVALID_GRID_GAP", node, path, "Grid gap must be a positive number (mm)");
+  }
 }
 
 function validateRow(

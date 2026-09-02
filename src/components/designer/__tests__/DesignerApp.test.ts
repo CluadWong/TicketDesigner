@@ -222,6 +222,20 @@ describe("DesignerApp V2 selection and deletion", () => {
     expect(gridById(schema, "ticket-layout").cellPadding).toBe(4);
   });
 
+  it("sets Grid cell gap (CSS gap, rows + columns) via the inspector", async () => {
+    const wrapper = mount(DesignerApp);
+    await wrapper.find('[data-node-id="ticket-layout"]').trigger("click");
+
+    const gapInput = wrapper.find('input[data-grid="gap"]');
+    expect(gapInput.exists()).toBe(true);
+
+    await gapInput.setValue("6");
+    await gapInput.trigger("change");
+
+    const schema = schemaOf(wrapper);
+    expect(gridById(schema, "ticket-layout").gap).toBe(6);
+  });
+
   it("merges and splits adjacent cells from the cell inspector", async () => {
     const wrapper = mount(DesignerApp);
     // 选中外层 Grid 第一行第 0 格（cell-u-l），其右侧有 cell-u-f 可合并

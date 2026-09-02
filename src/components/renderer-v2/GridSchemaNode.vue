@@ -16,6 +16,7 @@ import HtmlBlock from "./HtmlBlock.vue";
 import {
   bindTableRowCell,
   resolveCellBoxV2,
+  resolveGridGapV2,
   resolveTableRowCount,
   NODE_MOVE_MIME,
 } from "@/types";
@@ -85,6 +86,15 @@ const track = (value: number | `${number}fr` | "auto" | undefined): string => {
   return typeof value === "number" ? `${value}mm` : value;
 };
 
+/**
+ * Grid 容器（flex column）间距：仅行与行之间（列间距由 `.layout-grid__row` 的
+ * `column-gap` 负责）。gap 同时作用于行列（CSS `gap` 语义）。
+ */
+function gridContainerStyle(node: GridNodeV2): CSSProperties {
+  const gap = resolveGridGapV2(node);
+  return gap > 0 ? { rowGap: `${gap}mm` } : {};
+}
+
 function gridRowStyle(node: GridNodeV2, rowIndex: number): CSSProperties {
   const row = node.rows[rowIndex];
   // 优先使用 Grid 的共享列轨（grid.columns），使跨列合并（colspan）在任意
@@ -93,9 +103,12 @@ function gridRowStyle(node: GridNodeV2, rowIndex: number): CSSProperties {
     node.columns && node.columns.length > 0
       ? node.columns
       : row.cells.map((cell) => cell.width);
+  const gap = resolveGridGapV2(node);
   return {
     gridTemplateColumns: tracks.map(track).join(" "),
     minHeight: `${row.height * props.baseRowHeight}mm`,
+    // 列间距：gap 同时作用于行列。
+    columnGap: gap > 0 ? `${gap}mm` : undefined,
   };
 }
 
@@ -357,6 +370,7 @@ function onImgError(): void {
   <div
     v-if="node.type === 'grid'"
     class="layout-grid"
+    :style="gridContainerStyle(node)"
     :class="[
       `layout-grid--${node.border}`,
       {

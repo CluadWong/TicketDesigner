@@ -382,3 +382,31 @@
 - **为何不用「恢复 `::before{content:"\200b"}`」**：注入零宽空格虽也能撑出行盒，但属于可编辑区内容，存在被光标/取值误吞的风险（历史注释即因此被注释掉）；`min-height` 是纯布局下限、不产生任何文本节点，对 `innerText`/`textContent` 采值零影响（`collectFieldValues` 走 `innerText`）。
 - **验证**：`vue-tsc --noEmit` 干净（Exit 0）；`vitest` 全量 **173/173（18 文件）** 通过，无回归；未跑 `vite build`；未提交 git。
 - **经验固化**：flex 化的 contenteditable 容器里，**每个承载文本的 flex 子项都必须有「一行的高度」下限**（`min-height: <line-height>`），否则空值即塌缩；修 `<p>` 自身的 `min-height` 无效（子项会在其中被 `align-items:center` 居中，行盒仍向下溢出），必须作用在**承载文本的那个子项**上。
+
+## 2026-09-02 十三续 — 修复「选 A3 横向打印仍按 A4 出页」导致内容被裁
+
+- **用户反馈（真机）**：工具栏切到 A3（横向）后画布渲染正常（纸张元素 420×297mm），但打印出来仍是 A4 样式，内容缺失（被裁）。
+- **根因**：`@page { size: A4; margin: 0 }` **硬编码在 `DesignerApp.vue` 的样式块里**。`@page` 是页面级规则——既不能写成组件 scoped 样式、也无法用 Vue 绑定——所以 P11-3 把「方向由纸张尺寸派生」落到渲染层（`paperSize` computed：A3→420×297）与校验层（`pageUsableHeightMm`）后，**唯独打印纸张尺寸没跟着变**：屏幕 420mm 宽、打印页 210mm 宽 → 右侧内容被裁。
+- **修复（纸张尺寸单一来源 + 运行时注入 `@page`）**：
+  1. `src/types/schema-v2.ts` 新增**共享解析**：`PAPER_SIDE_MM`（A4 210/297、A3 297/420）+ `resolvePaperSizeV2(paper)` → `{size, orientation, widthMm, heightMm}`（方向由尺寸派生：A4 纵向 / A3 横向）。渲染、打印、校验三处统一调用，杜绝各处硬编码。
+  2. 新增 `src/components/renderer-v2/page-size-style.ts`：`document.head` **单例 `<style id="grid-form-page-size">`**，写入 `@page { size: <w>mm <h>mm; margin: 0 }`；`setPageSizeStyle(w,h)` 幂等更新、`registerPageSizeStyle()` 登记使用者并在最后一个释放时移除、`currentPageSizeStyle()` 供测试/调试。写具体毫米值而非 `A3 landscape`（各浏览器对「关键字+方向」支持不一致，物理尺寸最稳且与纸张元素完全对齐）。
+  3. `GridFormRenderer.vue`（渲染内核）：`paperSize` 改用 `resolvePaperSizeV2`；`watch(paperSize, s => setPageSizeStyle(s.widthMm, s.heightMm), { immediate: true })` + `onUnmounted(registerPageSizeStyle())`。**放在内核而非设计器**，消费页 `<FormRenderer>` 打印同样正确。
+  4. `DesignerApp.vue`：删除硬编码 `@page { size: A4 }`（留注释说明由内核注入）。
+  5. `schema-v2-validation.ts`：`pageUsableHeightMm` 删除本地 `PAPER_SIDE_MM`，改用 `resolvePaperSizeV2`（消除第二份纸张尺寸副本）。
+  6. `renderer-v2/index.ts` 导出 `setPageSizeStyle / registerPageSizeStyle / currentPageSizeStyle`。
+- **测试**：新增 `src/components/renderer-v2/__tests__/PaperSizePrint.test.ts`（4 例）：A4→`@page { size: 210mm 297mm }` 且纸张元素 210mm/297mm；A3→`420mm 297mm` 且纸张元素 420mm；A4→A3 切换时 `@page` 同步更新（回归用例）；全部实例卸载后移除注入样式。
+- **踩坑**：初版用**模块级引用计数**（`applyPageSizeStyle` 每次 +1），切纸张时 watch 再次触发导致计数虚高、卸载后样式残留（测试暴露）。改为**「更新」与「登记」分离**（`setPageSizeStyle` 幂等更新不计数 + `registerPageSizeStyle()` 返回 release 函数交给 `onUnmounted`）。另：测试里不可直接 `remove()` 该 style（模块缓存引用会失效），须走 `unmount()` 释放。
+- **验证**：`vue-tsc --noEmit` 干净（Exit 0）；`vitest` 全量 **177/177（19 文件）**（173 + 新 4）通过，无回归；未跑 `vite build`；未提交 git。
+- **经验固化**：`@page` 只能用运行时注入的全局 `<style>` 表达；任何「纸张尺寸」都必须来自 `resolvePaperSizeV2` 单一来源——渲染尺寸、打印 `@page`、溢出校验三者一旦各写一份，就会出现「屏幕对、打印错」。
+
+## 2026-09-02 十四续 — Grid 组件增加 gap 单元格间距配置
+
+- **需求**：Grid 增加 gap 样式配置（用户选单一 gap：同时作用于行间距与列间距，等价于 CSS `gap`）。
+- **Schema（`types/schema-v2.ts`）**：`GridNodeV2` 新增 `gap?: number`（mm，非负，行列同值）。
+- **解析/操作（`types/schema-v2-operations.ts`）**：新增 `updateGridGapV2(schema, gridId, gap)`（0/负/非数字→清字段）、`resolveGridGapV2(grid)`（缺省/非法回退 0，旧数据保持单元格紧贴）。
+- **序列化（`types/schema-v2-serialization.ts`）**：`normalizeNode` 的 grid 分支显式规范化 gap（非法值清除），导出干净；`schema-v2-validation.ts` 的 `validateGrid` 加 `INVALID_GRID_GAP`（warning）。
+- **渲染（`GridSchemaNode.vue`）**：`.layout-grid` 容器加 `gridContainerStyle(node)`→`rowGap`（flex 行间距，因容器是 flex column）；`.layout-grid__row` 的 `gridRowStyle` 加 `columnGap`（grid 列间距）。导入 `resolveGridGapV2`。
+- **设计器（`DesignerApp.vue`）**：Grid 选中时在「单元格默认」分组新增「单元格间距(mm)」输入（`data-grid="gap"`，`@change="updateGridGap"`），导入 `updateGridGapV2`。
+- **与边框规则交互**：内部线单边归属（每格只画自身单边）在 gap 下表现为「每条线之间出现等距留白」——这是 CSS gap 的必然结果，符合「单元格分开」语义，无需特殊处理；相邻 Grid 外框去重逻辑不受影响。
+- **测试**：`schema-v2-operations.test.ts` +1（`resolveGridGapV2`/`updateGridGapV2`）、`GridGap.test.ts`（新增 3：无 gap 无字段 / gap=6 行+列均 6mm / 嵌套 Grid 独立计算 gap）、`schema-v2.test.ts` +2（round-trip 保留 gap / 非法 gap 载入清除）、`DesignerApp.test.ts` +1（检查器设 gap 写回 schema.gap）。
+- **验证**：`vue-tsc --noEmit` 干净（Exit 0）；`vitest` 全量 **184/184（20 文件）**（177 + 新 7）通过，无回归；未跑 `vite build`；未提交 git。
