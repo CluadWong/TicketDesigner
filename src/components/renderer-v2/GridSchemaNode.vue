@@ -751,7 +751,10 @@ function onImgError(): void {
   display: inline-block;
   flex: 1 1 auto;
   min-width: 12mm;
-  min-height: 1em;
+  /* 1.35em = .layout-p 的 line-height：空值时也要占满一整行。
+     若只给 1em，空的块盒比行盒矮，行盒（含光标）会向下溢出，
+     表现为「光标压在底部横线的下方」（见 .layout-p__value 注释）。 */
+  min-height: 1.35em;
   outline: none;
 }
 
@@ -762,6 +765,14 @@ function onImgError(): void {
 .layout-p__value {
   flex: 1 1 auto;
   min-width: 0;
+  /* 空值兜底（关键）：该 span 作为 flex 子项会被「块化」，内容为空时高度为 0，
+     于是 <p> 的内容盒塌缩成 0，只剩 1px 下边框——在单元格里（align-self:center）
+     看起来就是「垂直居中的一条直线」；而光标所在的行盒仍按 line-height 从内容盒
+     顶部向下撑开，于是光标落在横线下方。
+     给定一个行高（1.35em，与 .layout-p 的 line-height 一致）作为最小高度，
+     空字段也能占满一整行：光标在行内垂直居中、底部才是边框线（同普通 input）。
+     有内容时以内容高度为准，min-height 仅作下限，不影响多行换行版式。 */
+  min-height: 1.35em;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }

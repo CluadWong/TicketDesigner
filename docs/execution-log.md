@@ -368,3 +368,17 @@
 - **测试**：`FirstFiveRowsSnapshot` 设计态每个非复合字段新增 `<span class="layout-p__value"></span>`（空值）→ `vitest -u` 重生成（功能生效非回归）；`DesignerApp.test.ts` 27/27。
 - **验证**：`vue-tsc --noEmit` 干净（Exit 0）；`vitest` 全量 **173/173（18 文件）** 通过，无回归；未跑 `vite build`；未提交 git。
 - **经验固化**：contenteditable 元素（`<p>`/容器）的**直接文本插值子节点**在「数据晚于挂载到达」时 Vue 不重新 patch；需把值放进内层 `<span>`（或任何非直接文本子节点）才能可靠刷新。后续改字段 P 渲染结构时勿再把 `{{ fieldValue }}` 直接作为 contenteditable 元素的文本子节点、且勿用 `<template v-else>` 包裹它。
+
+## 2026-09-02 十二续 — 修复空值字段 P 塌缩成「一条居中直线、光标在线下」
+
+- **用户反馈（真机）**：`GridSchemaNode.vue` 中非复合字段的空值 `<span class="layout-p__value"></span>` 在 UI 上只显示一条**垂直居中的直线**，点击后**光标落在该直线的下方**，而不是像正常 input 那样「光标在中间、底部才是边框线」。
+- **根因（布局推导，与十一续结构是两回事）**：
+  1. `.layout-p` 是 `display:flex` 容器，`.layout-p__value` 作为 flex 子项被**块化**（`display:inline` → `block`），空内容时**内容高度为 0**；
+  2. 于是 `<p>` 的内容盒塌缩为 0，只剩 `.layout-p--underline` 的 1px 底边框；`<p>` 自身 `align-self:center`，该 1px 线在单元格里被垂直居中 → 视觉上就是「一条居中的直线」；
+  3. 而 contenteditable 的**行盒**仍按 `line-height:1.35`（≈17.55px）从内容盒顶部向下撑开，光标位于这个行盒内 → 光标整体落在那条 1px 线**下方**（顺序与直觉相反，因为边框在内容盒底边、行盒从同一基线继续向下溢出）。
+- **修复（`GridSchemaNode.vue`，纯 CSS、不动结构/不改文本节点）**：
+  1. `.layout-p__value` 新增 `min-height: 1.35em`（与 `.layout-p` 的 `line-height:1.35` 对齐）——空值时也占满一整行，光标落在行内、底部才是边框；有内容时以内容高度为准，`min-height` 仅作下限，**不影响多行换行版式**。
+  2. 顺带修同类隐患：`.layout-p__input`（复合字段可输入区，自带 underline）的 `min-height` 由 `1em` → `1.35em`——此前空值块盒（13px）比行盒（17.55px）矮，行盒含光标同样向下溢出压到下划线上。（`.layout-p__lines` 本来就是 1.35em，不受影响。）
+- **为何不用「恢复 `::before{content:"\200b"}`」**：注入零宽空格虽也能撑出行盒，但属于可编辑区内容，存在被光标/取值误吞的风险（历史注释即因此被注释掉）；`min-height` 是纯布局下限、不产生任何文本节点，对 `innerText`/`textContent` 采值零影响（`collectFieldValues` 走 `innerText`）。
+- **验证**：`vue-tsc --noEmit` 干净（Exit 0）；`vitest` 全量 **173/173（18 文件）** 通过，无回归；未跑 `vite build`；未提交 git。
+- **经验固化**：flex 化的 contenteditable 容器里，**每个承载文本的 flex 子项都必须有「一行的高度」下限**（`min-height: <line-height>`），否则空值即塌缩；修 `<p>` 自身的 `min-height` 无效（子项会在其中被 `align-items:center` 居中，行盒仍向下溢出），必须作用在**承载文本的那个子项**上。
