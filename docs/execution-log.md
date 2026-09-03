@@ -509,4 +509,28 @@
     - 「分页告警：K」仅在 K > 0 时显示（`data-paginate-warning-count`），复用既有 `.warning-count.has-warning` 配色。
     - 原「警告」项语义不变，仍是结构校验（`validateFormSchemaV2`）的问题数，与分页告警分列。
 - 测试（新增 4 例，均在 `DesignerApp.pagination.test.ts`）：超高 Schema 显示打印张数且与画布纸张数一致；空白 Schema 不显示打印张数；单行 800mm（100×8mm ≫ 277mm）触发并显示分页告警；50 行 Schema 无超高时不显示告警。
+
+### 2026-09-03 二十续 · 自动分页真实高度校正（内容超高必换页、不溢出纸外）
+
+用户澄清（最新消息）：① 不需要启动服务器；② 期望在**设计、渲染过程中，分页开启时自动分页**——目前内容超出纸张高度时仍然显示在纸张外；③ 跨页 Grid 选中两处高亮（同一 Grid 的两段都高亮）保持不动。
+
+根因：确定性分页引擎按 `row.height × baseRowHeight` 估算行高，但**多行字段、换行文本、超大图片**等实际渲染高度往往更高；引擎据此认为「本页放得下」，实际渲染却超出纸张高度 → 溢出纸外。此外十八续把分页关闭态也改成固定 `height`，使设计态关分页且内容超高时也溢出纸外。
+
+#### ① 浏览器内真实行高测量 + 二次分页
+- `pagination.ts`：`PaginateContext` / `paginateSchema` 的 `extra` 新增 `measureRow?: (row: GridRowV2) => number | undefined`；`gridRowHeightMm` / `gridFragmentHeightMm` / `splitGrid` / `paginateGrid` 均透传 `measureRow`（真实值有限且 >0 时优先，否则回退确定性估算）。
+- `GridFormRenderer.vue`：渲染确定性分页结果后，在 `onMounted` 与 `watch(renderedPages, flush:'post')` 里调 `correctPagination()`：用 `measureRowHeights()` 读 `.grid-form-paper .layout-grid__row` 的 `getBoundingClientRect().height / PX_PER_MM`（PX_PER_MM = 96/25.4），拿到真实高度后回灌 `paginateSchema(props.schema, { data, measureRow })` 重分页；`displayedPages = measuredPages ?? renderedPages`。设计态（`paginate=false`）或纯测试/SSR（getBBox=0）自动跳过测量、回退确定性分页，结果稳定可断言。
+- 设计态与渲染态共用同一修正通道（都跑在 `GridFormRenderer` 内核内），故「设计、渲染过程自动分页」一致生效。
+
+#### ② 分页关闭态纸张高度改回 min-height
+- `GridFormRenderer.paperStyle()`：`paginate=true` 仍固定 `height=整纸高`（box-sizing:border-box，内容盒恰为正文可用高，与引擎 bodyHeightMm 同口径）；`paginate=false` 改回 `min-height`（纸张随内容长高、内容留在纸内，不溢出纸外）。关闭分页时超高内容长高可见，而非溢出灰底。
+- 受影响断言同步：本续新增 `GridFormRenderer.pagination.test.ts`「paginate=false → 纸张 style 含 min-height:297mm 且不含独立 height:297mm」断言。
+
+#### ③ 测试与验证
+- 新增 `src/engine-v2/__tests__/pagination.test.ts` 用例：注入 `measureRow: () => 20`（远高于确定性估算）后分页按真实高度切分（页数 > 2、50 行不丢、每页 ≤ 正文高），验证「估算偏低 → 多换页、不溢出」。
+- 新增 `GridFormRenderer.pagination.test.ts` 用例（paginate=false → min-height，见②）。
+- `vue-tsc --noEmit` 干净；`vitest run` **203/203（23 文件）** 通过（基线 201 + 引擎 measureRow 1 例 + 本续 renderer min-height 1 例）。未跑 `vite build`；未启动服务器（用户要求）；未提交 git。
+
+#### 未改动
+- 跨页 Grid 选中两处高亮（同一 `grid.id` 的两段都加选中框）按用户要求**保持不动**。
+- Table 按行跨页切分仍延后（维持原子块整体落页/换页）。
 - 验证：`vue-tsc --noEmit` 干净；`vitest run` **201/201（23 文件）** 通过（原 197 + 新增 4）。未跑 `vite build`；未提交 git。

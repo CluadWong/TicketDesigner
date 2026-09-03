@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onUnmounted, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import type { CSSProperties } from "vue";
 import {
   resolvePaperSizeV2,
@@ -11,7 +11,7 @@ import {
 import GridSchemaNode from "./GridSchemaNode.vue";
 import { registerPageSizeStyle, setPageSizeStyle } from "./page-size-style";
 import type { PhysicalPage } from "@/engine-v2/pagination";
-import { paginatePage } from "@/engine-v2/pagination";
+import { paginatePage, paginateSchema } from "@/engine-v2/pagination";
 
 defineOptions({ name: "GridFormRenderer" });
 
@@ -67,24 +67,24 @@ watch(
 onUnmounted(registerPageSizeStyle());
 
 /**
- * 纸张尺寸：**高度固定为整纸高**（`height`，而非 `min-height`）。
+ * 纸张尺寸：
+ * - **分页开启**（`height` 固定为整纸高）：分页引擎已保证每页内容 ≤ 正文可用高
+ *   （`heightMm − margin.top − margin.bottom`），纸张恰好等于一张纸；配合 `box-sizing: border-box`，
+ *   内容盒高度恰为正文可用高，与分页引擎的 `bodyHeightMm` 口径一致。
+ * - **分页关闭**（设计态整页连续编辑）：改用 `min-height`。此时不做切分，内容可能远超一张纸；
+ *   用 `min-height` 让纸张随内容长高，内容落在纸内（而非溢出纸外、跑到灰底上）。
  *
- * 之所以不用 `min-height`：`min-height` 只设下限，内容超高时纸张会被无限撑开，
- * 永远看不出「内容已经超出一张纸」——这正是分页要解决的问题。
- * 固定高度后：
- * - 分页开启（预览/填写/打印）：分页引擎已保证每页内容 ≤ 正文可用高
- *   （`heightMm − margin.top − margin.bottom`），纸张恰好等于一张纸；
- * - 分页关闭（设计态整页编辑）：超高内容会溢出到纸张之外的灰底上，
- *   即「内容超出纸张」的可见反馈，而不是把纸悄悄撑长。
- *
- * 配合 `.grid-form-paper` 的 `box-sizing: border-box`，内容盒高度恰为正文可用高，
- * 与分页引擎的 `bodyHeightMm` 口径一致。
+ * 之所以分页开启用 `height` 而非 `min-height`：`min-height` 只设下限，会让单物理页被无限撑开、
+ * 看不出「已超出一张纸」；而分页本就会把内容切走，固定高度恰为一张纸。
  */
 function paperStyle(margin: EdgeInsetsV2): CSSProperties {
   const size = paperSize.value;
+  const useFixed = props.paginate;
   return {
     width: `${size.widthMm}mm`,
-    height: `${size.heightMm}mm`,
+    ...(useFixed
+      ? { height: `${size.heightMm}mm` }
+      : { minHeight: `${size.heightMm}mm` }),
     padding: `${margin.top}mm ${margin.right}mm ${margin.bottom}mm ${margin.left}mm`,
   };
 }
@@ -125,6 +125,53 @@ const renderedPages = computed<PhysicalPage[]>(() => {
 });
 
 /**
+ * 自动分页校正（2026-09-03 二十续）：确定性分页按 `row.height × baseRowHeight` 估算行高，
+ * 多行字段、换行文本、超大图片等实际渲染高度往往更高，导致「本应换页」的页被判定为放得下、
+ * 实际渲染却溢出纸外。这里在浏览器里测量每个 Grid 行的真实渲染高度，用测量结果二次分页，
+ * 保证内容超高一律自动换页、永不溢出纸外（设计态与渲染态共用同一通道，因都在本内核内）。
+ *
+ * 纯测试 / SSR 环境无真实布局 → `getBoundingClientRect().height` 为 0，测量跳过，
+ * 回退到确定性分页（测试即基于此路径，结果稳定可断言）。
+ */
+const PX_PER_MM = 96 / 25.4;
+const measuredPages = ref<PhysicalPage[] | null>(null);
+
+function measureRowHeights(): Map<string, number> | null {
+  if (typeof document === "undefined") return null;
+  const map = new Map<string, number>();
+  document
+    .querySelectorAll<HTMLElement>(".grid-form-paper .layout-grid__row")
+    .forEach((el) => {
+      const id = el.dataset.layoutId;
+      if (!id) return;
+      const h = el.getBoundingClientRect().height / PX_PER_MM;
+      if (Number.isFinite(h) && h > 0) map.set(id, h);
+    });
+  return map.size ? map : null;
+}
+
+function correctPagination(): void {
+  if (!props.paginate || typeof document === "undefined") {
+    measuredPages.value = null;
+    return;
+  }
+  const rowHeights = measureRowHeights();
+  if (!rowHeights) return;
+  const result = paginateSchema(props.schema, {
+    data: props.data ?? null,
+    measureRow: (row) => rowHeights.get(row.id),
+  });
+  measuredPages.value = result.pages;
+}
+
+// 确定性分页结果渲染到 DOM 后，按真实测量高度校正一次（flush:'post' + nextTick 确保已绘制）。
+watch(renderedPages, () => nextTick(correctPagination), { flush: "post" });
+onMounted(() => nextTick(correctPagination));
+
+/** 最终渲染的物理页：浏览器里经真实高度校正，否则用确定性分页（测试 / SSR 回退）。 */
+const displayedPages = computed<PhysicalPage[]>(() => measuredPages.value ?? renderedPages.value);
+
+/**
  * 合并边框抑制：兄弟级去重（相邻外框 Grid 抑制后一个 top）与跨页片段的连续外观抑制。
  * 跨页片段自身的 top/bottom 抑制优先（连续外观），兄弟去重仅补充其未涉及的侧。
  */
@@ -152,7 +199,7 @@ function pageSiblingSuppressBorders(children: FormNodeV2[], index: number): { to
 <template>
   <div class="grid-form-canvas" :class="{ 'grid-form-canvas--bare': bare }">
     <main
-      v-for="pp in renderedPages"
+      v-for="pp in displayedPages"
       :key="pp.id"
       class="grid-form-paper"
       :class="{ 'grid-form-paper--selected': selectedNodeId === pp.id }"

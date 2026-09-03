@@ -12,6 +12,12 @@
  * 做**精确、可测试**的逐行切分；对 Text/Image/Html/Table 这类内容高度不确定的节点，
  * 用启发式估算（并可注入 DOM 测量回调 `measureNode` 提升精度），整块落页或整体换页。
  *
+ * 自动分页（2026-09-03 二十续）：纯确定性估算可能误判——多行字段、换行文本、超大图片等
+ * 实际渲染高度会高于 `row.height × baseRowHeight` 的估算值，导致引擎认为「放得下」的页
+ * 实际却溢出纸张。为此本引擎支持注入**真实测量高度** `measureRow`（逐 Grid 行）与
+ * `measureNode`（原子节点），由渲染层在浏览器里测量实际渲染高度后二次校正分页，
+ * 保证「内容超高 → 自动换页、永不溢出纸外」（设计态与渲染态共用同一修正通道）。
+ *
  * 旧版 v1 引擎（`src/engine`，基于 DOM 测量 + FormSchema/Component 旧模型）已于
  * 2026-09-02 十八续删除；本文件是全项目**唯一**的分页实现。
  *
@@ -53,7 +59,16 @@ function drawsOuterFrame(grid: GridNodeV2): boolean {
 export function gridRowHeightMm(
   baseRowHeight: number,
   row: GridRowV2,
+  measureRow?: (row: GridRowV2) => number | undefined,
 ): number {
+  // 渲染层注入真实测量高度时优先使用：解决「多行字段 / 换行文本使实际行高高于 row.height 估算」的误判，
+  // 让分页按真实渲染高度切分，避免本应换页的页被判定为放得下而溢出纸外。
+  if (measureRow) {
+    const measured = measureRow(row);
+    if (typeof measured === "number" && Number.isFinite(measured) && measured > 0) {
+      return measured;
+    }
+  }
   let factor = row.height;
   for (const cell of row.cells) {
     if (
@@ -72,6 +87,7 @@ export function gridRowHeightMm(
  * @param rows 该片段包含的行（连续）
  * @param suppressTop 是否抑制上边框（非首片段时连续外观用）
  * @param suppressBottom 是否抑制下边框（非末片段时连续外观用）
+ * @param measureRow 可选逐行真实测量高度（mm），优先级高于确定性估算。
  */
 export function gridFragmentHeightMm(
   baseRowHeight: number,
@@ -79,12 +95,13 @@ export function gridFragmentHeightMm(
   rows: GridRowV2[],
   suppressTop: boolean,
   suppressBottom: boolean,
+  measureRow?: (row: GridRowV2) => number | undefined,
 ): number {
   const gap = resolveGridGapV2(grid);
   let h = 0;
   rows.forEach((row, idx) => {
     if (idx > 0) h += gap;
-    h += gridRowHeightMm(baseRowHeight, row);
+    h += gridRowHeightMm(baseRowHeight, row, measureRow);
   });
   if (drawsOuterFrame(grid)) {
     if (!suppressTop) h += ONE_PX_MM;
@@ -142,7 +159,7 @@ function atomicNodeHeightMm(
   switch (node.type) {
     case "grid":
       // 整 Grid 高度（无抑制边框）
-      return gridFragmentHeightMm(ctx.baseRowHeight, node, node.rows, false, false);
+      return gridFragmentHeightMm(ctx.baseRowHeight, node, node.rows, false, false, ctx.measureRow);
     case "image":
       return imageHeightMm(node, ctx.baseRowHeight);
     case "text":
@@ -170,6 +187,9 @@ export interface PaginateContext {
   data?: FormDataV2 | null;
   /** 可选 DOM 测量回调：返回节点精确高度（mm）或 undefined 走启发式。 */
   measureNode?: (node: FormNodeV2) => number | undefined;
+  /** 可选逐 Grid 行测量回调：返回该行真实渲染高度（mm）或 undefined 走确定性估算。
+   *  用于自动分页——真实行高（多行字段/换行文本）高于估算值时，按真实高度切分，避免溢出纸外。 */
+  measureRow?: (row: GridRowV2) => number | undefined;
 }
 
 /** 物理页中的一个子项（节点，或裁剪了 rows 的 Grid 片段）。 */
@@ -262,7 +282,7 @@ export function paginatePage(page: PageSchemaV2, opts: PaginateContext): Paginat
   };
 
   const paginateGrid = (grid: GridNodeV2): void => {
-    const fullH = gridFragmentHeightMm(opts.baseRowHeight, grid, grid.rows, false, false);
+    const fullH = gridFragmentHeightMm(opts.baseRowHeight, grid, grid.rows, false, false, opts.measureRow);
     // 整 Grid 能放进当前页剩余空间 → 直接放
     if (fits(fullH)) {
       push({ node: grid });
@@ -277,6 +297,7 @@ export function paginatePage(page: PageSchemaV2, opts: PaginateContext): Paginat
     const rows = grid.rows;
     const gap = resolveGridGapV2(grid);
     const bordered = drawsOuterFrame(grid);
+    const mr = opts.measureRow;
     let i = 0;
     let isFirstFragment = true;
 
@@ -289,7 +310,7 @@ export function paginatePage(page: PageSchemaV2, opts: PaginateContext): Paginat
       let acc = suppressTop || !bordered ? 0 : ONE_PX_MM; // 片段上边框（首片段且带框时计入）
       let placed = 0;
       while (j < rows.length) {
-        const rowH = gridRowHeightMm(opts.baseRowHeight, rows[j]);
+        const rowH = gridRowHeightMm(opts.baseRowHeight, rows[j], mr);
         const add = (placed > 0 ? gap : 0) + rowH;
         // 若该片段到此为止（j 是最后一行）→ 末片段需留底边框；否则中间片段无底边框
         const wouldBeLastFragment = j + 1 >= rows.length;
@@ -308,7 +329,7 @@ export function paginatePage(page: PageSchemaV2, opts: PaginateContext): Paginat
         if (curChildren.length > 0) flush();
         const st = !isFirstFragment;
         const sb = i + 1 < rows.length; // 还有后续行 → 抑制底边框（连续）
-        const fragH = gridFragmentHeightMm(opts.baseRowHeight, grid, rows.slice(i, i + 1), st, sb);
+        const fragH = gridFragmentHeightMm(opts.baseRowHeight, grid, rows.slice(i, i + 1), st, sb, mr);
         if (fragH > bodyH + 1e-6) {
           warnings.push({
             nodeId: grid.id,
@@ -363,7 +384,11 @@ export function paginatePage(page: PageSchemaV2, opts: PaginateContext): Paginat
  */
 export function paginateSchema(
   schema: FormSchemaV2,
-  extra?: { data?: FormDataV2 | null; measureNode?: PaginateContext["measureNode"] },
+  extra?: {
+    data?: FormDataV2 | null;
+    measureNode?: PaginateContext["measureNode"];
+    measureRow?: PaginateContext["measureRow"];
+  },
 ): PaginateResult {
   const paper: ResolvedPaperSizeV2 = resolvePaperSizeV2(schema.paper);
   const all: PhysicalPage[] = [];
@@ -377,6 +402,7 @@ export function paginateSchema(
       contentWidthMm,
       data: extra?.data ?? null,
       measureNode: extra?.measureNode,
+      measureRow: extra?.measureRow,
     });
     all.push(...r.pages);
     warnings.push(...r.warnings);

@@ -172,4 +172,36 @@ describe("分页引擎 pagination", () => {
     expect(result.pages[1].index).toBe(2);
     expect(result.pages[1].sourcePageId).toBe("lp2");
   });
+
+  it("measureRow 注入真实行高后，分页按真实高度切分（估算偏低 → 多换页、不溢出）", () => {
+    const schema = makeFiftyRowGridSchema();
+    // 模拟「多行字段 / 换行文本」使真实行高（20mm）远高于确定性估算（8mm）
+    const result = paginateSchema(schema, { measureRow: () => 20 });
+    const pages = nonEmptyPages(result.pages);
+
+    // 真实行高下每页装得下更少行 → 物理页数多于确定性分页的 2 页
+    expect(pages.length).toBeGreaterThan(2);
+    // 50 行一分不丢
+    expect(totalGridRows(pages)).toBe(50);
+    // 用真实行高复核：每页内容高度不再超过正文可用高（不溢出纸外）
+    const paper = resolvePaperSizeV2(schema.paper);
+    const bodyH = paper.heightMm - 10 - 10;
+    for (const p of pages) {
+      let used = 0;
+      for (const c of p.children) {
+        if (c.node.type === "grid") {
+          const sb = c.suppressBorders;
+          used += gridFragmentHeightMm(
+            schema.baseRowHeight,
+            c.node,
+            c.node.rows,
+            !!sb?.top,
+            !!sb?.bottom,
+            () => 20,
+          );
+        }
+      }
+      expect(used).toBeLessThanOrEqual(bodyH + 0.5);
+    }
+  });
 });

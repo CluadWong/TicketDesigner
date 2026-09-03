@@ -46,4 +46,16 @@ describe("GridFormRenderer 分页渲染", () => {
     expect(papers).toHaveLength(1);
     expect(wrapper.findAll(".layout-grid__row")).toHaveLength(50);
   });
+
+  it("paginate=false 时纸张用 min-height（内容高于一张纸也不溢出纸外）", () => {
+    const wrapper = mount(GridFormRenderer, {
+      props: { schema: makeFiftyRowGridSchema(), paginate: false },
+    });
+    const paper = wrapper.find(".grid-form-paper");
+    const style = paper.attributes("style") ?? "";
+    // 分页关闭：纸张随内容长高、内容留在纸内，故用 min-height 而非固定 height。
+    expect(style).toMatch(/min-height\s*:\s*297mm/);
+    // 注意：min-height 内部含 "height" 子串，这里用负向后查确保不是独立的 height 声明。
+    expect(style).not.toMatch(/(?<!-)height\s*:\s*297mm/);
+  });
 });
