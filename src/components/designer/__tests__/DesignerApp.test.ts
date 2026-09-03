@@ -4,6 +4,7 @@ import { mount, type VueWrapper } from "@vue/test-utils";
 import DesignerApp from "@/components/designer/DesignerApp.vue";
 import type { FormSchemaV2 } from "@/types";
 import { makeYunlvSecondTicketFirstFiveRowsSchema } from "@/dev/yunlv-second-ticket-first-five-rows";
+import demoData from "@/dev/demoData";
 
 function schemaOf(wrapper: VueWrapper): FormSchemaV2 {
   return (wrapper.vm as unknown as { schema: FormSchemaV2 }).schema;
@@ -36,7 +37,11 @@ function findOwnerCellOfField(schema: FormSchemaV2, fieldId: string) {
  */
 function mountDesigner() {
   return mount(DesignerApp, {
-    props: { initialSchema: makeYunlvSecondTicketFirstFiveRowsSchema() },
+    props: {
+      initialSchema: makeYunlvSecondTicketFirstFiveRowsSchema(),
+      // 预览态种子数据原由 DesignerApp 写死 demoData，B3 解耦后改为 props 注入
+      previewData: demoData,
+    },
   });
 }
 

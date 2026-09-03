@@ -72,7 +72,7 @@
 |---|---|---|---|---|---|
 | **B1** | 没有独立于设计器的渲染入口，"渲染组件是一层"无法验证 | `App.vue` 只挂 `DesignerApp`；`src/components/preview/` 为空目录；`GridFormRenderer.test.ts` 仅 1 例 | 渲染组件只能在设计器里被看到 | 提供「预览页 / 填充页」或独立 demo 入口，证明渲染组件可脱离设计器运行 | **P2** |
 | **B2** | 填充数据硬编码，无数据入口也无填写结果出口 | `toggleViewMode()` 内 `previewFormData.value = { ...demoData }`；切换模式即重置 | "填充 = 数据 + 渲染组件"中的**数据侧完全缺失**，只能用内置 demoData | 数据可导入（JSON/表单）、可导出填写结果；数据生命周期独立于设计器状态 | **P2** |
-| **B3** | 设计器直接依赖 `dev` 样例，初始 schema 写死 | `DesignerApp.vue` import `@/dev/yunlv-second-ticket-first-five-rows`、`@/dev/yunlv-second-ticket-full`、`@/dev/demoData`；`schema = ref(make...Schema())` | 运行时依赖开发样例目录 | 样例由外层注入（样例注册表 / 参数化），设计器自身不依赖 dev 目录 | **P3** |
+| **B3** | 设计器直接依赖 `dev` 样例，初始 schema 写死 | `DesignerApp.vue` import `@/dev/yunlv-second-ticket-first-five-rows`、`@/dev/yunlv-second-ticket-full`、`@/dev/demoData`；`schema = ref(make...Schema())` | 运行时依赖开发样例目录 | ✅ 2026-09-03 已解耦：`DesignerApp` 不再 import `@/dev`，样例集与预览数据改由 `src/App.vue`（dev 入口）经 `samples`/`previewData` props 注入；`src/samples/types.ts` 定义 `SampleEntry` 注册表契约（设计器仅依赖 `@/samples/types`，不依赖 dev 目录）。`preview/App.vue` 为消费页演示仍引用样例属预期 | **P3（已解耦）** |
 | **B4** | 渲染期领域逻辑落在 `@/types`，`src/engine/` 是空壳 | 渲染组件 import `@/types` 的 `bindTableRowCell` / `resolveCellBoxV2` / `resolveTableRowCount`；`src/engine/` 只有空的 `__tests__` | 布局计算与渲染组件混在同一层 | 渲染期派生/布局/取值计算归 `engine`，渲染组件只做视图映射 | **P3** |
 
 ### C 类｜"仅禁止拖拽 / 配置"靠逐处手工守卫

@@ -2,8 +2,7 @@
 import { computed, ref, watch, onMounted, onUnmounted, reactive } from "vue";
 import CanvasSurface from "./CanvasSurface.vue";
 import { NODE_ID_ATTR, LAYOUT_ID_ATTR, PALETTE_DRAG_MIME } from "@/engine-v2/node-address";
-import { makeYunlvSecondTicketFullSchema } from "@/dev/yunlv-second-ticket-full";
-import demoData from "@/dev/demoData";
+import type { SampleEntry } from "@/samples/types";
 import {
   buildEditorNodeIndexV2,
   resolveCellBoxV2,
@@ -60,7 +59,13 @@ import StatusBar from "./StatusBar.vue";
 import NodeTreeItem, { type TreeNode } from "./NodeTreeItem.vue";
 import { collectFieldValues } from "@/components/renderer-v2";
 
-const props = defineProps<{ initialSchema?: FormSchemaV2 }>();
+const props = defineProps<{
+  initialSchema?: FormSchemaV2;
+  /** 可载入的样例集（由外层注入，设计器不依赖 dev 目录，见 B3）。 */
+  samples?: SampleEntry[];
+  /** 预览/填写态默认种子数据（由外层注入，替代原先写死的 demoData）。 */
+  previewData?: FormDataV2;
+}>();
 
 /** 空白初始化：空 page + 一个根 Grid，便于用户从空白开始设计（用户要求默认空白）。 */
 function buildBlankSchema(): FormSchemaV2 {
@@ -283,7 +288,7 @@ function toggleViewMode(mode: "preview"): void {
     previewFormData.value = null;
     return;
   }
-  previewFormData.value = { ...demoData };
+  previewFormData.value = { ...(props.previewData ?? {}) };
   clearSelection();
 }
 
@@ -547,8 +552,9 @@ onUnmounted(() => {
   window.removeEventListener("beforeunload", beforeUnload);
 });
 
-function reloadSample(): void {
-  resetHistory(makeYunlvSecondTicketFullSchema());
+/** 载入一个注入的样例（B3：样例来自 props 注册表，设计器不依赖 dev 目录）。 */
+function loadSample(sample: SampleEntry): void {
+  resetHistory(sample.loadSchema());
   clearSelection();
 }
 
@@ -1304,8 +1310,14 @@ function updateSelectedSafetyField(event: Event): void {
         <button class="v2-toolbar__button" type="button" @click="resetBlank">
           新建空白
         </button>
-        <button class="v2-toolbar__button" type="button" @click="reloadSample">
-          载入样例
+        <button
+          v-for="sample in samples"
+          :key="sample.id"
+          class="v2-toolbar__button"
+          type="button"
+          @click="loadSample(sample)"
+        >
+          载入{{ sample.label }}
         </button>
       </div>
       <div class="v2-toolbar__group">
