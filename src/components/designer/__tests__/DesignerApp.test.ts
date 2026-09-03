@@ -3,6 +3,7 @@ import { nextTick } from "vue";
 import { mount, type VueWrapper } from "@vue/test-utils";
 import DesignerApp from "@/components/designer/DesignerApp.vue";
 import type { FormSchemaV2 } from "@/types";
+import { makeYunlvSecondTicketFirstFiveRowsSchema } from "@/dev/yunlv-second-ticket-first-five-rows";
 
 function schemaOf(wrapper: VueWrapper): FormSchemaV2 {
   return (wrapper.vm as unknown as { schema: FormSchemaV2 }).schema;
@@ -29,9 +30,19 @@ function findOwnerCellOfField(schema: FormSchemaV2, fieldId: string) {
   return null;
 }
 
+/**
+ * 默认初始化已改为空白（见 DesignerApp 改造），故需显式注入前五行样例，
+ * 使依赖其 fixture 节点（unit-field / ticket-layout / work-task-table 等）的用例仍可运行。
+ */
+function mountDesigner() {
+  return mount(DesignerApp, {
+    props: { initialSchema: makeYunlvSecondTicketFirstFiveRowsSchema() },
+  });
+}
+
 describe("DesignerApp V2 selection and deletion", () => {
   it("cycles from a filled cell component through its cell to ancestors", async () => {
-    const wrapper = mount(DesignerApp);
+    const wrapper = mountDesigner();
     const field = wrapper.find('[data-node-id="unit-field"]');
 
     await field.trigger("click");
@@ -56,7 +67,7 @@ describe("DesignerApp V2 selection and deletion", () => {
   });
 
   it("removes a selected root grid from the rendered page", async () => {
-    const wrapper = mount(DesignerApp);
+    const wrapper = mountDesigner();
     const grid = wrapper.find('[data-node-id="ticket-layout"]');
 
     await grid.trigger("click");
@@ -69,7 +80,7 @@ describe("DesignerApp V2 selection and deletion", () => {
   });
 
   it("selects a cell but disables its deletion; the Grid itself stays deletable", async () => {
-    const wrapper = mount(DesignerApp);
+    const wrapper = mountDesigner();
     const addGridButton = wrapper
       .findAll(".v2-palette-item--button")
       .find(button => button.text().includes("Grid"));
@@ -94,7 +105,7 @@ describe("DesignerApp V2 selection and deletion", () => {
   });
 
   it("updates row and column counts from the selected Grid inspector", async () => {
-    const wrapper = mount(DesignerApp);
+    const wrapper = mountDesigner();
     await wrapper.find('[data-node-id="ticket-layout"]').trigger("click");
 
     const rowsInput = wrapper.find('input[data-dimension="rows"]');
@@ -110,7 +121,7 @@ describe("DesignerApp V2 selection and deletion", () => {
   });
 
   it("deleting a table column removes its derived field template (table P not individually selectable)", async () => {
-    const wrapper = mount(DesignerApp);
+    const wrapper = mountDesigner();
     // 点击表格内的默认字段 P → 因不可单独选中，回退选中所属 Table
     await wrapper.find("tbody .layout-p").trigger("click");
     await nextTick();
@@ -131,7 +142,7 @@ describe("DesignerApp V2 selection and deletion", () => {
   });
 
   it("selects the overflowing P when its issue entry is clicked", async () => {
-    const wrapper = mount(DesignerApp);
+    const wrapper = mountDesigner();
     const schema = schemaOf(wrapper);
     const basic = gridById(schema, "ticket-layout");
     const unitRow = basic.rows.find(r => r.id === "row-unit-number")!;
@@ -149,7 +160,7 @@ describe("DesignerApp V2 selection and deletion", () => {
   });
 
   it("falls back to the nearest selectable Grid for a row-level issue", async () => {
-    const wrapper = mount(DesignerApp);
+    const wrapper = mountDesigner();
     const schema = schemaOf(wrapper);
     gridById(schema, "ticket-layout").rows.find(r => r.id === "row-unit-number")!.cells = [];
     await nextTick();
@@ -164,7 +175,7 @@ describe("DesignerApp V2 selection and deletion", () => {
   });
 
   it("falls back to the first Page for a schema-level issue without nodeId", async () => {
-    const wrapper = mount(DesignerApp);
+    const wrapper = mountDesigner();
     const schema = schemaOf(wrapper);
     schema.baseRowHeight = 0;
     await nextTick();
@@ -178,7 +189,7 @@ describe("DesignerApp V2 selection and deletion", () => {
   });
 
   it("renders a structure tree and selects a node by clicking it", async () => {
-    const wrapper = mount(DesignerApp);
+    const wrapper = mountDesigner();
     const treeRows = wrapper.findAll(".v2-tree-row");
     expect(treeRows.length).toBeGreaterThan(5);
 
@@ -192,7 +203,7 @@ describe("DesignerApp V2 selection and deletion", () => {
   });
 
   it("edits a cell's padding via the inspector and writes it to the schema", async () => {
-    const wrapper = mount(DesignerApp);
+    const wrapper = mountDesigner();
     const field = wrapper.find('[data-node-id="unit-field"]');
     await field.trigger("click"); // 选中字段
     await field.trigger("click"); // 循环到所属单元格
@@ -209,7 +220,7 @@ describe("DesignerApp V2 selection and deletion", () => {
   });
 
   it("sets a Grid-level cell default via the inspector", async () => {
-    const wrapper = mount(DesignerApp);
+    const wrapper = mountDesigner();
     await wrapper.find('[data-node-id="ticket-layout"]').trigger("click");
 
     const defaultPadding = wrapper.find('input[data-cell-default="padding"]');
@@ -223,7 +234,7 @@ describe("DesignerApp V2 selection and deletion", () => {
   });
 
   it("sets Grid cell gap (CSS gap, rows + columns) via the inspector", async () => {
-    const wrapper = mount(DesignerApp);
+    const wrapper = mountDesigner();
     await wrapper.find('[data-node-id="ticket-layout"]').trigger("click");
 
     const gapInput = wrapper.find('input[data-grid="gap"]');
@@ -237,7 +248,7 @@ describe("DesignerApp V2 selection and deletion", () => {
   });
 
   it("merges and splits adjacent cells from the cell inspector", async () => {
-    const wrapper = mount(DesignerApp);
+    const wrapper = mountDesigner();
     // 选中外层 Grid 第一行第 0 格（cell-u-l），其右侧有 cell-u-f 可合并
     await wrapper.find('[data-node-id="cell-u-l"]').trigger("click");
 
@@ -264,7 +275,7 @@ describe("DesignerApp V2 selection and deletion", () => {
   });
 
   it("clicking a table-internal P selects the table and shows the derived-field hint", async () => {
-    const wrapper = mount(DesignerApp);
+    const wrapper = mountDesigner();
 
     // 普通字段（unit-field）不在表格内，选中后不显示表格提示
     await wrapper.find('[data-node-id="unit-field"]').trigger("click");
@@ -292,7 +303,7 @@ describe("DesignerApp V2 selection and deletion", () => {
 
 describe("DesignerApp 把 Grid 放进 / 拖进 cell（Grid 嵌套，九续）", () => {
   it("选中某格后点击「添加 Grid」会把 Grid 嵌进该格并渲染嵌套 Grid", async () => {
-    const wrapper = mount(DesignerApp);
+    const wrapper = mountDesigner();
     // 选中位于外层 Grid 某单元格内的字段，使 insertionSlot 指向其所属 cell
     await wrapper.find('[data-node-id="unit-field"]').trigger("click");
     await nextTick();
@@ -322,7 +333,7 @@ describe("DesignerApp 把 Grid 放进 / 拖进 cell（Grid 嵌套，九续）", 
   });
 
   it("预览态：点击「添加 Grid」被禁用且不改动结构", async () => {
-    const wrapper = mount(DesignerApp);
+    const wrapper = mountDesigner();
     await wrapper.find('[data-node-id="unit-field"]').trigger("click");
     await nextTick();
 
@@ -381,7 +392,7 @@ describe("DesignerApp 拖拽重排已有节点（P9）", () => {
   };
 
   it("拖拽把组件跨格移动到其它单元格（格内排序 / 跨格移动统一原语）", async () => {
-    const wrapper = mount(DesignerApp);
+    const wrapper = mountDesigner();
     expect(ownerCellOrder(wrapper)).toEqual([
       "owner-label",
       "owner-field",
@@ -411,7 +422,7 @@ describe("DesignerApp 拖拽重排已有节点（P9）", () => {
   });
 
   it("同格内拖拽调整顺序（末尾落点 → 移到最后）", async () => {
-    const wrapper = mount(DesignerApp);
+    const wrapper = mountDesigner();
     expect(ownerCellOrder(wrapper)).toEqual([
       "owner-label",
       "owner-field",
@@ -447,7 +458,7 @@ describe("DesignerApp 预览态只读（不可添加组件 / 不可输入）", (
     wrapper.findAll(".v2-palette-item--button");
 
   it("预览态：模板按钮全部禁用，字段与复合字段输入区均可编辑（<p> 渲染，非 readonly 控件）", async () => {
-    const wrapper = mount(DesignerApp);
+    const wrapper = mountDesigner();
     // 设计态基线：模板可用、字段可编辑
     expect(paletteButtons(wrapper).every(b => b.attributes("disabled") === undefined)).toBe(true);
     expect(wrapper.find('[data-node-id="unit-field"]').attributes("contenteditable")).toBe("true");
@@ -473,7 +484,7 @@ describe("DesignerApp 预览态只读（不可添加组件 / 不可输入）", (
   });
 
   it("预览态：绕过 UI 直接调用添加函数也不改动结构", async () => {
-    const wrapper = mount(DesignerApp);
+    const wrapper = mountDesigner();
     const before = JSON.stringify(schemaOf(wrapper));
     await wrapper.find('[data-view-mode="preview"]').trigger("click");
 
@@ -488,41 +499,8 @@ describe("DesignerApp 预览态只读（不可添加组件 / 不可输入）", (
     expect(JSON.stringify(schemaOf(wrapper))).toBe(before);
   });
 
-  it("填充态保留字段输入与数据回写（与预览区分）", async () => {
-    const wrapper = mount(DesignerApp);
-    await wrapper.find('[data-view-mode="fill"]').trigger("click");
-
-    const field = wrapper.find('[data-node-id="unit-field"]');
-    // 填充态字段为可编辑 <p>（非 textarea 控件），值直接落在文本
-    expect(field.attributes("contenteditable")).toBe("true");
-
-    const formData = (wrapper.vm as unknown as { previewData: Record<string, string> | null })
-      .previewData;
-    expect(formData).not.toBeNull();
-
-    const key = field.attributes("data-field")!;
-    // 通过 <p> 输入（失焦）触发回写
-    field.element.textContent = "测试值";
-    await field.trigger("blur");
-    expect(formData).toHaveProperty(key);
-    expect(formData![key]).toBe("测试值");
-  });
-
-  it("collectFormValues 通过 DOM 遍历采集预览/填充值（不依赖 emit）", async () => {
-    const wrapper = mount(DesignerApp);
-    await wrapper.find('[data-view-mode="fill"]').trigger("click");
-
-    const field = wrapper.find('[data-node-id="unit-field"]');
-    field.element.textContent = "DOM采集值";
-    await field.trigger("blur");
-
-    const values = (wrapper.vm as unknown as { collectFormValues: () => Record<string, string> })
-      .collectFormValues();
-    expect(values["单位"]).toBe("DOM采集值");
-  });
-
   it("再次点击同一模式按钮回到设计态", async () => {
-    const wrapper = mount(DesignerApp);
+    const wrapper = mountDesigner();
     const toggle = wrapper.find('[data-view-mode="preview"]');
     await toggle.trigger("click");
     expect(paletteButtons(wrapper)[0]?.attributes("disabled")).toBeDefined();
@@ -535,14 +513,14 @@ describe("DesignerApp 预览态只读（不可添加组件 / 不可输入）", (
 
 describe("DesignerApp 排列方向配置隐藏（text/p 分支不再暴露 writingMode）", () => {
   it("选中 text 节点时 Inspector 不再显示「排列方向」", async () => {
-    const wrapper = mount(DesignerApp);
+    const wrapper = mountDesigner();
     await wrapper.find('[data-node-id="title-text"]').trigger("click");
     // 渲染层仍按节点 style.writingMode 渲染（竖排数据不受影响），仅面板隐藏该配置
     expect(wrapper.text()).not.toContain("排列方向");
   });
 
   it("选中字段 P 节点时 Inspector 不再显示「排列方向」", async () => {
-    const wrapper = mount(DesignerApp);
+    const wrapper = mountDesigner();
     await wrapper.find('[data-node-id="unit-field"]').trigger("click");
     expect(wrapper.text()).not.toContain("排列方向");
   });
@@ -559,7 +537,7 @@ describe("DesignerApp 字段组件配置：宽度 / 默认内容 / 内部边框"
   }
 
   it("宽度：输入 mm/px/% 等自由长度字符串并写入 schema", async () => {
-    const wrapper = mount(DesignerApp);
+    const wrapper = mountDesigner();
     await wrapper.find('[data-node-id="unit-field"]').trigger("click");
 
     const widthInput = wrapper.find("input[data-field-width]");
@@ -577,7 +555,7 @@ describe("DesignerApp 字段组件配置：宽度 / 默认内容 / 内部边框"
   });
 
   it("默认内容：文本域输入并写入 schema，渲染层无 data 时回退该值", async () => {
-    const wrapper = mount(DesignerApp);
+    const wrapper = mountDesigner();
     await wrapper.find('[data-node-id="unit-field"]').trigger("click");
 
     const defaultInput = wrapper.find("textarea[data-field-default]");
@@ -592,7 +570,7 @@ describe("DesignerApp 字段组件配置：宽度 / 默认内容 / 内部边框"
   });
 
   it("内部边框：勾选写入 innerBorder=true，取消勾选移除", async () => {
-    const wrapper = mount(DesignerApp);
+    const wrapper = mountDesigner();
     await wrapper.find('[data-node-id="unit-field"]').trigger("click");
 
     const checkbox = wrapper.find("input[data-field-inner-border]");

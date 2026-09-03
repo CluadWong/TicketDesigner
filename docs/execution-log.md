@@ -425,3 +425,88 @@
 - **测试**：`GridGap.test.ts` +1（`gap + border=all：列/行间距生效且 2×2=4 cell 全部渲染、列间距 4mm 生效` 的结构回归，锁定「边框归属修正不丢 cell」）。jsdom 无法可靠计算 scoped `border-*` 计算样式（scoped 选择器带 `data-v`、getComputedStyle 不应用），故**不**另起 computed-style 断言（脆弱）；边框归属正确性由 CSS 规则本身 + 全量回归背书。
 - **验证**：`vue-tsc --noEmit` 干净（Exit 0）；`vitest` 全量 **185/185（20 文件）**（184 + 新 1）通过，无回归；未跑 `vite build`；未提交 git。
 - **经验固化（补充十四续「无需特殊处理」那条）**：十四续写「内部线单边归属在 gap 下表现为线间等距留白、符合预期、无需特殊处理」——**仅当单边归属画在「下一格的 left/top」时才成立**；一旦归属侧是 left/top，gap 会把线推到留白中间、前一格视觉无边框。正确做法是**让每条内部线归属「拥有它的 cell 的 right/bottom」**，线永远贴在自己边缘、留白在外侧。记此修正，避免后续 Table 边框复用同一错误归属。
+
+---
+
+## 2026-09-02 十六续：分页引擎（内容超高自动换页）
+
+### 背景 / 诉求
+纸张当前用 `min-height` 渲染，内容超过纸张高时只是在单页内继续向下撑开，看不到「超高出页 → 换页」的效果。用户要求实现分页引擎：超高内容流向下一页。建议用 50 行 Grid 验证。提示 `src/engine` 为旧 v1 分页引擎（基于 DOM 测量 + 旧 `FormSchema`/`Component` 模型），可参考可不参考。
+
+### 决策：DOM 无关 + 确定性切分（而非 v1 的 DOM 测量）
+- v1 引擎（`src/engine/paginate.ts`）靠 `DomMeasure` 把组件写进 off-screen 容器测 `offsetHeight`，再按组件粒度切页。它对接的是**旧 Schema 模型**，且依赖运行时 DOM 测量（jsdom 下不准、测试需 mock）。
+- Schema V2 的 Grid 行高是**确定性**的：`row.height × baseRowHeight`（mm），cell 的 `rowHeight` 可覆盖所在行高；再叠加 `gap` 行间距与（all/outer 的）外框 1px 边框。因此无需渲染即可精确算出每行高度——分页引擎做成**纯函数、可测试、无 DOM 依赖**，远比测量稳健。
+- 故新建 `src/engine-v2/pagination.ts`（与旧 `src/engine` 平行、互不干扰），不改动旧参考代码。
+
+### 算法（`paginatePage(page, opts)` → `PhysicalPage[]` + `warnings`）
+- 遍历逻辑页 `children`，按节点类型分流：
+  - **Grid**：先试整 Grid 能否放进当前页剩余空间；放不下则 `splitGrid` 按**行边界**切分——首片段保留上框、末片段保留下框、中间片段用 `suppressBorders:{top,bottom}` 抑制上/下框，多页连起来像被「拆开」的连续表格。首片段优先填当前页剩余空间（标题 + 前几行可在同一页，不浪费空间）。单行比整页还高时强制放入并告警。
+  - **Text/Image/Table/Html**：原子块。当前页放得下就放，放不下（且本页已有内容）换页；比整页还高则强制放入 + 告警。高度用启发式估算（Text 按内容宽度折行、Image 用给定尺寸、Html 回退一行基准高），并支持注入 `measureNode` DOM 测量回调提精度。
+- 行高计算 `gridRowHeightMm` = `max(row.height, 本行任意 cell.rowHeight) × baseRowHeight`；片段高 `gridFragmentHeightMm` = 各行 + 行 `gap` +（未抑制的）上下外框 1px（1px≈0.2646mm @96dpi）。
+
+### 接入 `GridFormRenderer`
+- 新增 `paginate?: boolean`（默认 `true`）。新增计算属性 `renderedPages`：分页开启时对每个逻辑页跑 `paginatePage` 得物理页；关闭时每个逻辑页原样作为一页（设计态用）。
+- 模板由 `v-for="page in schema.pages"` 改为 `v-for="pp in renderedPages"`，逐物理页渲染 `<main class="grid-form-paper">`，子项直接用片段节点（裁剪了 rows 的 `GridNodeV2`）喂 `GridSchemaNode`，边框抑制经 `suppressFor` 合并「兄弟去重 + 跨页连续」两侧。
+- **设计态关分页**：`DesignerApp` 传入 `:paginate="false"`，整页连续渲染便于编辑（避免同一 Grid 出现在多页导致选中态歧义）。预览/填写/打印走默认分页。
+- 物理页 `data-node-id`：每个逻辑页的**首个**物理页复用逻辑页 id（保证单页场景下与旧结构逐字节一致、兼容存量快照/选择）；后续片段用合成 id。空逻辑页也保证至少一张物理纸（`@page` 注入元素始终存在）。
+
+### 演示与验证
+- 新增 `src/dev/gridPaginationDemo.ts`：`makeFiftyRowGridSchema()` 生成「标题 + 50 行 Grid（A4/边距10/baseRowHeight8 → 正文可用 277mm，50×8=400mm 必换页）」。
+- `preview/App.vue` 增加下拉：可选「云铝工作票（单行，单页）」或「50 行 Grid 分页演示」。运行 `npm run dev` 打开 `/preview.html` 即可肉眼验证换页。
+- 单测：`engine-v2/__tests__/pagination.test.ts`（6 例：50行→2页且行数不丢、各页不超高、连续外观 suppressBorders、短内容单页不切分、超高单节点告警、多逻辑页拼接编号）；`GridFormRenderer.pagination.test.ts`（3 例：渲染 2 张纸且 50 行不丢、跨页边框类正确、paginate=false 单张纸）。
+- 回归：`GridFormRenderer.test.ts` / `PaperSizePrint.test.ts` / `FirstFiveRowsSnapshot.test.ts` 等全部通过（`data-node-id` 复用逻辑页 id 避免破坏快照）。
+
+### 旧 `src/engine`（v1 参考）处理
+该目录对接旧 Schema 类型（`Component`/`FormSchema`/`PaperSize` 等当前不存在），`vue-tsc` 会报一堆 TS2305/2724；且其测试 `src/engine/__tests__/*` 亦依赖旧类型。经验证**无任何应用代码 import `src/engine`**（纯参考残留）。为不污染当前基线，在 `tsconfig.json` 加 `"exclude":["src/engine"]`、`vitest.config.ts` 加 `exclude:['src/engine/**']`。⚠️ 若日后要启用 v1 代码，需先把它迁移到 Schema V2 类型，或删除。
+
+### 结果
+- `vue-tsc --noEmit` 干净；`vitest run` **194/194（22 文件）** 通过（原 185 + 新增 9）。未跑 `vite build`（本次无新外部依赖）；未提交 git。
+
+### 2026-09-02 十七续 · 设计器默认空白 + 移除填充按钮 + 纸张边距配置
+- 需求（用户指令）：`DesignerApp.vue` 页面初始化默认加载空白，不再默认挂载 `yunlv-second-ticket-first-five-rows` 样例；移除「填充」按钮及相关交互（不影响预览/其他按钮）；工具栏在「纸张」与「行高(mm)」之间新增「纸张边距(mm)」配置。
+- 实现：
+  - 默认空白：`schema` 初始值改为 `buildBlankSchema()`（空 page + 一个根 Grid，复用 `createEmptyFormSchemaV2`+`createGridNodeV2`+`insertRootGridV2`，与 `resetBlank()` 共用同一构造）；移除对 `yunlv-second-ticket-first-five-rows.ts` 的导入与默认依赖（该文件保留，仍被多处测试引用）。新增可选 prop `initialSchema?`，测试经它注入前五行样例以保住既有 fixture 节点（`unit-field`/`ticket-layout`/`work-task-table` 等）。
+  - 移除填充：`ViewMode` 由 `"design"|"preview"|"fill"` 缩为 `"design"|"preview"`；`toggleViewMode` 签名简化为 `"preview"`；删除工具栏「填充」按钮；清理 `onCanvasFieldChange`/`collectFormValues`/`canvasEl`/`readonlyMode`/`@field-change`/`defineExpose({collectFormValues})`（字段值采集改由预览态 DOM 遍历 `collectFieldValues`，与渲染内核 fill 态解耦，不影响预览/打印）。图片 `objectFit:"fill"` 与字段 `action` 的 `fill` 值与视图态 fill 无关，保留。
+  - 纸张边距：新增 `paperMargin` 计算属性（取首页 `margin.top`）与 `updatePaperMargin`（将统一值写入所有页 `margin` 四边）；工具栏 `.v2-toolbar__meta` 在「纸张」select 与「行高(mm)」input 之间插入「纸张边距(mm)」`number` 输入（min0/max99/step1）。
+  - 测试同步：`DesignerApp.test.ts` 移除 2 个依赖 fill 按钮的用例（数据回写 / collectFormValues），其余用例经 `mountDesigner()` 注入 `initialSchema`；移除 `previewData`/`collectFormValues` 的 vm 访问。
+- 验证：`vue-tsc --noEmit` 干净；`vitest run` **192/192（22 文件）** 通过（原 194 − 删除 2 个填充态用例）。未跑 `vite build`；未提交 git。
+
+### 2026-09-02 十八续 · 分页收尾四项（删旧引擎 / Table 延后 / 设计器分页可见 / 纸张固定高）
+
+用户四条指令：① 移除旧分页引擎；② Table 按行跨页切分延后；③ `DesignerApp` 传 `paginate=true` 还是没效果；④ 纸张不该用 `min-height`（会被无限撑开），应等于整纸高。
+
+#### ① 删除旧 v1 分页引擎
+- `src/engine/`（`geom.ts`/`measure.ts`/`paginate.ts`/`render-html.ts`/`index.ts` + `__tests__` 4 个测试）已删除。该目录未被 git 跟踪（用户确认早期已上传过，可直删）；删除前再次核对**无任何应用代码 import `src/engine`**（只有 `engine-v2` 在用）。
+- 撤销十六续为绕开它而加的排除：`tsconfig.json` 删 `"exclude":["src/engine"]`、`vitest.config.ts` 删 `exclude:['src/engine/**']`。自此类型检查与测试覆盖全量源码，不再有「法外之地」。
+
+#### ② Table 按行跨页切分
+- 用户确认**延后**，保持现状：Table 作为原子块整体落页/换页（超高单节点强制放入并告警）。已在 `development-plan.md` §0.3 标注为「用户已确认延后」。
+
+#### ③ `paginate=true`「没效果」的定位
+- **先复现再下结论**：新增 `src/components/designer/__tests__/DesignerApp.pagination.test.ts`，用 `initialSchema` 注入 50 行 Grid 后断言 `.grid-form-paper` 数量 > 1 且 50 行不丢 —— **用例直接通过**，说明渲染链路（`GridSchemaRenderer` 就是 `GridFormRenderer` 的别名 import，`paginate` prop 声明完整、物理页正常产出）**本来就是通的**。
+- 真正原因：**设计器自十七续起默认空白 Schema**（空 page + 一个根 Grid），内容远未超一页，分页引擎无事可做 → 视觉上「传了 true 也看不出变化」。属「没有可分页的内容」，不是「分页失效」。
+- 交付的可验证手段：
+  - 工具栏新增 **「分页演示(50 行)」** 按钮（`loadPaginationDemo()` → `resetHistory(makeFiftyRowGridSchema())`），一键载入超高 Schema 立即看到换页。
+  - 工具栏新增 **「分页」复选框**（`paginate` ref，默认**开**）；绑定改为 `:paginate="previewMode || paginate"` —— **预览/打印强制分页**，设计态可关为整页连续渲染（关掉后同一 Grid 不会被切成两页，避免同一 `grid.id` 出现在两张纸上）。
+  - 样式：新增 `.v2-toolbar__control--toggle`（覆盖 `.v2-toolbar__control input` 的 44px 定宽/居中，使复选框正常显示）。
+- 未改动 `.v2-canvas { overflow:hidden }`：内层 `.grid-form-canvas` 是 `height:100%; overflow:auto`，多张纸可正常滚动，非阻塞点。
+
+#### ④ 纸张高度 `min-height` → 固定 `height`
+- `GridFormRenderer.paperStyle()`：`minHeight: ${heightMm}mm` 改为 `height: ${heightMm}mm`，并补充注释说明取舍。
+- 理由（与用户判断一致）：`min-height` 只设下限，内容超高时纸张被无限撑开，永远看不出「已超出一张纸」；固定 `height` 后 —— 分页开启时分页引擎已保证每页内容 ≤ 正文可用高（`heightMm − margin.top − margin.bottom`，配合 `box-sizing:border-box` 内容盒口径一致），纸张恰好一张；分页关闭且内容超高时，超出部分溢出到纸张外的灰底，即「内容超出纸张」的可见反馈。
+- 同步受影响断言：`PaperSizePrint.test.ts` 两处 `min-height: 297mm` → `height: 297mm`；`__snapshots__/FirstFiveRowsSnapshot.test.ts.snap` 纸张 style 同步（快照语义未变，仅高度属性名）。
+
+#### 结果
+- `vue-tsc --noEmit` 干净；`vitest run` **197/197（23 文件）** 通过（十七续基线 192 + 新增 5 例）。未跑 `vite build`；未提交 git。
+
+### 2026-09-02 十九续 · 状态栏暴露分页结果（打印张数 + 超高告警）
+
+- 动机：分页结果此前**只能靠肉眼在画布里找**，或点「分页演示」才看得到。更严重的是——单个节点比整页还高时引擎会「强制放入并告警」，而这条告警**没有任何出口**，用户打印前完全不知道内容会被裁。
+- 实现：
+  - `DesignerApp`：新增 `pagination = computed(() => paginateSchema(schema.value, { data: previewData.value }))`。关键取舍：调的是**与渲染内核同一个** `paginateSchema`，且入参口径完全一致（`data` 同取 `previewData`；正文高 / 内宽同由 `resolvePaperSizeV2` 派生），因此状态栏数字与画布物理页必然一致 —— 避免了「两处各算一套、日后参数改动而漂移」的隐患。始终按「分页开启」计算（工具栏开关只影响设计态画布，预览/打印永远分页），显示的即真实出纸张数。
+  - `StatusBar`：新增可选 props `physicalPageCount?` / `paginateWarningCount?`。
+    - 「打印：N 张」仅在 **N ≠ 逻辑页数**时显示（`data-physical-page-count`），不制造噪音；
+    - 「分页告警：K」仅在 K > 0 时显示（`data-paginate-warning-count`），复用既有 `.warning-count.has-warning` 配色。
+    - 原「警告」项语义不变，仍是结构校验（`validateFormSchemaV2`）的问题数，与分页告警分列。
+- 测试（新增 4 例，均在 `DesignerApp.pagination.test.ts`）：超高 Schema 显示打印张数且与画布纸张数一致；空白 Schema 不显示打印张数；单行 800mm（100×8mm ≫ 277mm）触发并显示分页告警；50 行 Schema 无超高时不显示告警。
+- 验证：`vue-tsc --noEmit` 干净；`vitest run` **201/201（23 文件）** 通过（原 197 + 新增 4）。未跑 `vite build`；未提交 git。

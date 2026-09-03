@@ -2,7 +2,7 @@
 
 exports[`前五行渲染基线（P4.5 快照） > DOM 结构快照与基线一致 1`] = `
 "<div data-v-d627bc46="" class="grid-form-canvas">
-  <main data-v-d627bc46="" class="grid-form-paper" style="width: 210mm; min-height: 297mm; padding: 10mm 10mm 10mm 10mm;" data-node-id="ticket-page-1">
+  <main data-v-d627bc46="" class="grid-form-paper" style="width: 210mm; height: 297mm; padding: 10mm 10mm 10mm 10mm;" data-node-id="ticket-page-1">
     <div data-v-af1345cc="" data-v-d627bc46="" class="layout-grid layout-grid--none" data-node-id="ticket-title-layout" draggable="true">
       <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 1fr; min-height: 16mm;" data-layout-id="row-title">
         <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="cell-title" data-node-id="cell-title">

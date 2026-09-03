@@ -366,4 +366,4 @@ updateNode(schema, nodeId, patch)
 
 ## 17. 旧代码清理
 
-`src/engine/paginate.ts`、`FormRenderer` 与 `FormSchema.body[]` 等迁移前遗留实现已在 P0 阶段移除（目前 `src/engine`、`src/components/renderer` 仅剩旧测试目录）。剩余清理工作——旧测试文件、可能的 import 残留与旧类型——归入 [development-plan.md](./development-plan.md) P12。清理目标仍是避免出现两套 Schema、分页和设计器状态。
+`src/engine/paginate.ts`、`FormRenderer` 与 `FormSchema.body[]` 等迁移前遗留实现已在 P0 阶段移除。**2026-09-02 十八续：旧 v1 引擎目录 `src/engine/`（DOM 测量版，含其 `__tests__`）已整体删除**，此前为绕开其旧 Schema 类型而加的 `tsconfig.json` / `vitest.config.ts` `exclude` 也已撤销——分页实现自此只有一套：`src/engine-v2/pagination.ts`（确定性、DOM 无关）。剩余清理工作（旧类型残留等）归入 [development-plan.md](./development-plan.md) P12。清理目标仍是避免出现两套 Schema、分页和设计器状态。

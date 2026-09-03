@@ -1,15 +1,8 @@
 <script setup lang="ts">
-import {
-  computed,
-  ref,
-  watch,
-  onMounted,
-  onUnmounted,
-  reactive,
-} from "vue";
-import { GridFormRenderer as GridSchemaRenderer, collectFieldValues } from "@/components/renderer-v2";
-import { makeYunlvSecondTicketFirstFiveRowsSchema } from "@/dev/yunlv-second-ticket-first-five-rows";
+import { computed, ref, watch, onMounted, onUnmounted, reactive } from "vue";
+import { GridFormRenderer as GridSchemaRenderer } from "@/components/renderer-v2";
 import { makeYunlvSecondTicketFullSchema } from "@/dev/yunlv-second-ticket-full";
+import { makeFiftyRowGridSchema } from "@/dev/gridPaginationDemo";
 import demoData from "@/dev/demoData";
 import {
   buildEditorNodeIndexV2,
@@ -63,10 +56,24 @@ import type {
   TableColumnV2,
 } from "@/types";
 import { isSelectableSchemaNodeV2 } from "@/types";
+import { paginateSchema } from "@/engine-v2/pagination";
 import StatusBar from "./StatusBar.vue";
 import NodeTreeItem, { type TreeNode } from "./NodeTreeItem.vue";
 
-const schema = ref(makeYunlvSecondTicketFirstFiveRowsSchema());
+const props = defineProps<{ initialSchema?: FormSchemaV2 }>();
+
+/** 空白初始化：空 page + 一个根 Grid，便于用户从空白开始设计（用户要求默认空白）。 */
+function buildBlankSchema(): FormSchemaV2 {
+  const blank = createEmptyFormSchemaV2();
+  const grid = createGridNodeV2();
+  return insertRootGridV2(blank, grid);
+}
+
+const schema = ref<FormSchemaV2>(
+  props.initialSchema
+    ? (JSON.parse(JSON.stringify(props.initialSchema)) as FormSchemaV2)
+    : buildBlankSchema(),
+);
 const selectedNodeId = ref<string | null>(null);
 const selectedInsertionSlotId = ref<string | null>(null);
 const selectionPathIds = ref<string[]>([]);
@@ -74,6 +81,19 @@ const selectionPathIndex = ref(0);
 
 const issues = computed(() => validateFormSchemaV2(schema.value));
 const warningCount = computed(() => issues.value.length);
+/**
+ * 分页结果（纯函数、DOM 无关）：用于状态栏暴露「实际会打印几张纸」与超高告警。
+ *
+ * 与渲染内核 `GridFormRenderer` 调的是**同一个** `paginateSchema` 且入参口径一致
+ * （`data` 同为 `previewData`，body/内宽同由 `resolvePaperSizeV2` 派生），
+ * 因此状态栏数字与画布物理页必然一致，不会出现两处各算一套而漂移。
+ *
+ * 注意：这里始终按**分页开启**计算 —— 工具栏「分页」开关只影响设计态画布是否切分，
+ * 预览/打印永远分页，所以状态栏显示的就是真实出纸张数。
+ */
+const pagination = computed(() =>
+  paginateSchema(schema.value, { data: previewData.value }),
+);
 const nodeIndex = computed(() => buildEditorNodeIndexV2(schema.value));
 // 单元格（grid-cell）作为「仅样式可编辑」实体可被选中，但不可删除、不进入节点树。
 /** 节点是否位于某个 Table 的行模板内（含嵌套 Grid）。表格内节点不可单独选中/配置，
@@ -96,7 +116,9 @@ function isStyleEditableNodeId(id: string): boolean {
 }
 const selectedNode = computed<EditorNodeV2 | null>(() => {
   const id = selectedNodeId.value;
-  return id && isStyleEditableNodeId(id) ? (nodeIndex.value.get(id)?.node ?? null) : null;
+  return id && isStyleEditableNodeId(id)
+    ? (nodeIndex.value.get(id)?.node ?? null)
+    : null;
 });
 const selectedPath = computed<EditorNodeV2[]>(() => {
   return selectionPathIds.value
@@ -228,43 +250,26 @@ const fileInput = ref<HTMLInputElement | null>(null);
  * 视图模式：
  * - `design`：设计态，可编辑结构、可选中/添加组件；
  * - `preview`：**预览态，只读** —— 带数据渲染，但不可添加组件、不可选中、字段不可输入；
- * - `fill`：填充态，带数据渲染且字段可输入（用于验证 P9.1b「数据回写正确」）。
+ * - `fill`：填充态（已移除，字段回写改由预览态 DOM 遍历采集）。
  */
-type ViewMode = "design" | "preview" | "fill";
+type ViewMode = "design" | "preview";
 const viewMode = ref<ViewMode>("design");
+/**
+ * 分页开关（默认开启）：开启后渲染器按纸张正文高度把超高内容切成多张物理页。
+ *
+ * 关闭时整页连续渲染（纸张高度固定为整纸高，超出部分溢出到纸张外的灰底，
+ * 便于整体排版时查看连续结构）。注意：**打印/预览始终分页**，此开关只影响设计态画布，
+ * 因为设计态下分页会把跨页的 Grid 切成两个片段（同一个 grid id 出现在两张纸上）。
+ */
+const paginate = ref(true);
 /** 非设计态：结构一律不可编辑（不可选中、不可拖拽、不可添加/删除组件）。 */
 const previewMode = computed(() => viewMode.value !== "design");
-/** 只读预览：带数据但字段不可输入。 */
-const readonlyMode = computed(() => viewMode.value === "preview");
 // 预览/填写态的表单数据。使用响应式对象，字段输入可即时回写并被渲染层读取。
 const previewFormData = reactive<{ value: FormDataV2 | null }>({ value: null });
 const previewData = computed<FormDataV2 | null>(() => previewFormData.value);
 
-/** 渲染画布根容器（设计 / 预览 / 填充态都挂载于此），供 DOM 遍历采集字段值。 */
-const canvasEl = ref<HTMLElement | null>(null);
-
-/**
- * 通过遍历渲染 DOM 采集当前预览 / 填充态的字段值（用户需求：预览 / 填写不必逐键回写，
- * 改用 DOM 遍历获取）。返回字段键 → 字符串值的映射。预览态（不回写响应式 data）尤其适用。
- */
-function collectFormValues(): FormDataV2 {
-  return canvasEl.value ? collectFieldValues(canvasEl.value) : ({} as FormDataV2);
-}
-
-defineExpose({ collectFormValues });
-
-/**
- * 渲染内核（GridSchemaNode）在填写态 emit `field-change`；此处把字段输入写回响应式
- * previewFormData，满足 P9.1b「数据回写正确」。不再依赖 inject("formFill") 私有约定
- * （A4 / G15）。内核仅在 fill 态 emit（onFillInput 已守 canFill，只读预览 / 设计态不触发）。
- */
-function onCanvasFieldChange(field: string, value: string): void {
-  if (previewFormData.value && !readonlyMode.value)
-    previewFormData.value[field] = value;
-}
-
-/** 在「设计 / 预览 / 填充」之间切换；再次点击同一模式则回到设计态。 */
-function toggleViewMode(mode: "preview" | "fill"): void {
+/** 在「设计 / 预览」之间切换；再次点击同一模式则回到设计态。 */
+function toggleViewMode(mode: "preview"): void {
   viewMode.value = viewMode.value === mode ? "design" : mode;
   if (viewMode.value === "design") {
     previewFormData.value = null;
@@ -462,16 +467,16 @@ function reloadSample(): void {
   clearSelection();
 }
 
+/** 载入 50 行 Grid 演示（A4 纵向，50×8mm=400mm ≫ 正文 277mm），用于直观验证分页换页。 */
+function loadPaginationDemo(): void {
+  resetHistory(makeFiftyRowGridSchema());
+  clearSelection();
+}
+
 function resetBlank(): void {
   // 空白初始化默认配一个 Grid 作为根部（用户要求），仍从空 page 起算，
   // 便于用户在「添加 Grid」前就有一个可编辑的容器。
-  const blank = createEmptyFormSchemaV2();
-  const grid = createGridNodeV2();
-  resetHistory(insertRootGridV2(blank, grid));
-  selectedNodeId.value = grid.id;
-  selectedInsertionSlotId.value = null;
-  selectionPathIds.value = [blank.pages[0].id, grid.id];
-  selectionPathIndex.value = 1;
+  resetHistory(buildBlankSchema());
   clearSelection();
 }
 
@@ -599,7 +604,8 @@ function onCanvasDragOver(event: DragEvent): void {
  *  若全部在中点之上，则追加到末尾（children.length）。 */
 function computeInsertionIndex(cellEl: HTMLElement, clientY: number): number {
   const childEls = Array.from(cellEl.children).filter(
-    (el): el is HTMLElement => el instanceof HTMLElement && el.hasAttribute("data-node-id"),
+    (el): el is HTMLElement =>
+      el instanceof HTMLElement && el.hasAttribute("data-node-id"),
   );
   for (let i = 0; i < childEls.length; i += 1) {
     const rect = childEls[i].getBoundingClientRect();
@@ -1257,6 +1263,24 @@ function updatePaperSize(event: Event): void {
   commit(updatePaperConfigV2(schema.value, { size, orientation }));
 }
 
+/** 纸张边距（mm）：统一作用于四边，展示为单一数值（取首页 top）。 */
+const paperMargin = computed<number>(
+  () => schema.value.pages[0]?.margin.top ?? 10,
+);
+
+/** 设置纸张边距（mm）：统一写入所有页的上下左右。 */
+function updatePaperMargin(event: Event): void {
+  const raw = Number((event.target as HTMLInputElement).value);
+  const value = Number.isFinite(raw) ? Math.max(0, Math.floor(raw)) : 0;
+  commit({
+    ...schema.value,
+    pages: schema.value.pages.map((page) => ({
+      ...page,
+      margin: { top: value, right: value, bottom: value, left: value },
+    })),
+  });
+}
+
 // ── Field P: action 属性（外部组件触发） ───────────────────────
 
 function updateSelectedAction(event: Event): void {
@@ -1304,6 +1328,17 @@ function updateSelectedSafetyField(event: Event): void {
           </select>
         </label>
         <label class="v2-toolbar__control">
+          <span>纸张边距(mm)</span>
+          <input
+            type="number"
+            min="0"
+            max="99"
+            step="1"
+            :value="paperMargin"
+            @change="updatePaperMargin"
+          />
+        </label>
+        <label class="v2-toolbar__control">
           <span>行高(mm)</span>
           <input
             type="number"
@@ -1326,6 +1361,14 @@ function updateSelectedSafetyField(event: Event): void {
         </button>
         <button class="v2-toolbar__button" type="button" @click="reloadSample">
           载入样例
+        </button>
+        <button
+          class="v2-toolbar__button"
+          type="button"
+          data-load-pagination-demo="true"
+          @click="loadPaginationDemo"
+        >
+          分页演示(50 行)
         </button>
       </div>
       <div class="v2-toolbar__group">
@@ -1370,18 +1413,13 @@ function updateSelectedSafetyField(event: Event): void {
         >
           {{ viewMode === "preview" ? "退出预览" : "预览" }}
         </button>
-        <button
-          class="v2-toolbar__button"
-          type="button"
-          data-view-mode="fill"
-          :class="{ 'v2-toolbar__button--active': viewMode === 'fill' }"
-          @click="toggleViewMode('fill')"
-        >
-          {{ viewMode === "fill" ? "退出填充" : "填充" }}
-        </button>
         <button class="v2-toolbar__button" type="button" @click="printDocument">
           打印
         </button>
+        <label class="v2-toolbar__control v2-toolbar__control--toggle">
+          <input v-model="paginate" type="checkbox" data-paginate="true" />
+          <span>分页</span>
+        </label>
       </div>
       <input
         ref="fileInput"
@@ -1487,7 +1525,6 @@ function updateSelectedSafetyField(event: Event): void {
 
       <main
         class="v2-canvas"
-        ref="canvasEl"
         :class="{ 'v2-canvas--preview': previewMode }"
         @click="selectNode"
         @dragover="onCanvasDragOver"
@@ -1500,10 +1537,10 @@ function updateSelectedSafetyField(event: Event): void {
           :selected-node-id="previewMode ? null : selectedNodeId"
           :data="previewData"
           :readonly="false"
+          :paginate="previewMode || paginate"
           :drag-over-cell-id="dragOverCellId"
           :drag-over-index="dragOverIndex"
           @node-drag-start="onCanvasNodeDragStart"
-          @field-change="onCanvasFieldChange"
         />
       </main>
 
@@ -1552,12 +1589,16 @@ function updateSelectedSafetyField(event: Event): void {
           <strong>{{ schema.version }}</strong>
         </div>
         <template
-          v-if="selectedNode && selectedNode.type !== 'page' && selectedNode.type !== 'grid-cell'"
+          v-if="
+            selectedNode &&
+            selectedNode.type !== 'page' &&
+            selectedNode.type !== 'grid-cell'
+          "
         >
           <div class="v2-sidebar__subheading">位置（拖拽重排）</div>
           <div class="v2-inspector-row v2-inspector-row--hint">
-            在设计画布中拖拽节点即可重排：同格内拖动调整顺序；拖到其它格 / 嵌套 Grid 即跨格移动。整段可编辑字段请按住
-            Alt 再拖拽。
+            在设计画布中拖拽节点即可重排：同格内拖动调整顺序；拖到其它格 / 嵌套
+            Grid 即跨格移动。整段可编辑字段请按住 Alt 再拖拽。
           </div>
         </template>
         <template v-if="selectedNode?.type === 'grid'">
@@ -2159,6 +2200,8 @@ function updateSelectedSafetyField(event: Event): void {
     <StatusBar
       :page-count="schema.pages.length"
       :warning-count="warningCount"
+      :physical-page-count="pagination.pages.length"
+      :paginate-warning-count="pagination.warnings.length"
     />
   </div>
 </template>
@@ -2220,6 +2263,19 @@ function updateSelectedSafetyField(event: Event): void {
 .v2-toolbar__control input {
   width: 44px;
   text-align: center;
+}
+
+/* 分页开关：复选框不套用普通输入框的 44px 定宽与居中排版。 */
+.v2-toolbar__control--toggle {
+  cursor: pointer;
+  user-select: none;
+}
+
+.v2-toolbar__control--toggle input {
+  width: auto;
+  height: auto;
+  padding: 0;
+  cursor: pointer;
 }
 
 .v2-toolbar__dirty {

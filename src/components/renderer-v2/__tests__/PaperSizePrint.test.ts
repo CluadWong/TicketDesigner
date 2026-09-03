@@ -34,7 +34,7 @@ describe("打印纸张尺寸（@page 跟随 schema.paper）", () => {
     const wrapper = mount(GridFormRenderer, { props: { schema: makeSchema("A4") } });
     expect(currentPageSizeStyle()).toBe("@page { size: 210mm 297mm; margin: 0; }");
     expect(wrapper.find(".grid-form-paper").attributes("style")).toContain("width: 210mm");
-    expect(wrapper.find(".grid-form-paper").attributes("style")).toContain("min-height: 297mm");
+    expect(wrapper.find(".grid-form-paper").attributes("style")).toContain("height: 297mm");
     wrapper.unmount();
   });
 
@@ -42,7 +42,7 @@ describe("打印纸张尺寸（@page 跟随 schema.paper）", () => {
     const wrapper = mount(GridFormRenderer, { props: { schema: makeSchema("A3") } });
     expect(currentPageSizeStyle()).toBe("@page { size: 420mm 297mm; margin: 0; }");
     expect(wrapper.find(".grid-form-paper").attributes("style")).toContain("width: 420mm");
-    expect(wrapper.find(".grid-form-paper").attributes("style")).toContain("min-height: 297mm");
+    expect(wrapper.find(".grid-form-paper").attributes("style")).toContain("height: 297mm");
     wrapper.unmount();
   });
 

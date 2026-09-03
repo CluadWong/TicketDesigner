@@ -2,19 +2,25 @@
 /**
  * 底部状态栏
  *
- * 职责（v1 阶段 3.2 骨架）：
- *   - 显示当前页数
- *   - 显示分页警告数
+ * 职责（v1 阶段 3.2 骨架 + 2026-09-02 十九续）：
+ *   - 显示当前**逻辑**页数
+ *   - 显示**物理（打印）页数**：与逻辑页数不同时才提示，用于暴露「内容超高 → 换页」
+ *     （此前分页结果只能靠肉眼在画布里找，或点「分页演示」才看得到）
+ *   - 显示分页警告数（结构校验警告 + 分页超高告警）
  *   - 缩放控件占位（阶段 5 完善）
  *
  * 设计依据：docs/design-biz.md §2.1（设计器界面）、docs/development-plan.md §3（已锁定决策）。
  */
 
 defineProps<{
-  /** 当前总页数 */
+  /** 当前逻辑页数 */
   pageCount: number
-  /** 分页警告数（超高组件等） */
+  /** 结构校验警告数 */
   warningCount: number
+  /** 物理（打印）页数，由分页引擎算出；等于逻辑页数时不额外展示。 */
+  physicalPageCount?: number | null
+  /** 分页超高告警数（单个节点比整页还高、被强制放入而可能裁切）。 */
+  paginateWarningCount?: number
 }>()
 </script>
 
@@ -24,10 +30,25 @@ defineProps<{
       <span class="status-item">
         页数：<strong>{{ pageCount }}</strong>
       </span>
+      <!-- 物理页数与逻辑页数不一致 ⇒ 内容超高已换页（预览/打印的实际出纸张数）。 -->
+      <span
+        v-if="physicalPageCount != null && physicalPageCount !== pageCount"
+        class="status-item"
+        data-physical-page-count="true"
+      >
+        打印：<strong>{{ physicalPageCount }}</strong> 张
+      </span>
       <span
         :class="['status-item', 'warning-count', { 'has-warning': warningCount > 0 }]"
       >
         警告：<strong>{{ warningCount }}</strong>
+      </span>
+      <span
+        v-if="paginateWarningCount"
+        class="status-item warning-count has-warning"
+        data-paginate-warning-count="true"
+      >
+        分页告警：<strong>{{ paginateWarningCount }}</strong>
       </span>
     </div>
     <div class="status-group status-right">
