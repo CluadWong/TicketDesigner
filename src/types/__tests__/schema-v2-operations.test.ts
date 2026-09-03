@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { resolveCellBoxV2 } from "@/engine-v2/derivation";
 import { makeYunlvSecondTicketFirstFiveRowsSchema } from "@/dev/yunlv-second-ticket-first-five-rows";
 import {
   appendNodeToCellV2,
@@ -24,7 +25,6 @@ import {
   removeTableColumnV2,
   updateTableColumnV2,
   updateSchemaNodeV2,
-  resolveCellBoxV2,
   updateCellPaddingV2,
   updateCellAlignV2,
   updateCellVerticalAlignV2,

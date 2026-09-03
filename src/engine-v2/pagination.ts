@@ -41,7 +41,8 @@ import type {
   PageSchemaV2,
   ResolvedPaperSizeV2,
 } from "@/types";
-import { resolveGridGapV2, resolvePaperSizeV2, resolveTableRowCount } from "@/types";
+import { resolveGridGapV2, resolvePaperSizeV2 } from "@/types";
+import { resolveTableRowCount } from "@/engine-v2/derivation";
 
 /** 1px（96DPI 下）换算成 mm，用于外框边框占用的高度。 */
 const ONE_PX_MM = 1 / (96 / 25.4); // ≈ 0.264583mm

@@ -211,32 +211,6 @@ export function updateCellWidthV2(
   );
 }
 
-/**
- * 单元格样式级联解析：cell 自身设置优先，否则继承 Grid 默认，再否则取常量默认。
- * 渲染层与检查器共用，保证「实际生效值」一致。
- */
-export interface ResolvedCellBoxV2 {
-  padding: number;
-  align: "left" | "center" | "right";
-  verticalAlign: "top" | "middle" | "bottom";
-}
-
-const DEFAULT_CELL_PADDING = 0;
-const DEFAULT_CELL_ALIGN: "left" | "center" | "right" = "left";
-const DEFAULT_CELL_VERTICAL_ALIGN: "top" | "middle" | "bottom" = "middle";
-
-export function resolveCellBoxV2(
-  cell: GridCellV2,
-  grid: GridNodeV2,
-): ResolvedCellBoxV2 {
-  return {
-    padding: cell.padding ?? grid.cellPadding ?? DEFAULT_CELL_PADDING,
-    align: cell.align ?? grid.cellAlign ?? DEFAULT_CELL_ALIGN,
-    verticalAlign:
-      cell.verticalAlign ?? grid.cellVerticalAlign ?? DEFAULT_CELL_VERTICAL_ALIGN,
-  };
-}
-
 /** 设置单元格内边距（mm，非负）。用于「单元格仅覆盖」模式。 */
 export function updateCellPaddingV2(
   schema: FormSchemaV2,

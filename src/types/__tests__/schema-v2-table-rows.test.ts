@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { collectFieldKeys } from "@/types";
+import type { FormNodeV2, FormSchemaV2, TableNodeV2 } from "@/types";
 import {
   bindTableRowCell,
   buildTableRowField,
-  collectFieldKeys,
   collectSchemaFields,
   resolveTableRowCount,
-} from "@/types";
-import type { FormNodeV2, FormSchemaV2, TableNodeV2 } from "@/types";
+} from "@/engine-v2/derivation";
 
 /**
  * 表格「动态行」不是 schema 属性，而是渲染期按 data 推导：

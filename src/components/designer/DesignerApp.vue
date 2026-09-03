@@ -3,9 +3,9 @@ import { computed, ref, watch, onMounted, onUnmounted, reactive } from "vue";
 import CanvasSurface from "./CanvasSurface.vue";
 import { NODE_ID_ATTR, LAYOUT_ID_ATTR, PALETTE_DRAG_MIME } from "@/engine-v2/node-address";
 import type { SampleEntry } from "@/samples/types";
+import { resolveCellBoxV2 } from "@/engine-v2/derivation";
 import {
   buildEditorNodeIndexV2,
-  resolveCellBoxV2,
   appendNodeToCellV2,
   createEmptyFormSchemaV2,
   createFieldPNodeV2,

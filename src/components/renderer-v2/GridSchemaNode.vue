@@ -13,12 +13,12 @@ import type {
   FormDataV2,
 } from "@/types";
 import HtmlBlock from "./HtmlBlock.vue";
+import { resolveGridGapV2 } from "@/types";
 import {
   bindTableRowCell,
   resolveCellBoxV2,
-  resolveGridGapV2,
   resolveTableRowCount,
-} from "@/types";
+} from "@/engine-v2/derivation";
 
 defineOptions({ name: "GridSchemaNodeV2" });
 
