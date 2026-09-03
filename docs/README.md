@@ -5,7 +5,7 @@
 
 > **新会话 / 新任务从哪里开始**：`docs/` 下的文档**不会被自动读取**，需按序打开——
 > ① 最近一次 `.workbuddy/memory/YYYY-MM-DD.md`（续做近期工作）→ ② `development-plan.md` §0（当前状态 / 缺口 / 下一步）
-> → ③ `execution-log.md` 末尾 1–2 条（上一轮具体做了什么）→ ④ 按任务命中下表对应的 spec（**不要全读**）。
+> → ③ `execution-log.md` 近期轮次（更早轮次已归档 `archive/`，不再每轮追加）→ ④ 按任务命中下表对应的 spec（**不要全读**）。
 > 说明：`.workbuddy/memory/MEMORY.md` 每次会话**自动注入**上下文，无需打开，且已置顶同样的阅读顺序提示。
 
 ## 一、活跃文档
@@ -13,7 +13,7 @@
 | 文档 | 用途 | 维护方式 |
 |---|---|---|
 | [development-plan.md](./development-plan.md) | 开发计划与执行追踪：§0 概览（当前状态/缺口/最近执行）、§1 最终目标、§2 当前状态与 MVP 范围、§3 已锁定决策、**§13–§18（P9–P12 阶段与风险控制）** | **每次执行前后更新 §0** |
-| [execution-log.md](./execution-log.md) | 每轮执行的**详细过程**（「本轮 N 续」流水），从 development-plan.md §0.1 拆出 | **每次执行后追加一条** |
+| [execution-log.md](./execution-log.md) | 近期轮次（十六续起）的详细过程；更早轮次见 `archive/execution-log-2026-09-early.md` | **不再每轮追加**（连续性以 memory 日log 为准） |
 | [design.md](./design.md) | 统一设计契约：Schema 结构、Grid / P / Table / HTML / Image 模型、边框模型 | 设计变更时更新 |
 | [design-biz.md](./design-biz.md) | 业务与交互设计：设计器界面、节点选择、拖拽规则、配置面板、数据与权限 | 设计变更时更新 |
 | [engine.md](./engine.md) | 渲染引擎契约：运行时索引、Schema 校验、递归渲染、尺寸与边框算法、结构操作 | 设计变更时更新 |
@@ -37,13 +37,13 @@
 
 ## 三、每次执行后的文档更新约定
 
-1. **追加过程**：在 [execution-log.md](./execution-log.md) 末尾追加一条「本轮（YYYY-MM-DD N续）」，记录做了什么、验证结果。
-2. **更新状态**：回到 [development-plan.md](./development-plan.md) §0，更新「最后更新」一行、§0.2「任务节点状态」、§0.3「已知缺口」，并在 §0.4「最近执行记录」表补一行。
-3. **只留结论**：`development-plan.md` 只保留状态与指针，详细过程一律放 `execution-log.md`，避免该文件再次膨胀。
+1. **（自动）连续记录**：每轮结束，本会话已在 `.workbuddy/memory/YYYY-MM-DD.md` 记录「本轮做了什么」，且每次会话自动注入上下文——**不再手写 execution-log 流水账**。
+2. **手动只更新状态**：回到 `development-plan.md` §0，仅更新 §0.1「当前主线位置」一行 + §0.3「已知缺口」；**§0.4 执行记录表已删除，不再补行**。
+3. **只留结论**：`development-plan.md` 只保留状态与指针，避免再次膨胀。
 
 ## 四、当前进度速览
 
 - **主线：P11 完整工作票**（P10 前五行闭环已全部验收通过，§14 闸门已解除）。
 - 已完成：P11-1 full 样例 1-Grid 对齐（消除段间 2px 双边框）、P11-3 A4 整票打印真机核验 + 打印方向由尺寸派生 + Table 边框配置。
 - 下一步：P11-2 完整票快照基线（可选）、P11-4 并入推迟项（P7.2d/e/f、P9.1c-d、P9.2、P6.3 拖拽形式、P12 清理）。
-- 验证基线：`vitest` **124/124** 通过，`vue-tsc --noEmit` 干净。
+- 验证基线：`vitest` **210/210** 通过，`vue-tsc --noEmit` 干净。
