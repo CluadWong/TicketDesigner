@@ -3,22 +3,19 @@ import { computed, ref } from "vue";
 import type { FormDataV2, FormSchemaV2 } from "@/types";
 import FormRenderer from "@/components/renderer-v2/FormRenderer.vue";
 import { makeYunlvSecondTicketFirstFiveRowsSchema } from "@/dev/yunlv-second-ticket-first-five-rows";
-import { makeFiftyRowGridSchema } from "@/dev/gridPaginationDemo";
 import demoData from "@/dev/demoData";
 
 // 消费页典型流程：服务器返回 JSON 字符串 → parseTolerantFormSchemaV2(json).schema →
 // 传给 <FormRenderer>；此处直接用内存中的样例 schema + demo data 演示（真实场景用容错解析）。
-type DemoKey = "yunlv" | "pagination";
+type DemoKey = "yunlv";
 
 const demoOptions: { value: DemoKey; label: string }[] = [
   { value: "yunlv", label: "云铝工作票（五行，单页）" },
-  { value: "pagination", label: "50 行 Grid 分页演示（超高换页）" },
 ];
-const demoKey = ref<DemoKey>("pagination");
+const demoKey = ref<DemoKey>("yunlv");
 
 const schemaSource: Record<DemoKey, () => FormSchemaV2> = {
   yunlv: makeYunlvSecondTicketFirstFiveRowsSchema,
-  pagination: makeFiftyRowGridSchema,
 };
 const schema = computed<FormSchemaV2>(() => schemaSource[demoKey.value]());
 

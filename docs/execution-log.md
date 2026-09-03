@@ -575,3 +575,74 @@
 #### 测试
 - 新增引擎测试：「Table（50 行数据）in Grid（1 行）按数据行跨页切分」——验证 pages.length > 1、tableFragmentCount ≥ 2、totalDataRows = 50（一行不丢）、每页高度 ≤ 正文区。
 - 全量 `vitest run` **204/204（23 文件）**；`vue-tsc --noEmit` 干净。未跑 `vite build`；未启动服务器；未提交 git。
+
+---
+
+### 2026-09-02 廿二续 · 删除 50 行分页演示 UI
+
+用户确认分页功能正常（廿一续 Table 按数据行跨页切分已生效），要求**删除 50 行分页演示相关代码**，随后继续推进。
+
+#### 删除范围（仅移除「用户可见演示入口」，保留测试夹具）
+- `DesignerApp.vue`：删除 `import { makeFiftyRowGridSchema }`（line 5，唯一用途即演示）、`loadPaginationDemo()` 函数（`resetHistory(makeFiftyRowGridSchema())`）、工具栏「分页演示(50 行)」按钮（`data-load-pagination-demo="true"`）。
+- `preview/App.vue`：删除 `makeFiftyRowGridSchema` 导入、下拉选项「50 行 Grid 分页演示（超高换页）」、`schemaSource.pagination` 条目；`DemoKey` 收窄为 `"yunlv"`，默认 `demoKey` 改 `"yunlv"`。
+- `DesignerApp.pagination.test.ts`：删除「工具栏『分页演示(50 行)』可一键载入超高 Schema」用例（点击 `[data-load-pagination-demo="true"]`）；同步修订顶部 doc comment（不再提「一键载入超高演示」入口，改为「载入超高 Schema + 切换分页开关」）。
+
+#### 保留项（刻意不动）
+- `src/dev/gridPaginationDemo.ts` 与 `makeFiftyRowGridSchema()` 保留，作为**测试夹具**——引擎 `pagination.test.ts`(4 处)、`GridFormRenderer.pagination.test.ts`(4 处)、`DesignerApp.pagination.test.ts`(其余用例) 共 3 个测试文件仍依赖它生成超高 Schema。删除文件会迫使 9 处用例内联重写，风险高、收益低；用户诉求是「去掉手动演示按钮」，已满足。
+
+#### 验证
+- `vue-tsc --noEmit` 干净（exit 0）。
+- `vitest run` **203/203（23 文件）**（基线由 204 因移除 1 个 demo 按钮用例 → 203）。
+- 未跑 `vite build`（无新依赖）；未启动服务器；未提交 git。
+
+#### 下一步
+- 待用户指定「继续推进」方向。当前 P11 主线仅剩可选 **P11-2**（完整票快照基线）与 **P11-4**（推迟项并入：P9.1c 专用控件 / P9.2 / P12 清理）。详见 `development-plan.md` §0.1。
+
+---
+
+### 2026-09-02 廿三续 · P11-2 完整票快照基线
+
+用户选定「继续推进」方向为 **P11-2 完整票快照基线**（P11 主线剩余项均为可选/推迟，此为其一）。
+
+#### 背景
+- `YunlvSecondTicketFull.test.ts` 已覆盖 P11-2 的全部**非快照**验收项（schema 校验无 error、边框分布 all×3/outer×9/none×4、全部业务字段可索引、工作任务表按列 key 派生 `工作地点_行号`/`工作内容_行号`、各段网格 id 存在）。
+- 唯一未落地的是「可选」的整票 `toMatchSnapshot` 结构回归基线——用于防止后续重构无意破坏整票 DOM 结构/行高/嵌套。
+
+#### 改动
+- 在 `src/dev/__tests__/YunlvSecondTicketFull.test.ts` 的 describe 内新增 `it("DOM 结构快照与基线一致（整票结构回归基线…）")`：`mount(GridFormRenderer, { props: { schema: makeYunlvSecondTicketFullSchema() } })` 后 `expect(wrapper.html()).toMatchSnapshot()`。
+- 沿用 `FirstFiveRowsSnapshot.test.ts` 约定：仅传 `schema`（不传 `data`，保持纯结构基线）、默认 `paginate`（jsdom 下 `measureRow` 返回 0 回退确定性分页，快照稳定可复现）。
+- 首次运行自动生成 `src/dev/__tests__/__snapshots__/YunlvSecondTicketFull.test.ts.snap`（608 行，含 103 处 `layout-grid`、63 处 `data-field`、1 个 `grid-form-paper`，即完整 13 段网格整票结构）。
+
+#### 验证
+- `vitest run` **204/204（23 文件）**（203 + 本续 1 例快照）；`vue-tsc --noEmit` 干净。
+- 未跑 `vite build`；未启动服务器；未提交 git。
+
+#### 下一步
+- P11 主线仅剩 **P11-4**（推迟项并入：P9.1c 专用控件 / P9.2 / P12 清理），或转 P12 清理等。待用户指定。
+
+---
+
+### 2026-09-02 廿四续 · P12 清理（安全项收尾）
+
+用户选定「继续推进」方向为 **P11-4 · P12 清理**（技术债清理）。
+
+#### 盘点（先厘清范围，不盲目动）
+- D 类清理项（architecture-layering-review.md）：
+  - **D1** `useTextarea`/`inputElType` 死代码：grep `src` 确认**已无残留**（八续/九续 删除），属已完成项。
+  - **D2** 打印责任分散（`window.print()` 在设计器、`@media print` 在渲染组件）：属设计层归属问题，非纯清理，本轮不动。
+  - **D3** 渲染组件内设计态打印样式分支（`@media print .layout-node--selected`）：文档明确「随 A5 一并清理」，而 A5（移除渲染组件 `selectedNodeId`）是未获批的结构重构——**孤立清理会改变打印行为**，暂缓。
+- `src/dev` 无旧渲染器残留（`src/engine` 已于 十八续 删除）；`grid-50-rows.json` 为用户手拖复现样本、未被任何代码/测试引用，留作样本不删。
+- 源码无死代码/TODO/console 残留（仅 `preview/App.vue` 一处 `console.log` 占位，属 demo，不动）。
+
+#### 本轮实际清理（纯注释/文档，零行为变更）
+1. `StatusBar.vue:8`：删除已失效的「或点『分页演示』才看得到」引用（demo 按钮已于廿二续移除）。
+2. `src/dev/gridPaginationDemo.ts`：修正头部注释（预览页下拉已移除，现为纯测试夹具）+ 标题文本「分页演示：50 行 Grid」→「测试夹具：50 行 Grid」（仅测试数据，无断言依赖）。
+3. `docs/architecture-layering-review.md` D 类：D1 标注「已解决」、D3 标注「暂缓（受 A5 门控）」。
+4. `docs/development-plan.md` §16 P12 清单：两项勾选完成并补注（旧 renderer/schema 已删、D1 已解决）。
+
+#### 验证
+- `vue-tsc --noEmit` 干净；`vitest run` **204/204（23 文件）**（仅注释/字符串字面量改动，无回归）。
+- 未跑 `vite build`；未启动服务器；未提交 git。
+
+#### 结论
+P12 中可安全独立收尾的清理项已全部完成；剩余 D2/D3 属设计层/结构重构（A5），需用户拍板后方可做，不孤立推进。

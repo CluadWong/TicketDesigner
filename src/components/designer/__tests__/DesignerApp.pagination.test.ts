@@ -42,7 +42,8 @@ function makeOversizedRowSchema(): FormSchemaV2 {
  *
  * 背景：曾出现「`paginate` 传了 true 却看不到分页效果」的反馈。经查渲染链路是通的
  * （本文件用例 1 即为固化证据），看不到效果的原因是**设计器默认空白 Schema、内容远未超页**，
- * 分页引擎无事可做。故同时固化「一键载入超高演示」入口与「分页开关」，确保效果可验证。
+ * 分页引擎无事可做。故用例同时载入超高 Schema（`makeFiftyRowGridSchema`）+ 切换「分页开关」，
+ * 确保分页效果可验证。
  */
 function mountWithTallSchema() {
   return mount(DesignerApp, {
@@ -80,16 +81,6 @@ describe("DesignerApp 分页渲染", () => {
     await wrapper.find('[data-paginate="true"]').setValue(false);
 
     expect(wrapper.findAll(".grid-form-paper")).toHaveLength(1);
-    expect(wrapper.findAll(".layout-grid__row")).toHaveLength(50);
-  });
-
-  it("工具栏「分页演示(50 行)」可一键载入超高 Schema 并立即分页", async () => {
-    const wrapper = mount(DesignerApp);
-    expect(wrapper.findAll(".grid-form-paper")).toHaveLength(1);
-
-    await wrapper.find('[data-load-pagination-demo="true"]').trigger("click");
-
-    expect(wrapper.findAll(".grid-form-paper").length).toBeGreaterThan(1);
     expect(wrapper.findAll(".layout-grid__row")).toHaveLength(50);
   });
 });

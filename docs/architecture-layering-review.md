@@ -87,9 +87,9 @@
 
 | 编号 | 不符合点 | 位置 | 说明 | 优先级 |
 |---|---|---|---|---|
-| **D1** | 渲染组件死代码 | `useTextarea(_node)` 恒 `true`、`inputElType(_node)` 恒 `"text"`，`component :is` 的 `input` 分支永不命中 | 字段统一为字符串类型后遗留 | **P4** |
+| **D1** | 渲染组件死代码 | `useTextarea(_node)` 恒 `true`、`inputElType(_node)` 恒 `"text"`，`component :is` 的 `input` 分支永不命中 | 字段统一为字符串类型后遗留（**已解决**：八续/九续 删除 `useTextarea`/`inputElType`，grep 确认 `src` 内无残留） | **P4** |
 | **D2** | 打印责任分散 | `window.print()` 在设计器工具栏，`@media print` 样式在渲染组件 | 触发与呈现分处两层 | **P4** |
-| **D3** | 渲染组件内为设计态服务的样式分支 | `@media print .layout-node--selected{...}`、`.layout-p--underline` 打印移除等 | 随 A5 一并清理 | **P4** |
+| **D3** | 渲染组件内为设计态服务的样式分支 | `@media print .layout-node--selected{...}`、`.layout-p--underline` 打印移除等 | 随 A5 一并清理（**暂缓**：A5 移除渲染组件 `selectedNodeId` 尚未获批，孤立清理会改变打印行为，待 A5 落地后处理） | **P4** |
 
 ---
 

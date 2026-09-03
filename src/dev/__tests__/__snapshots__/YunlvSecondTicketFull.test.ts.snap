@@ -1,0 +1,608 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`yunlv-second-ticket-full（P11 完整工作票样例 · 扁平结构） > DOM 结构快照与基线一致（整票结构回归基线，防止后续重构破坏整票） 1`] = `
+"<div data-v-d627bc46="" class="grid-form-canvas">
+  <main data-v-d627bc46="" class="grid-form-paper" style="width: 210mm; height: 297mm; padding: 10mm 10mm 10mm 10mm;" data-node-id="ticket-page-full">
+    <div data-v-af1345cc="" data-v-d627bc46="" class="layout-grid layout-grid--none" data-node-id="title-grid" draggable="true">
+      <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 1fr; min-height: 8mm;" data-layout-id="title-row">
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="title-cell" data-node-id="title-cell">
+          <!--v-if-->
+          <div data-v-af1345cc="" class="layout-text" style="justify-content: center; align-items: center; text-align: center; font-size: 22px; line-height: 1.6; font-weight: bold;" data-node-id="title" draggable="true">云南铝业股份有限公司 电气第二种工作票</div>
+          <!--v-if-->
+        </div>
+      </div>
+    </div>
+    <div data-v-af1345cc="" data-v-d627bc46="" class="layout-grid layout-grid--all" data-node-id="basic-unit-number-grid" draggable="true">
+      <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 20mm 1fr 20mm 1fr; min-height: 8mm;" data-layout-id="basic-unit-number-row">
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="unit-label-cell" data-node-id="unit-label-cell">
+          <!--v-if-->
+          <div data-v-af1345cc="" class="layout-text" style="justify-content: center; align-items: center; text-align: center;" data-node-id="unit-label" draggable="true">单位</div>
+          <!--v-if-->
+        </div>
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="unit-field-cell" data-node-id="unit-field-cell">
+          <!--v-if-->
+          <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--underline" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" contenteditable="true" data-field="单位" data-node-id="unit-field" draggable="true">
+            <!--v-if-->
+            <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
+         设计/预览/填写共用同一结构，仅 contenteditable 差异。 -->
+            <!-- 非复合字段：普通展示值。直接作为 <p> 的 v-else 子项（不经 <template v-else>
+         包裹，否则 contenteditable <p> 的数据晚到时文本子节点不会重新 patch）。 --><span data-v-af1345cc="" class="layout-p__value"></span>
+            <!--v-if-->
+          </p>
+          <!--v-if-->
+        </div>
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="number-label-cell" data-node-id="number-label-cell">
+          <!--v-if-->
+          <div data-v-af1345cc="" class="layout-text" style="justify-content: center; align-items: center; text-align: center;" data-node-id="number-label" draggable="true">编号</div>
+          <!--v-if-->
+        </div>
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="number-field-cell" data-node-id="number-field-cell">
+          <!--v-if-->
+          <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--underline" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" contenteditable="true" data-field="编号" data-node-id="number-field" draggable="true">
+            <!--v-if-->
+            <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
+         设计/预览/填写共用同一结构，仅 contenteditable 差异。 -->
+            <!-- 非复合字段：普通展示值。直接作为 <p> 的 v-else 子项（不经 <template v-else>
+         包裹，否则 contenteditable <p> 的数据晚到时文本子节点不会重新 patch）。 --><span data-v-af1345cc="" class="layout-p__value"></span>
+            <!--v-if-->
+          </p>
+          <!--v-if-->
+        </div>
+      </div>
+    </div>
+    <div data-v-af1345cc="" data-v-d627bc46="" class="layout-grid layout-grid--outer layout-grid--no-top" data-node-id="basic-owner-team-grid" draggable="true">
+      <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 1fr 1fr; min-height: 8mm;" data-layout-id="basic-owner-team-row">
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="owner-field-cell" data-node-id="owner-field-cell">
+          <!--v-if-->
+          <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--composite" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" data-field="工作负责人（监护人）" data-node-id="owner-field" draggable="true"><span data-v-af1345cc="" class="layout-p__label">工作负责人（监护人）：</span>
+            <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
+         设计/预览/填写共用同一结构，仅 contenteditable 差异。 --><span data-v-af1345cc="" class="layout-p__input layout-p--underline" contenteditable="true" data-field="工作负责人（监护人）"></span>
+            <!--v-if-->
+          </p>
+          <!--v-if-->
+        </div>
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="team-field-cell" data-node-id="team-field-cell">
+          <!--v-if-->
+          <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--composite" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" data-field="班组" data-node-id="team-field" draggable="true"><span data-v-af1345cc="" class="layout-p__label">班组：</span>
+            <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
+         设计/预览/填写共用同一结构，仅 contenteditable 差异。 --><span data-v-af1345cc="" class="layout-p__input layout-p--underline" contenteditable="true" data-field="班组"></span>
+            <!--v-if-->
+          </p>
+          <!--v-if-->
+        </div>
+      </div>
+    </div>
+    <div data-v-af1345cc="" data-v-d627bc46="" class="layout-grid layout-grid--outer layout-grid--no-top" data-node-id="basic-members-grid" draggable="true">
+      <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 1fr; min-height: 8mm;" data-layout-id="members-label-row">
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="members-label-cell" data-node-id="members-label-cell">
+          <!--v-if-->
+          <div data-v-af1345cc="" class="layout-text" style="justify-content: flex-start; align-items: center;" data-node-id="members-label" draggable="true">工作班成员（不包括工作负责人）：</div>
+          <!--v-if-->
+        </div>
+      </div>
+      <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 1fr; min-height: 8mm;" data-layout-id="members-field-row">
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="members-field-cell" data-node-id="members-field-cell">
+          <!--v-if-->
+          <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--underline" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" contenteditable="true" data-field="工作班成员" data-node-id="members-field" draggable="true">
+            <!--v-if-->
+            <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
+         设计/预览/填写共用同一结构，仅 contenteditable 差异。 -->
+            <!-- 非复合字段：普通展示值。直接作为 <p> 的 v-else 子项（不经 <template v-else>
+         包裹，否则 contenteditable <p> 的数据晚到时文本子节点不会重新 patch）。 --><span data-v-af1345cc="" class="layout-p__value"></span>
+            <!--v-if-->
+          </p>
+          <!--v-if-->
+        </div>
+      </div>
+      <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 1fr; min-height: 8mm;" data-layout-id="members-count-row">
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="members-count-cell" data-node-id="members-count-cell">
+          <!--v-if-->
+          <div data-v-af1345cc="" class="layout-grid layout-grid--none" data-node-id="members-count-grid" draggable="true">
+            <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 1fr 30mm; min-height: 8mm;" data-layout-id="members-count-inner-row">
+              <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="members-count-spacer-cell" data-node-id="members-count-spacer-cell">
+                <!--v-if-->
+              </div>
+              <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="members-count-field-cell" data-node-id="members-count-field-cell">
+                <!--v-if-->
+                <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--composite layout-p--inner-border" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" data-field="工作班成员人数" data-node-id="members-count-field" draggable="true"><span data-v-af1345cc="" class="layout-p__label">共</span>
+                  <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
+         设计/预览/填写共用同一结构，仅 contenteditable 差异。 --><span data-v-af1345cc="" class="layout-p__input layout-p--underline" contenteditable="true" data-field="工作班成员人数"><div data-v-af1345cc="" class="layout-p__line"></div></span><span data-v-af1345cc="" class="layout-p__label">人</span>
+                </p>
+                <!--v-if-->
+              </div>
+            </div>
+          </div>
+          <!--v-if-->
+        </div>
+      </div>
+    </div>
+    <div data-v-af1345cc="" data-v-d627bc46="" class="layout-grid layout-grid--all layout-grid--no-top" data-node-id="station-grid" draggable="true">
+      <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 1fr; min-height: 8mm;" data-layout-id="station-row">
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="station-field-cell" data-node-id="station-field-cell">
+          <!--v-if-->
+          <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--composite" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" data-field="电站设备" data-node-id="station-field" draggable="true"><span data-v-af1345cc="" class="layout-p__label">工作的变、配电站名称及设备名称：</span>
+            <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
+         设计/预览/填写共用同一结构，仅 contenteditable 差异。 --><span data-v-af1345cc="" class="layout-p__input layout-p--underline" contenteditable="true" data-field="电站设备"></span>
+            <!--v-if-->
+          </p>
+          <!--v-if-->
+        </div>
+      </div>
+    </div>
+    <div data-v-af1345cc="" data-v-d627bc46="" class="layout-grid layout-grid--all layout-grid--no-top" data-node-id="work-task-grid" draggable="true">
+      <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 30mm 1fr; min-height: 8mm;" data-layout-id="work-task-row">
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="work-task-label-cell" data-node-id="work-task-label-cell">
+          <!--v-if-->
+          <div data-v-af1345cc="" class="layout-text" style="justify-content: center; align-items: center; text-align: center;" data-node-id="work-task-label" draggable="true">工作任务</div>
+          <!--v-if-->
+        </div>
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="work-task-table-cell" data-node-id="work-task-table-cell">
+          <!--v-if-->
+          <table data-v-af1345cc="" class="layout-table layout-table--inner" data-node-id="work-task-table" data-field="工作任务" draggable="true">
+            <thead data-v-af1345cc="">
+              <tr data-v-af1345cc="" class="layout-table__row layout-table__header" style="grid-template-columns: 1fr 1fr; min-height: 8mm;">
+                <th data-v-af1345cc="" class="layout-table__cell" style="justify-content: flex-start;">工作地点或地段</th>
+                <th data-v-af1345cc="" class="layout-table__cell" style="justify-content: flex-start;">工作内容</th>
+              </tr>
+            </thead>
+            <tbody data-v-af1345cc="">
+              <tr data-v-af1345cc="" class="layout-table__row" style="grid-template-columns: 1fr 1fr; min-height: 8mm;">
+                <td data-v-af1345cc="" class="layout-table__cell" style="justify-content: flex-start;" data-layout-id="work-task-loc-tpl">
+                  <!--v-if-->
+                  <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--underline" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" contenteditable="true" data-field="工作地点_1" data-node-id="work-task-loc-p" draggable="true">
+                    <!--v-if-->
+                    <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
+         设计/预览/填写共用同一结构，仅 contenteditable 差异。 -->
+                    <!-- 非复合字段：普通展示值。直接作为 <p> 的 v-else 子项（不经 <template v-else>
+         包裹，否则 contenteditable <p> 的数据晚到时文本子节点不会重新 patch）。 --><span data-v-af1345cc="" class="layout-p__value"></span>
+                    <!--v-if-->
+                  </p>
+                  <!--v-if-->
+                </td>
+                <td data-v-af1345cc="" class="layout-table__cell" style="justify-content: flex-start;" data-layout-id="work-task-content-tpl">
+                  <!--v-if-->
+                  <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--underline" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" contenteditable="true" data-field="工作内容_1" data-node-id="work-task-content-p" draggable="true">
+                    <!--v-if-->
+                    <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
+         设计/预览/填写共用同一结构，仅 contenteditable 差异。 -->
+                    <!-- 非复合字段：普通展示值。直接作为 <p> 的 v-else 子项（不经 <template v-else>
+         包裹，否则 contenteditable <p> 的数据晚到时文本子节点不会重新 patch）。 --><span data-v-af1345cc="" class="layout-p__value"></span>
+                    <!--v-if-->
+                  </p>
+                  <!--v-if-->
+                </td>
+              </tr>
+              <tr data-v-af1345cc="" class="layout-table__row" style="grid-template-columns: 1fr 1fr; min-height: 8mm;">
+                <td data-v-af1345cc="" class="layout-table__cell" style="justify-content: flex-start;" data-layout-id="work-task-loc-tpl">
+                  <!--v-if-->
+                  <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--underline" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" contenteditable="true" data-field="工作地点_2" data-node-id="work-task-loc-p" draggable="true">
+                    <!--v-if-->
+                    <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
+         设计/预览/填写共用同一结构，仅 contenteditable 差异。 -->
+                    <!-- 非复合字段：普通展示值。直接作为 <p> 的 v-else 子项（不经 <template v-else>
+         包裹，否则 contenteditable <p> 的数据晚到时文本子节点不会重新 patch）。 --><span data-v-af1345cc="" class="layout-p__value"></span>
+                    <!--v-if-->
+                  </p>
+                  <!--v-if-->
+                </td>
+                <td data-v-af1345cc="" class="layout-table__cell" style="justify-content: flex-start;" data-layout-id="work-task-content-tpl">
+                  <!--v-if-->
+                  <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--underline" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" contenteditable="true" data-field="工作内容_2" data-node-id="work-task-content-p" draggable="true">
+                    <!--v-if-->
+                    <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
+         设计/预览/填写共用同一结构，仅 contenteditable 差异。 -->
+                    <!-- 非复合字段：普通展示值。直接作为 <p> 的 v-else 子项（不经 <template v-else>
+         包裹，否则 contenteditable <p> 的数据晚到时文本子节点不会重新 patch）。 --><span data-v-af1345cc="" class="layout-p__value"></span>
+                    <!--v-if-->
+                  </p>
+                  <!--v-if-->
+                </td>
+              </tr>
+              <tr data-v-af1345cc="" class="layout-table__row" style="grid-template-columns: 1fr 1fr; min-height: 8mm;">
+                <td data-v-af1345cc="" class="layout-table__cell" style="justify-content: flex-start;" data-layout-id="work-task-loc-tpl">
+                  <!--v-if-->
+                  <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--underline" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" contenteditable="true" data-field="工作地点_3" data-node-id="work-task-loc-p" draggable="true">
+                    <!--v-if-->
+                    <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
+         设计/预览/填写共用同一结构，仅 contenteditable 差异。 -->
+                    <!-- 非复合字段：普通展示值。直接作为 <p> 的 v-else 子项（不经 <template v-else>
+         包裹，否则 contenteditable <p> 的数据晚到时文本子节点不会重新 patch）。 --><span data-v-af1345cc="" class="layout-p__value"></span>
+                    <!--v-if-->
+                  </p>
+                  <!--v-if-->
+                </td>
+                <td data-v-af1345cc="" class="layout-table__cell" style="justify-content: flex-start;" data-layout-id="work-task-content-tpl">
+                  <!--v-if-->
+                  <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--underline" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" contenteditable="true" data-field="工作内容_3" data-node-id="work-task-content-p" draggable="true">
+                    <!--v-if-->
+                    <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
+         设计/预览/填写共用同一结构，仅 contenteditable 差异。 -->
+                    <!-- 非复合字段：普通展示值。直接作为 <p> 的 v-else 子项（不经 <template v-else>
+         包裹，否则 contenteditable <p> 的数据晚到时文本子节点不会重新 patch）。 --><span data-v-af1345cc="" class="layout-p__value"></span>
+                    <!--v-if-->
+                  </p>
+                  <!--v-if-->
+                </td>
+              </tr>
+              <tr data-v-af1345cc="" class="layout-table__row" style="grid-template-columns: 1fr 1fr; min-height: 8mm;">
+                <td data-v-af1345cc="" class="layout-table__cell" style="justify-content: flex-start;" data-layout-id="work-task-loc-tpl">
+                  <!--v-if-->
+                  <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--underline" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" contenteditable="true" data-field="工作地点_4" data-node-id="work-task-loc-p" draggable="true">
+                    <!--v-if-->
+                    <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
+         设计/预览/填写共用同一结构，仅 contenteditable 差异。 -->
+                    <!-- 非复合字段：普通展示值。直接作为 <p> 的 v-else 子项（不经 <template v-else>
+         包裹，否则 contenteditable <p> 的数据晚到时文本子节点不会重新 patch）。 --><span data-v-af1345cc="" class="layout-p__value"></span>
+                    <!--v-if-->
+                  </p>
+                  <!--v-if-->
+                </td>
+                <td data-v-af1345cc="" class="layout-table__cell" style="justify-content: flex-start;" data-layout-id="work-task-content-tpl">
+                  <!--v-if-->
+                  <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--underline" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" contenteditable="true" data-field="工作内容_4" data-node-id="work-task-content-p" draggable="true">
+                    <!--v-if-->
+                    <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
+         设计/预览/填写共用同一结构，仅 contenteditable 差异。 -->
+                    <!-- 非复合字段：普通展示值。直接作为 <p> 的 v-else 子项（不经 <template v-else>
+         包裹，否则 contenteditable <p> 的数据晚到时文本子节点不会重新 patch）。 --><span data-v-af1345cc="" class="layout-p__value"></span>
+                    <!--v-if-->
+                  </p>
+                  <!--v-if-->
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <!--v-if-->
+        </div>
+      </div>
+      <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 30mm 1fr; min-height: 8mm;" data-layout-id="schedule-row">
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="schedule-label-cell" data-node-id="schedule-label-cell">
+          <!--v-if-->
+          <div data-v-af1345cc="" class="layout-text" style="justify-content: center; align-items: center; text-align: center;" data-node-id="schedule-label" draggable="true">计划工作时间</div>
+          <!--v-if-->
+        </div>
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="schedule-fields-cell" data-node-id="schedule-fields-cell">
+          <!--v-if-->
+          <div data-v-af1345cc="" class="layout-grid layout-grid--none" data-node-id="schedule-grid" draggable="true">
+            <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 1fr 1fr; min-height: 8mm;" data-layout-id="schedule-inner-row">
+              <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="schedule-from-cell" data-node-id="schedule-from-cell">
+                <!--v-if-->
+                <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--composite" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" data-field="计划工作时间_开始" data-node-id="schedule-from" draggable="true"><span data-v-af1345cc="" class="layout-p__label">自</span>
+                  <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
+         设计/预览/填写共用同一结构，仅 contenteditable 差异。 --><span data-v-af1345cc="" class="layout-p__input layout-p--underline" contenteditable="true" data-field="计划工作时间_开始">      年    月    日      时    分</span>
+                  <!--v-if-->
+                </p>
+                <!--v-if-->
+              </div>
+              <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="schedule-to-cell" data-node-id="schedule-to-cell">
+                <!--v-if-->
+                <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--composite" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" data-field="计划工作时间_截止" data-node-id="schedule-to" draggable="true"><span data-v-af1345cc="" class="layout-p__label">至</span>
+                  <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
+         设计/预览/填写共用同一结构，仅 contenteditable 差异。 --><span data-v-af1345cc="" class="layout-p__input layout-p--underline" contenteditable="true" data-field="计划工作时间_截止">      年    月    日      时    分</span>
+                  <!--v-if-->
+                </p>
+                <!--v-if-->
+              </div>
+            </div>
+          </div>
+          <!--v-if-->
+        </div>
+      </div>
+    </div>
+    <div data-v-af1345cc="" data-v-d627bc46="" class="layout-grid layout-grid--outer layout-grid--no-top" data-node-id="condition-grid" draggable="true">
+      <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 1fr; min-height: 8mm;" data-layout-id="condition-label-row">
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="condition-label-cell" data-node-id="condition-label-cell">
+          <!--v-if-->
+          <div data-v-af1345cc="" class="layout-text" style="justify-content: flex-start; align-items: center;" data-node-id="condition-label" draggable="true">工作条件（停电或不停电，或邻近及保留带电设备名称）：
+          </div>
+          <!--v-if-->
+        </div>
+      </div>
+      <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 1fr; min-height: 8mm;" data-layout-id="condition-field-row">
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="condition-field-cell" data-node-id="condition-field-cell">
+          <!--v-if-->
+          <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--underline" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" contenteditable="true" data-field="工作条件" data-node-id="condition-field" draggable="true">
+            <!--v-if-->
+            <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
+         设计/预览/填写共用同一结构，仅 contenteditable 差异。 -->
+            <!-- 非复合字段：普通展示值。直接作为 <p> 的 v-else 子项（不经 <template v-else>
+         包裹，否则 contenteditable <p> 的数据晚到时文本子节点不会重新 patch）。 --><span data-v-af1345cc="" class="layout-p__value"></span>
+            <!--v-if-->
+          </p>
+          <!--v-if-->
+        </div>
+      </div>
+    </div>
+    <div data-v-af1345cc="" data-v-d627bc46="" class="layout-grid layout-grid--outer layout-grid--no-top" data-node-id="safety-grid" draggable="true">
+      <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 1fr; min-height: 8mm;" data-layout-id="notice-label-row">
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="notice-label-cell" data-node-id="notice-label-cell">
+          <!--v-if-->
+          <div data-v-af1345cc="" class="layout-text" style="justify-content: flex-start; align-items: center;" data-node-id="notice-label" draggable="true">注意事项（安全措施）：</div>
+          <!--v-if-->
+        </div>
+      </div>
+      <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 1fr; min-height: 8mm;" data-layout-id="notice-field-row">
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="notice-field-cell" data-node-id="notice-field-cell">
+          <!--v-if-->
+          <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--underline" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" contenteditable="true" data-field="安全措施" data-node-id="notice-field" draggable="true">
+            <!--v-if-->
+            <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
+         设计/预览/填写共用同一结构，仅 contenteditable 差异。 -->
+            <!-- 非复合字段：普通展示值。直接作为 <p> 的 v-else 子项（不经 <template v-else>
+         包裹，否则 contenteditable <p> 的数据晚到时文本子节点不会重新 patch）。 --><span data-v-af1345cc="" class="layout-p__value"></span>
+            <!--v-if-->
+          </p>
+          <!--v-if-->
+        </div>
+      </div>
+      <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 1fr; min-height: 8mm;" data-layout-id="notice-remark-row">
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="notice-remark-cell" data-node-id="notice-remark-cell">
+          <!--v-if-->
+          <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--composite" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" data-field="安措备注" data-node-id="notice-remark-field" draggable="true"><span data-v-af1345cc="" class="layout-p__label">备注：</span>
+            <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
+         设计/预览/填写共用同一结构，仅 contenteditable 差异。 --><span data-v-af1345cc="" class="layout-p__input layout-p--underline" contenteditable="true" data-field="安措备注"></span>
+            <!--v-if-->
+          </p>
+          <!--v-if-->
+        </div>
+      </div>
+      <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 1fr; min-height: 8mm;" data-layout-id="issuer-row">
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="issuer-cell" data-node-id="issuer-cell">
+          <!--v-if-->
+          <div data-v-af1345cc="" class="layout-grid layout-grid--none" data-node-id="issuer-grid" draggable="true">
+            <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 1fr 1fr; min-height: 8mm;" data-layout-id="issuer-inner-row">
+              <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="issuer-sign-cell" data-node-id="issuer-sign-cell">
+                <!--v-if-->
+                <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--composite" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" data-field="工作票签发人签名" data-node-id="issuer-sign-field" draggable="true"><span data-v-af1345cc="" class="layout-p__label">工作票签发人签名：</span>
+                  <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
+         设计/预览/填写共用同一结构，仅 contenteditable 差异。 --><span data-v-af1345cc="" class="layout-p__input layout-p--underline" contenteditable="true" data-field="工作票签发人签名"></span>
+                  <!--v-if-->
+                </p>
+                <!--v-if-->
+              </div>
+              <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="issue-date-cell" data-node-id="issue-date-cell">
+                <!--v-if-->
+                <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--composite" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" data-field="签发日期" data-node-id="issue-date-field" draggable="true"><span data-v-af1345cc="" class="layout-p__label">签发日期：</span>
+                  <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
+         设计/预览/填写共用同一结构，仅 contenteditable 差异。 --><span data-v-af1345cc="" class="layout-p__input layout-p--underline" contenteditable="true" data-field="签发日期">      年    月    日      时    分</span>
+                  <!--v-if-->
+                </p>
+                <!--v-if-->
+              </div>
+            </div>
+          </div>
+          <!--v-if-->
+        </div>
+      </div>
+    </div>
+    <div data-v-af1345cc="" data-v-d627bc46="" class="layout-grid layout-grid--outer layout-grid--no-top" data-node-id="supplement-grid" draggable="true">
+      <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 1fr; min-height: 8mm;" data-layout-id="supplement-label-row">
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="supplement-label-cell" data-node-id="supplement-label-cell">
+          <!--v-if-->
+          <div data-v-af1345cc="" class="layout-text" style="justify-content: flex-start; align-items: center;" data-node-id="supplement-label" draggable="true">补充安全措施：</div>
+          <!--v-if-->
+        </div>
+      </div>
+      <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 1fr; min-height: 8mm;" data-layout-id="supplement-field-row">
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="supplement-field-cell" data-node-id="supplement-field-cell">
+          <!--v-if-->
+          <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--underline" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" contenteditable="true" data-field="补充安全措施" data-node-id="supplement-field" draggable="true">
+            <!--v-if-->
+            <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
+         设计/预览/填写共用同一结构，仅 contenteditable 差异。 -->
+            <!-- 非复合字段：普通展示值。直接作为 <p> 的 v-else 子项（不经 <template v-else>
+         包裹，否则 contenteditable <p> 的数据晚到时文本子节点不会重新 patch）。 --><span data-v-af1345cc="" class="layout-p__value"></span>
+            <!--v-if-->
+          </p>
+          <!--v-if-->
+        </div>
+      </div>
+      <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 1fr; min-height: 8mm;" data-layout-id="supplement-remark-row">
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="supplement-remark-cell" data-node-id="supplement-remark-cell">
+          <!--v-if-->
+          <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--composite" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" data-field="补充安措备注" data-node-id="supplement-remark-field" draggable="true"><span data-v-af1345cc="" class="layout-p__label">备注：</span>
+            <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
+         设计/预览/填写共用同一结构，仅 contenteditable 差异。 --><span data-v-af1345cc="" class="layout-p__input layout-p--underline" contenteditable="true" data-field="补充安措备注"></span>
+            <!--v-if-->
+          </p>
+          <!--v-if-->
+        </div>
+      </div>
+    </div>
+    <div data-v-af1345cc="" data-v-d627bc46="" class="layout-grid layout-grid--outer layout-grid--no-top" data-node-id="confirm-grid" draggable="true">
+      <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 1fr 1fr; min-height: 8mm;" data-layout-id="confirm-header-row">
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="confirm-header-cell" data-node-id="confirm-header-cell">
+          <!--v-if-->
+          <div data-v-af1345cc="" class="layout-text" style="justify-content: flex-start; align-items: center;" data-node-id="confirm-header" draggable="true">确认本工作票上述各项内容：</div>
+          <!--v-if-->
+        </div>
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="confirm-header-spacer-cell" data-node-id="confirm-header-spacer-cell">
+          <!--v-if-->
+        </div>
+      </div>
+      <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 1fr 1fr; min-height: 8mm;" data-layout-id="confirm-sign-row">
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="confirm-owner-cell" data-node-id="confirm-owner-cell">
+          <!--v-if-->
+          <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--composite" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" data-field="工作负责人签名" data-node-id="confirm-owner-sign" draggable="true"><span data-v-af1345cc="" class="layout-p__label">工作负责人签名：</span>
+            <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
+         设计/预览/填写共用同一结构，仅 contenteditable 差异。 --><span data-v-af1345cc="" class="layout-p__input layout-p--underline" contenteditable="true" data-field="工作负责人签名"></span>
+            <!--v-if-->
+          </p>
+          <!--v-if-->
+        </div>
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="confirm-permitter-cell" data-node-id="confirm-permitter-cell">
+          <!--v-if-->
+          <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--composite" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" data-field="工作许可人签名" data-node-id="confirm-permitter-sign" draggable="true"><span data-v-af1345cc="" class="layout-p__label">工作许可人签名：</span>
+            <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
+         设计/预览/填写共用同一结构，仅 contenteditable 差异。 --><span data-v-af1345cc="" class="layout-p__input layout-p--underline" contenteditable="true" data-field="工作许可人签名"></span>
+            <!--v-if-->
+          </p>
+          <!--v-if-->
+        </div>
+      </div>
+      <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 1fr 1fr; min-height: 8mm;" data-layout-id="permit-time-row">
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="permit-time-cell" data-node-id="permit-time-cell">
+          <!--v-if-->
+          <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--composite" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" data-field="许可工作时间" data-node-id="permit-time-field" draggable="true"><span data-v-af1345cc="" class="layout-p__label">许可工作时间：</span>
+            <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
+         设计/预览/填写共用同一结构，仅 contenteditable 差异。 --><span data-v-af1345cc="" class="layout-p__input layout-p--underline" contenteditable="true" data-field="许可工作时间">      年    月    日      时    分</span>
+            <!--v-if-->
+          </p>
+          <!--v-if-->
+        </div>
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="permit-time-spacer-cell" data-node-id="permit-time-spacer-cell">
+          <!--v-if-->
+        </div>
+      </div>
+    </div>
+    <div data-v-af1345cc="" data-v-d627bc46="" class="layout-grid layout-grid--outer layout-grid--no-top" data-node-id="confirm-task-grid" draggable="true">
+      <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 1fr; min-height: 8mm;" data-layout-id="confirm-task-label-row">
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="confirm-task-label-cell" data-node-id="confirm-task-label-cell">
+          <!--v-if-->
+          <div data-v-af1345cc="" class="layout-text" style="justify-content: flex-start; align-items: center;" data-node-id="confirm-task-label" draggable="true">确认工作负责人布置的工作任务和安全措施：</div>
+          <!--v-if-->
+        </div>
+      </div>
+      <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 1fr; min-height: 8mm;" data-layout-id="confirm-task-sign-row">
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="confirm-task-sign-cell" data-node-id="confirm-task-sign-cell">
+          <!--v-if-->
+          <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--composite" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" data-field="工作班成员签名" data-node-id="confirm-task-sign" draggable="true"><span data-v-af1345cc="" class="layout-p__label">工作班成员签名：</span>
+            <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
+         设计/预览/填写共用同一结构，仅 contenteditable 差异。 --><span data-v-af1345cc="" class="layout-p__input layout-p--underline" contenteditable="true" data-field="工作班成员签名"></span>
+            <!--v-if-->
+          </p>
+          <!--v-if-->
+        </div>
+      </div>
+    </div>
+    <div data-v-af1345cc="" data-v-d627bc46="" class="layout-grid layout-grid--outer layout-grid--no-top" data-node-id="extension-grid" draggable="true">
+      <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 1fr 1fr; min-height: 8mm;" data-layout-id="extension-header-row">
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="extension-header-cell" data-node-id="extension-header-cell">
+          <!--v-if-->
+          <div data-v-af1345cc="" class="layout-text" style="justify-content: flex-start; align-items: center;" data-node-id="extension-header" draggable="true">工作票延期：</div>
+          <!--v-if-->
+        </div>
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="extension-header-spacer-cell" data-node-id="extension-header-spacer-cell">
+          <!--v-if-->
+        </div>
+      </div>
+      <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 1fr 1fr; min-height: 8mm;" data-layout-id="extension-expire-row">
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="extension-expire-cell" data-node-id="extension-expire-cell">
+          <!--v-if-->
+          <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--composite" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" data-field="有效期延长到" data-node-id="extension-expire-field" draggable="true"><span data-v-af1345cc="" class="layout-p__label">有效期延长到：</span>
+            <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
+         设计/预览/填写共用同一结构，仅 contenteditable 差异。 --><span data-v-af1345cc="" class="layout-p__input layout-p--underline" contenteditable="true" data-field="有效期延长到">      年    月    日      时    分</span>
+            <!--v-if-->
+          </p>
+          <!--v-if-->
+        </div>
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="extension-expire-spacer-cell" data-node-id="extension-expire-spacer-cell">
+          <!--v-if-->
+        </div>
+      </div>
+      <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 1fr 1fr; min-height: 8mm;" data-layout-id="extension-owner-row">
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="extension-owner-cell" data-node-id="extension-owner-cell">
+          <!--v-if-->
+          <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--composite" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" data-field="延期工作负责人签名" data-node-id="extension-owner-sign" draggable="true"><span data-v-af1345cc="" class="layout-p__label">工作负责人签名：</span>
+            <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
+         设计/预览/填写共用同一结构，仅 contenteditable 差异。 --><span data-v-af1345cc="" class="layout-p__input layout-p--underline" contenteditable="true" data-field="延期工作负责人签名"></span>
+            <!--v-if-->
+          </p>
+          <!--v-if-->
+        </div>
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="extension-owner-date-cell" data-node-id="extension-owner-date-cell">
+          <!--v-if-->
+          <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--composite" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" data-field="延期工作负责人签名日期" data-node-id="extension-owner-date" draggable="true"><span data-v-af1345cc="" class="layout-p__label">日期：</span>
+            <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
+         设计/预览/填写共用同一结构，仅 contenteditable 差异。 --><span data-v-af1345cc="" class="layout-p__input layout-p--underline" contenteditable="true" data-field="延期工作负责人签名日期">      年    月    日      时    分</span>
+            <!--v-if-->
+          </p>
+          <!--v-if-->
+        </div>
+      </div>
+      <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 1fr 1fr; min-height: 8mm;" data-layout-id="extension-permitter-row">
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="extension-permitter-cell" data-node-id="extension-permitter-cell">
+          <!--v-if-->
+          <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--composite" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" data-field="延期工作许可人签名" data-node-id="extension-permitter-sign" draggable="true"><span data-v-af1345cc="" class="layout-p__label">工作许可人签名：</span>
+            <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
+         设计/预览/填写共用同一结构，仅 contenteditable 差异。 --><span data-v-af1345cc="" class="layout-p__input layout-p--underline" contenteditable="true" data-field="延期工作许可人签名"></span>
+            <!--v-if-->
+          </p>
+          <!--v-if-->
+        </div>
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="extension-permitter-date-cell" data-node-id="extension-permitter-date-cell">
+          <!--v-if-->
+          <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--composite" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" data-field="延期工作许可人签名日期" data-node-id="extension-permitter-date" draggable="true"><span data-v-af1345cc="" class="layout-p__label">日期：</span>
+            <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
+         设计/预览/填写共用同一结构，仅 contenteditable 差异。 --><span data-v-af1345cc="" class="layout-p__input layout-p--underline" contenteditable="true" data-field="延期工作许可人签名日期">      年    月    日      时    分</span>
+            <!--v-if-->
+          </p>
+          <!--v-if-->
+        </div>
+      </div>
+    </div>
+    <div data-v-af1345cc="" data-v-d627bc46="" class="layout-grid layout-grid--outer layout-grid--no-top" data-node-id="completion-grid" draggable="true">
+      <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 1fr 1fr; min-height: 8mm;" data-layout-id="completion-header-row">
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="completion-header-cell" data-node-id="completion-header-cell">
+          <!--v-if-->
+          <div data-v-af1345cc="" class="layout-text" style="justify-content: flex-start; align-items: center;" data-node-id="completion-header" draggable="true">工作票终结：</div>
+          <!--v-if-->
+        </div>
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="completion-header-spacer-cell" data-node-id="completion-header-spacer-cell">
+          <!--v-if-->
+        </div>
+      </div>
+      <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 1fr 1fr; min-height: 8mm;" data-layout-id="completion-end-row">
+        <div data-v-af1345cc="" class="layout-grid__cell" style="grid-column: span 2; padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="completion-end-cell" data-node-id="completion-end-cell">
+          <!--v-if-->
+          <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--composite" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" data-field="工作票终结日期" data-node-id="completion-end-field" draggable="true"><span data-v-af1345cc="" class="layout-p__label">全部工作于</span>
+            <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
+         设计/预览/填写共用同一结构，仅 contenteditable 差异。 --><span data-v-af1345cc="" class="layout-p__input layout-p--underline" contenteditable="true" data-field="工作票终结日期">      年    月    日      时    分</span><span data-v-af1345cc="" class="layout-p__label">结束，工作人员已全部撤离，材料工具已清理完毕。</span>
+          </p>
+          <!--v-if-->
+        </div>
+      </div>
+      <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 1fr 1fr; min-height: 8mm;" data-layout-id="completion-owner-row">
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="completion-owner-cell" data-node-id="completion-owner-cell">
+          <!--v-if-->
+          <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--composite" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" data-field="工作负责人签名-终结" data-node-id="completion-owner-sign" draggable="true"><span data-v-af1345cc="" class="layout-p__label">工作负责人签名：</span>
+            <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
+         设计/预览/填写共用同一结构，仅 contenteditable 差异。 --><span data-v-af1345cc="" class="layout-p__input layout-p--underline" contenteditable="true" data-field="工作负责人签名-终结"></span>
+            <!--v-if-->
+          </p>
+          <!--v-if-->
+        </div>
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="completion-owner-date-cell" data-node-id="completion-owner-date-cell">
+          <!--v-if-->
+          <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--composite" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" data-field="工作负责人签名-终结日期" data-node-id="completion-owner-date" draggable="true"><span data-v-af1345cc="" class="layout-p__label">日期：</span>
+            <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
+         设计/预览/填写共用同一结构，仅 contenteditable 差异。 --><span data-v-af1345cc="" class="layout-p__input layout-p--underline" contenteditable="true" data-field="工作负责人签名-终结日期">      年    月    日      时    分</span>
+            <!--v-if-->
+          </p>
+          <!--v-if-->
+        </div>
+      </div>
+      <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 1fr 1fr; min-height: 8mm;" data-layout-id="completion-permitter-row">
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="completion-permitter-cell" data-node-id="completion-permitter-cell">
+          <!--v-if-->
+          <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--composite" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" data-field="工作许可人签名-终结" data-node-id="completion-permitter-sign" draggable="true"><span data-v-af1345cc="" class="layout-p__label">工作许可人签名：</span>
+            <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
+         设计/预览/填写共用同一结构，仅 contenteditable 差异。 --><span data-v-af1345cc="" class="layout-p__input layout-p--underline" contenteditable="true" data-field="工作许可人签名-终结"></span>
+            <!--v-if-->
+          </p>
+          <!--v-if-->
+        </div>
+        <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="completion-permitter-date-cell" data-node-id="completion-permitter-date-cell">
+          <!--v-if-->
+          <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--composite" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" data-field="工作许可人签名-终结日期" data-node-id="completion-permitter-date" draggable="true"><span data-v-af1345cc="" class="layout-p__label">日期：</span>
+            <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
+         设计/预览/填写共用同一结构，仅 contenteditable 差异。 --><span data-v-af1345cc="" class="layout-p__input layout-p--underline" contenteditable="true" data-field="工作许可人签名-终结日期">      年    月    日      时    分</span>
+            <!--v-if-->
+          </p>
+          <!--v-if-->
+        </div>
+      </div>
+    </div>
+  </main>
+</div>"
+`;

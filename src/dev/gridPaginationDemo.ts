@@ -21,7 +21,8 @@ import type {
  * - 一个标题 `text` 节点（第一行）
  * - 一个 50 行 `grid`（border=all，3 列），每格一个字段 P，字段 key 形如 `c{列}_{行}`
  *
- * 该 Schema 同时被单测（engine-v2/pagination.test.ts）与预览页（/preview.html 下拉切换）复用。
+ * 该 Schema 仅被单测复用（engine-v2/pagination.test.ts、GridFormRenderer.pagination.test.ts、
+ * DesignerApp.pagination.test.ts 等），作为「超高 Schema」的分页测试夹具；预览页下拉已于廿二续移除。
  */
 
 const BASE_ROW_HEIGHT = 8;
@@ -73,7 +74,7 @@ export function makeFiftyRowGridSchema(): FormSchemaV2 {
     cellPadding: 1,
   };
 
-  const title: TextNodeV2 = textNode("demo-title", "分页演示：50 行 Grid（超高自动换页）");
+  const title: TextNodeV2 = textNode("demo-title", "测试夹具：50 行 Grid（超高分页）");
 
   const page: PageSchemaV2 = {
     id: "demo-page",

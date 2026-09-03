@@ -2,7 +2,6 @@
 import { computed, ref, watch, onMounted, onUnmounted, reactive } from "vue";
 import { GridFormRenderer as GridSchemaRenderer } from "@/components/renderer-v2";
 import { makeYunlvSecondTicketFullSchema } from "@/dev/yunlv-second-ticket-full";
-import { makeFiftyRowGridSchema } from "@/dev/gridPaginationDemo";
 import demoData from "@/dev/demoData";
 import {
   buildEditorNodeIndexV2,
@@ -464,12 +463,6 @@ onUnmounted(() => {
 
 function reloadSample(): void {
   resetHistory(makeYunlvSecondTicketFullSchema());
-  clearSelection();
-}
-
-/** 载入 50 行 Grid 演示（A4 纵向，50×8mm=400mm ≫ 正文 277mm），用于直观验证分页换页。 */
-function loadPaginationDemo(): void {
-  resetHistory(makeFiftyRowGridSchema());
   clearSelection();
 }
 
@@ -1361,14 +1354,6 @@ function updateSelectedSafetyField(event: Event): void {
         </button>
         <button class="v2-toolbar__button" type="button" @click="reloadSample">
           载入样例
-        </button>
-        <button
-          class="v2-toolbar__button"
-          type="button"
-          data-load-pagination-demo="true"
-          @click="loadPaginationDemo"
-        >
-          分页演示(50 行)
         </button>
       </div>
       <div class="v2-toolbar__group">

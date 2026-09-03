@@ -111,4 +111,11 @@ describe("yunlv-second-ticket-full（P11 完整工作票样例 · 扁平结构�
       ).toBe(true);
     }
   });
+
+  it("DOM 结构快照与基线一致（整票结构回归基线，防止后续重构破坏整票）", () => {
+    const wrapper = mount(GridFormRenderer, {
+      props: { schema: makeYunlvSecondTicketFullSchema() },
+    });
+    expect(wrapper.html()).toMatchSnapshot();
+  });
 });
