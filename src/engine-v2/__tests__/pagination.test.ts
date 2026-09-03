@@ -3,10 +3,12 @@ import {
   gridFragmentHeightMm,
   paginatePage,
   paginateSchema,
+  tableHeightMm,
   type PhysicalPage,
 } from "@/engine-v2/pagination";
 import { makeFiftyRowGridSchema } from "@/dev/gridPaginationDemo";
 import type {
+  FormNodeV2,
   FormSchemaV2,
   GridNodeV2,
   PageSchemaV2,
@@ -202,6 +204,128 @@ describe("分页引擎 pagination", () => {
         }
       }
       expect(used).toBeLessThanOrEqual(bodyH + 0.5);
+    }
+  });
+
+  it("Table（50 行数据）按数据行跨页切分，总行数不丢", () => {
+    // 构造与用户 grid-50-rows.json 一致的结构：Grid(1行) → Cell → Table(minRows:50)
+    const schema: FormSchemaV2 = {
+      version: 2,
+      paper: { size: "A4", orientation: "portrait" },
+      baseRowHeight: 8,
+      pages: [
+        {
+          id: "page-1",
+          type: "page",
+          mode: "fixed",
+          margin: { top: 10, right: 10, bottom: 10, left: 10 },
+          children: [
+            {
+              id: "grid-1",
+              type: "grid",
+              border: "all",
+              rows: [
+                {
+                  id: "row-1",
+                  type: "grid-row",
+                  height: 1,
+                  cells: [
+                    {
+                      id: "cell-1",
+                      type: "grid-cell",
+                      width: "1fr",
+                      children: [
+                        {
+                          id: "table-1",
+                          type: "table",
+                          columns: [
+                            { key: "c1", title: "列1", width: "1fr" },
+                            { key: "c2", title: "列2", width: "1fr" },
+                          ],
+                          minRows: 50,
+                          rowTemplate: [
+                            {
+                              id: "tpl-c1",
+                              type: "table-cell-template",
+                              columnKey: "c1",
+                              children: [{ id: "p1", type: "p", mode: "field", field: "", underline: true }],
+                            },
+                            {
+                              id: "tpl-c2",
+                              type: "table-cell-template",
+                              columnKey: "c2",
+                              children: [{ id: "p2", type: "p", mode: "field", field: "", underline: true }],
+                            },
+                          ],
+                          border: "all",
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const result = paginateSchema(schema);
+    const pages = nonEmptyPages(result.pages);
+
+    // 50 行数据 + 表头 = 51 × 8mm = 408mm > A4 正文区 277mm → 必须切分
+    expect(pages.length).toBeGreaterThan(1);
+
+    // 递归统计所有片段的 _paginateMaxRows 之和（Table 可能嵌套在 Grid 片段内部）
+    let totalDataRows = 0;
+    let tableFragmentCount = 0;
+    function countTables(node: FormNodeV2): void {
+      if (node.type === "table") {
+        tableFragmentCount++;
+        const maxRows = (node as { _paginateMaxRows?: number })._paginateMaxRows;
+        if (typeof maxRows === "number" && maxRows > 0) {
+          totalDataRows += maxRows;
+        }
+      } else if (node.type === "grid") {
+        for (const row of node.rows) {
+          for (const cell of row.cells) {
+            for (const child of cell.children) {
+              countTables(child);
+            }
+          }
+        }
+      }
+    }
+    for (const p of pages) {
+      for (const c of p.children) {
+        countTables(c.node);
+      }
+    }
+
+    // 至少有 2 个 Table 片段
+    expect(tableFragmentCount).toBeGreaterThanOrEqual(2);
+    // 所有片段的数据行之和 = 50（一行不丢）
+    expect(totalDataRows).toBe(50);
+
+    // 每页内容高度不超过正文可用高
+    const paper = resolvePaperSizeV2(schema.paper);
+    const bodyH = paper.heightMm - 10 - 10; // 277
+    for (const p of pages) {
+      let used = 0;
+      for (const c of p.children) {
+        if (c.node.type === "table") {
+          used += tableHeightMm(c.node, schema.baseRowHeight, null);
+        } else if (c.node.type === "grid") {
+          used += gridFragmentHeightMm(
+            schema.baseRowHeight,
+            c.node,
+            c.node.rows,
+            !!c.suppressBorders?.top,
+            !!c.suppressBorders?.bottom,
+          );
+        }
+      }
+      expect(used).toBeLessThanOrEqual(bodyH + 1.0); // 容许 1mm 浮点误差
     }
   });
 });

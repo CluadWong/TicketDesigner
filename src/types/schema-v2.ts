@@ -150,6 +150,13 @@ export interface TableNodeV2 extends SchemaNodeBaseV2 {
   rowTemplate: TableCellTemplateV2[];
   /** 边框模式（与 Grid 一致）：all=外框+内部线（默认）、inner=仅内部线、outer=仅外框、none=无。 */
   border?: BorderModeV2;
+  /**
+   * 分页引擎内部字段（2026-09-03 廿一续）：跨页切分时，本片段最多渲染的数据行数。
+   * 仅由 `paginateTable` 写入，渲染层 `GridSchemaNode.vue` 用它限制 `v-for` 行范围。
+   * 未设置或 ≤0 时渲染全部行（= 不限制，与未分页时一致）。
+   * 序列化/校验层忽略此字段（不在用户 JSON 中出现）。
+   */
+  _paginateMaxRows?: number;
 }
 
 export interface HtmlNodeV2 extends SchemaNodeBaseV2 {

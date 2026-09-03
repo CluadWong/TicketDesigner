@@ -1,0 +1,92 @@
+{
+  "version": 2,
+  "paper": {
+    "size": "A4",
+    "orientation": "portrait"
+  },
+  "baseRowHeight": 8,
+  "pages": [
+    {
+      "id": "page-mtkvmwiy-rivfv",
+      "type": "page",
+      "mode": "fixed",
+      "margin": {
+        "top": 10,
+        "right": 10,
+        "bottom": 10,
+        "left": 10
+      },
+      "children": [
+        {
+          "id": "grid-mtkvmwiy-hffm5",
+          "type": "grid",
+          "border": "all",
+          "rows": [
+            {
+              "id": "row-mtkvmwiy-rasdc",
+              "type": "grid-row",
+              "height": 1,
+              "cells": [
+                {
+                  "id": "cell-1-mtkvmwiy-oh6cd",
+                  "type": "grid-cell",
+                  "width": "1fr",
+                  "children": [
+                    {
+                      "id": "table-mtkvmzd9-xr7qq",
+                      "type": "table",
+                      "columns": [
+                        {
+                          "key": "col1",
+                          "title": "列 1",
+                          "width": "1fr"
+                        },
+                        {
+                          "key": "col2",
+                          "title": "列 2",
+                          "width": "1fr"
+                        }
+                      ],
+                      "minRows": 50,
+                      "rowTemplate": [
+                        {
+                          "id": "table-mtkvmzd9-xr7qq-col1-mtkvmzd9-e7opq",
+                          "type": "table-cell-template",
+                          "columnKey": "col1",
+                          "children": [
+                            {
+                              "id": "table-mtkvmzd9-xr7qq-col1-p-mtkvmzd9-7a8m1",
+                              "type": "p",
+                              "mode": "field",
+                              "field": "",
+                              "underline": true
+                            }
+                          ]
+                        },
+                        {
+                          "id": "table-mtkvmzd9-xr7qq-col2-mtkvmzd9-y98il",
+                          "type": "table-cell-template",
+                          "columnKey": "col2",
+                          "children": [
+                            {
+                              "id": "table-mtkvmzd9-xr7qq-col2-p-mtkvmzd9-c0u7e",
+                              "type": "p",
+                              "mode": "field",
+                              "field": "",
+                              "underline": true
+                            }
+                          ]
+                        }
+                      ],
+                      "border": "all"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -207,6 +207,20 @@ function tableTemplate(node: TableNodeV2, columnKey: string) {
 }
 
 /**
+ * 分页片段 Table 的数据行数上限（2026-09-03 廿一续）。
+ * 当分页引擎把一个 Table 按数据行切分到多页时，每个片段的 Table 节点会携带
+ * `_paginateMaxRows` 字段，限制该片段只渲染前 N 行数据（避免每页都渲染全部 50 行）。
+ * 未设置时返回完整行数（= 不限制，与未分页时一致）。
+ */
+function tablePaginatedRowCount(node: TableNodeV2, data: FormDataV2 | null | undefined): number {
+  const full = resolveTableRowCount(node, data);
+  if (typeof node._paginateMaxRows === "number" && node._paginateMaxRows > 0) {
+    return Math.min(full, node._paginateMaxRows);
+  }
+  return full;
+}
+
+/**
  * 实例化表格行模板：把单元格内字段 P 的 `field` 绑定到 `列key_行号`（渲染期派生，
  * 见 schema-v2-table-rows.ts 的 `bindTableRowCell`）。
  *
@@ -534,7 +548,7 @@ function onImgError(): void {
     </thead>
     <tbody>
       <tr
-        v-for="rowIndex in resolveTableRowCount(node, data)"
+        v-for="rowIndex in tablePaginatedRowCount(node, data)"
         :key="rowIndex"
         class="layout-table__row"
         :style="[

@@ -135,14 +135,18 @@ function imageHeightMm(node: Extract<FormNodeV2, { type: "image" }>, baseRowHeig
   return baseRowHeight;
 }
 
-/** Table 节点估算高度（mm）：表头 1 行 + 数据行（minRows 或 data 推导）× baseRowHeight + 外框。 */
-function tableHeightMm(
+/** Table 节点估算高度（mm）：表头 1 行 + 数据行（minRows 或 data 推导，受 _paginateMaxRows 限制）× baseRowHeight + 外框。 */
+export function tableHeightMm(
   node: Extract<FormNodeV2, { type: "table" }>,
   baseRowHeight: number,
   data: FormDataV2 | null | undefined,
 ): number {
-  const rows = resolveTableRowCount(node, data);
-  let h = (1 + rows) * baseRowHeight;
+  const totalRows = resolveTableRowCount(node, data);
+  // 分页片段可能限制行数（_paginateMaxRows），高度按实际渲染行数算
+  const dataRows = typeof node._paginateMaxRows === "number" && node._paginateMaxRows > 0
+    ? Math.min(totalRows, node._paginateMaxRows)
+    : totalRows;
+  let h = (1 + dataRows) * baseRowHeight;
   if (node.border === "all" || node.border === "outer") h += 2 * ONE_PX_MM;
   return h;
 }
@@ -283,15 +287,176 @@ export function paginatePage(page: PageSchemaV2, opts: PaginateContext): Paginat
 
   const paginateGrid = (grid: GridNodeV2): void => {
     const fullH = gridFragmentHeightMm(opts.baseRowHeight, grid, grid.rows, false, false, opts.measureRow);
-    // 整 Grid 能放进当前页剩余空间 → 直接放
-    if (fits(fullH)) {
+    // 额外检查：cell 内的 Table 可能使实际高度远超行高估算（2026-09-03 廿一续）。
+    // 例如 Grid(1行×8mm) 内含 Table(50数据行×8mm=400mm)，确定性估算只有 8mm 但实际 400+mm。
+    // 此时必须走 splitGrid（即使行高估算「放得下」），由 splitGrid 内部检测到 Table 并按数据行切分。
+    let hasTallTables = false;
+    for (const row of grid.rows) {
+      for (const cell of row.cells) {
+        for (const child of cell.children) {
+          if (child.type === "table") {
+            const tableH = tableHeightMm(child, opts.baseRowHeight, opts.data);
+            if (tableH > opts.bodyHeightMm * 0.8) { // Table 高度超过正文区 80% → 视为「超高」
+              hasTallTables = true;
+              break;
+            }
+          }
+        }
+        if (hasTallTables) break;
+      }
+      if (hasTallTables) break;
+    }
+
+    // 整 Grid 能放进当前页剩余空间 且无超高Table → 直接放
+    if (fits(fullH) && !hasTallTables) {
       push({ node: grid });
       return;
     }
-    // 放不下 → 跨页逐行切分：首个片段先填满当前页剩余空间，余下行流转到后续物理页。
+    // 放不下或有超高Table → 跨页逐行切分：首个片段先填满当前页剩余空间，余下行流转到后续物理页。
     // （即便当前页已有内容，也优先把能塞下的前几行留在当前页，避免内容被整体推到下一页而留白。）
     splitGrid(grid);
   };
+
+  /**
+   * Table 按数据行跨页切分（2026-09-03 廿一续）。
+   *
+   * 与 Grid 的 splitGrid 对称：Table 的每一数据行高度均为 baseRowHeight（均匀），
+   * 表头固定 1 行（仅首片段保留）。当整 Table 放不下当前页时，按数据行边界切分为
+   * 多个片段，每个片段是一个带 `_paginateMaxRows` 限制的 Table 副本。
+   *
+   * 切分语义：
+   * - 首片段：表头(1行) + 数据行 1..N
+   * - 后续片段：仅数据行 N+1..M（不重复表头；需要时后续可加表头重复选项）
+   * - 单数据行比可用高还高 → 强制放入并告警（与 Grid 单行超高处理一致）
+   */
+  const paginateTable = (table: Extract<FormNodeV2, { type: "table" }>): void => {
+    const totalDataRows = resolveTableRowCount(table, opts.data);
+    const rowH = opts.baseRowHeight; // 每数据行高度 = 基准行高
+    const headerH = opts.baseRowHeight; // 表头高度 = 基准行高
+    const bordered = table.border === "all" || table.border === "outer";
+    const borderH = bordered ? ONE_PX_MM : 0;
+
+    // 整 Table 高度 = 表头 + 全部数据行 + 外框
+    const fullH = headerH + totalDataRows * rowH + (bordered ? 2 * borderH : 0);
+
+    // 整 Table 放得下 → 直接作为原子块放入（不走切分）
+    if (fits(fullH)) {
+      push({ node: table });
+      return;
+    }
+
+    // 放不下 → 按数据行逐行切分
+    let remainingRows = totalDataRows;
+    let startRow = 0; // 当前片段起始数据行号（0-based）
+    let isFirstFragment = true;
+
+    while (remainingRows > 0) {
+      const avail = bodyH - curUsed;
+
+      // 当前片段可用的数据行高度预算（扣去表头/边框占用）
+      const reserveHeader = isFirstFragment ? headerH + borderH : borderH;
+      const budgetForRows = Math.max(0, avail - reserveHeader);
+
+      // 本片段能放的数据行数
+      let rowsInFragment = budgetForRows > 0 ? Math.floor(budgetForRows / rowH) : 0;
+
+      // 至少放 1 行数据（即使超出可用高——与 Grid 单行强制放入一致）
+      if (rowsInFragment === 0 && remainingRows > 0) {
+        rowsInFragment = 1;
+        // 如果本页已有内容且连 1 行都放不下 → 先换页
+        if (curChildren.length > 0 && reserveHeader + rowH > avail + 1e-6) {
+          flush();
+          // 换页后重新计算（新页面有完整可用高度）
+          continue;
+        }
+      }
+
+      // 取实际行数（不超过剩余行数）
+      rowsInFragment = Math.min(rowsInFragment, remainingRows);
+
+      // 本片段是否为末片段
+      const isLastFragment = startRow + rowsInFragment >= totalDataRows;
+
+      // 构建片段 Table 节点（携带 _paginateMaxRows 限制渲染行数）
+      const fragmentNode: Extract<FormNodeV2, { type: "table" }> = {
+        ...table,
+        _paginateMaxRows: rowsInFragment,
+      };
+
+      push({
+        node: fragmentNode,
+        suppressBorders: {
+          top: !isFirstFragment, // 后续片段抑制上外框（连续外观）
+          bottom: !isLastFragment, // 非末片段抑制下外框
+        },
+      });
+
+      remainingRows -= rowsInFragment;
+      startRow += rowsInFragment;
+      isFirstFragment = false;
+
+      // 还有剩余行 → 先 flush 再继续
+      if (remainingRows > 0) flush();
+    }
+  };
+
+/**
+ * 从 Grid 行的所有 cell 子节点中收集 Table 节点（2026-09-03 廿一续）。
+ * 用于检测单行超高是否由内部 Table 引起，从而触发 Table 级别的跨页切分。
+ */
+function collectTablesInRow(row: GridRowV2): Extract<FormNodeV2, { type: "table" }>[] {
+  const tables: Extract<FormNodeV2, { type: "table" }>[] = [];
+  for (const cell of row.cells) {
+    for (const child of cell.children) {
+      if (child.type === "table") tables.push(child);
+    }
+  }
+  return tables;
+}
+
+/**
+ * 深拷贝节点树，将其中每个 Table 按 mapFn 替换为带 _paginateMaxRows 限制的版本（2026-09-03 廿一续）。
+ * 用于在 Grid 单行跨页切分时，把行内的 Table 同步切成片段。
+ */
+function mapTablesInNodeTree(
+  nodes: FormNodeV2[],
+  mapFn: (table: Extract<FormNodeV2, { type: "table" }>) => number | undefined,
+): FormNodeV2[] {
+  return nodes.map((node) => {
+    if (node.type === "grid") {
+      return {
+        ...node,
+        rows: node.rows.map((row) => ({
+          ...row,
+          cells: row.cells.map((cell) => ({
+            ...cell,
+            children: mapTablesInNodeTree(cell.children, mapFn),
+          })),
+        })),
+      };
+    }
+    if (node.type === "table") {
+      const maxRows = mapFn(node);
+      if (typeof maxRows === "number" && maxRows > 0) {
+        return { ...node, _paginateMaxRows: maxRows };
+      }
+    }
+    return node;
+  });
+}
+
+/** 统计节点树中所有 Table 的数据行总数（用于验证切分行数不丢）。 */
+function totalTableDataRowsInRow(row: GridRowV2, data: FormDataV2 | null | undefined): number {
+  let total = 0;
+  for (const cell of row.cells) {
+    for (const node of cell.children) {
+      if (node.type === "table") {
+        total += resolveTableRowCount(node, data);
+      }
+    }
+  }
+  return total;
+}
 
   const splitGrid = (grid: GridNodeV2): void => {
     const rows = grid.rows;
@@ -305,6 +470,63 @@ export function paginatePage(page: PageSchemaV2, opts: PaginateContext): Paginat
       const suppressTop = !isFirstFragment;
       // 当前页可用高
       let avail = bodyH - curUsed;
+
+      // ★ 提前检测：当前行是否包含超高 Table（2026-09-03 廿一续）
+      // 若单行内的 Table 总高度超过可用空间，正常行放置循环会把整行「放得下」，
+      // 但实际渲染时 Table 内容远超页边界。此时跳过正常循环，直接走 Table 数据行切分。
+      const tablesInRow = collectTablesInRow(rows[i]);
+      let rowTableH = 0;
+      for (const t of tablesInRow) {
+        rowTableH += tableHeightMm(t, opts.baseRowHeight, opts.data);
+      }
+      const rowH = gridRowHeightMm(opts.baseRowHeight, rows[i], mr);
+      const gridOverhead = (bordered ? ONE_PX_MM : 0) + rowH; // Grid 行自身 + 外框
+
+      if (tablesInRow.length > 0 && rowTableH > avail - gridOverhead && rows.length - i === 1) {
+        // === Table 切分路径：最后一行（或唯一行）内含超高 Table ===
+        if (curChildren.length > 0) flush();
+
+        let remaining = 0;
+        for (const t of tablesInRow) {
+          remaining += resolveTableRowCount(t, opts.data);
+        }
+        let offset = 0;
+        let tblFirst = true;
+
+        while (remaining > 0) {
+          const pageAvail = bodyH - curUsed;
+          const tableBudget = Math.max(0, pageAvail - gridOverhead);
+          let chunk = tableBudget > 0 ? Math.floor(tableBudget / opts.baseRowHeight) : 0;
+          if (chunk === 0 && remaining > 0) chunk = 1;
+          chunk = Math.min(chunk, remaining);
+
+          const isLast = offset + chunk >= remaining;
+          const fragmentCells = rows[i].cells.map((cell) => ({
+            ...cell,
+            children: mapTablesInNodeTree(cell.children, (tbl) => {
+              const total = resolveTableRowCount(tbl, opts.data);
+              const ratio = total / Math.max(1, remaining + offset);
+              return Math.round(chunk * ratio);
+            }),
+          }));
+          push({
+            node: { ...grid, rows: [{ ...rows[i], cells: fragmentCells }] },
+            suppressBorders: { top: !tblFirst, bottom: !isLast },
+          });
+
+          remaining -= chunk;
+          offset += chunk;
+          tblFirst = false;
+          if (remaining > 0) flush();
+        }
+
+        isFirstFragment = false;
+        i = i + 1;
+        if (i < rows.length) flush();
+        continue;
+      }
+
+      // === 正常 Grid 行放置循环（无超高 Table 或多行可正常切分）===
 
       let j = i;
       let acc = suppressTop || !bordered ? 0 : ONE_PX_MM; // 片段上边框（首片段且带框时计入）
@@ -325,6 +547,8 @@ export function paginatePage(page: PageSchemaV2, opts: PaginateContext): Paginat
       }
 
       // 一行都放不下（该行比可用高还高，或本页剩余空间极小）→ 强制换页放至少一行
+      // 注：含超高 Table 的单行已在循环入口处提前检测并切分（见上方「Table 切分路径」），
+      //       此处仅处理无 Table 的普通超高行（如超大图片/超长文本等原子节点）。
       if (placed === 0) {
         if (curChildren.length > 0) flush();
         const st = !isFirstFragment;
@@ -358,6 +582,7 @@ export function paginatePage(page: PageSchemaV2, opts: PaginateContext): Paginat
 
   for (const node of page.children) {
     if (node.type === "grid") paginateGrid(node);
+    else if (node.type === "table") paginateTable(node);
     else paginateAtomic(node);
   }
   flush();

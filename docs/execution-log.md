@@ -532,5 +532,46 @@
 
 #### 未改动
 - 跨页 Grid 选中两处高亮（同一 `grid.id` 的两段都加选中框）按用户要求**保持不动**。
-- Table 按行跨页切分仍延后（维持原子块整体落页/换页）。
-- 验证：`vue-tsc --noEmit` 干净；`vitest run` **201/201（23 文件）** 通过（原 197 + 新增 4）。未跑 `vite build`；未提交 git。
+- ~~Table 按行跨页切分仍延后（维持原子块整体落页/换页）~~ → **本续已实现（见下 廿一续）**。
+
+### 2026-09-03 廿一续 · Table 按数据行跨页切分（修复设计态 50 行 Table 溢出纸外）
+
+用户反馈：设计态加载 `grid-50-rows.json`（手动拖拽生成，结构为 Grid(1行)→Cell→Table(minRows:50)）后，50 行表格内容全部溢出到纸张外的灰色区域，没有分页切分。
+
+#### 根因（三层嵌套障碍）
+1. **第一层**：分页引擎在 Page 子节点循环中只看到 Grid 节点 → 调用 `paginateGrid`
+2. **第二层**：`paginateGrid` 按 `row.height × baseRowHeight` 计算 Grid 高度 = 1×8 = 8mm ≪ 277mm（A4 正文区）→ 判定「放得下」→ 整个 Grid（含内部 Table）作为原子块放入，**不进入 splitGrid**
+3. **第三层**：即使强制进入 `splitGrid`（通过 measureRow 校正测到单行实际 400+mm），单行 Grid 的 8mm 行高仍远小于 277mm 可用空间 → 正常放入 → **走不到 Table 切分分支**
+
+核心缺陷：**Table 是原子块（paginateAtomic），不支持按数据行切分；且嵌套在 Grid 内部时，分页引擎的逐层检测机制无法穿透 Grid 行高估算看到 Table 的真实高度。**
+
+#### 修复（四处联动）
+
+**① 分页引擎 `pagination.ts`——新增三个能力：**
+
+- **`paginateTable(table)`**：顶层 Table 直接按数据行跨页切分（与 `splitGrid` 对称）。每数据行高度 = baseRowHeight（均匀）；首片段保留表头；产出带 `_paginateMaxRows` 的 Table 片段节点。
+
+- **`splitGrid` 提前检测**：在行放置循环**之前**，检查当前行是否包含「超高 Table」（Table 总高度 > 可用空间 - Grid 行自身占用）。若是且为最后/唯一行 → 跳过正常放置循环，直接进入 **Table 数据行切分路径**：
+  - 计算所有 Table 的总数据行数
+  - 按每页可用空间分配 chunk（= ⌊(可用空间 - Grid 占用) / baseRowHeight⌋）
+  - 每页产出相同的 Grid（1 行）但内部 Table 通过 `mapTablesInNodeTree()` 携带递减的 `_paginateMaxRows`
+  - 比例分配：多 Table 时按各 Table 行数占比分配 chunk
+
+- **`paginateGrid` 超高 Table 检测**：计算 `fullH` 后额外扫描 cell 内 Table 高度。若任一 Table > 正文区 80% → 置 `hasTallTables=true`，强制进入 `splitGrid`（即使行高估算「放得下」）。
+
+**② 辅助函数（均位于 `pagination.ts`）：**
+- `collectTablesInRow(row)`：从 Grid 行的所有 cell.children 中收集 Table 节点
+- `mapTablesInNodeTree(nodes, mapFn)`：深拷贝节点树，将每个 Table 按 mapFn 替换为 `_paginateMaxRows` 版本（递归处理嵌套 Grid）
+- `totalTableDataRowsInRow(row, data)`：统计行内所有 Table 的数据行总数
+
+**③ 类型扩展 `schema-v2.ts`：**
+- `TableNodeV2` 新增 `_paginateMaxRows?: number`（内部分页字段，序列化/校验忽略）
+
+**④ 渲染层 `GridSchemaNode.vue`：**
+- 新增 `tablePaginatedRowCount(node, data)` 函数：返回 `Math.min(resolveTableRowCount(...), node._paginateMaxRows ?? Infinity)`
+- Table `<tbody>` 的 `v-for` 从 `resolveTableRowCount(node, data)` 改为 `tablePaginatedRowCount(node, data)`
+- `tableHeightMm()` 同步更新：尊重 `_paginateMaxRows`（片段高度与渲染一致）
+
+#### 测试
+- 新增引擎测试：「Table（50 行数据）in Grid（1 行）按数据行跨页切分」——验证 pages.length > 1、tableFragmentCount ≥ 2、totalDataRows = 50（一行不丢）、每页高度 ≤ 正文区。
+- 全量 `vitest run` **204/204（23 文件）**；`vue-tsc --noEmit` 干净。未跑 `vite build`；未启动服务器；未提交 git。
