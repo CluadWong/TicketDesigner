@@ -123,24 +123,14 @@ const unitNumberGrid = grid(
   "all",
   [
     row("basic-unit-number-row", 1, [
-      cell(
-        "unit-label-cell",
-        [staticP("unit-label", "单位", { align: "center" })],
-        {
-          width: 20,
-        },
-      ),
-      cell("unit-field-cell", [fieldP("unit-field", "单位")], { width: "1fr" }),
-      cell(
-        "number-label-cell",
-        [staticP("number-label", "编号", { align: "center" })],
-        {
-          width: 20,
-        },
-      ),
-      cell("number-field-cell", [fieldP("number-field", "编号")], {
-        width: "1fr",
+      cell("unit-label-cell", [staticP("unit-label", "单位", { align: "center" })], {
+        width: 20,
       }),
+      cell("unit-field-cell", [fieldP("unit-field", "单位")], { width: "1fr" }),
+      cell("number-label-cell", [staticP("number-label", "编号", { align: "center" })], {
+        width: 20,
+      }),
+      cell("number-field-cell", [fieldP("number-field", "编号")], { width: "1fr" }),
     ]),
   ],
   { columns: [20, "1fr", 20, "1fr"] },
@@ -155,20 +145,12 @@ const ownerTeamGrid = grid(
     row("basic-owner-team-row", 1, [
       cell(
         "owner-field-cell",
-        [
-          fieldP("owner-field", "工作负责人（监护人）", {
-            prefix: "工作负责人（监护人）：",
-          }),
-        ],
+        [fieldP("owner-field", "工作负责人（监护人）", { prefix: "工作负责人（监护人）：" })],
         { width: "1fr" },
       ),
-      cell(
-        "team-field-cell",
-        [fieldP("team-field", "班组", { prefix: "班组：" })],
-        {
-          width: "1fr",
-        },
-      ),
+      cell("team-field-cell", [fieldP("team-field", "班组", { prefix: "班组：" })], {
+        width: "1fr",
+      }),
     ]),
   ],
   { columns: ["1fr", "1fr"] },
@@ -190,33 +172,29 @@ const membersGrid = grid("basic-members-grid", "outer", [
     }),
   ]),
   row("members-count-row", 1, [
-    cell(
-      "members-count-cell",
-      [
-        grid(
-          "members-count-grid",
-          "none",
-          [
-            row("members-count-inner-row", 1, [
-              cell("members-count-spacer-cell", [], { width: "1fr" }),
-              cell(
-                "members-count-field-cell",
-                [
-                  fieldP("members-count-field", "工作班成员人数", {
-                    prefix: "共",
-                    suffix: "人",
-                    innerBorder: true,
-                  }),
-                ],
-                { width: 30 },
-              ),
-            ]),
-          ],
-          { columns: ["1fr", 30] },
-        ),
-      ],
-      { width: "1fr" },
-    ),
+    cell("members-count-cell", [
+      grid(
+        "members-count-grid",
+        "none",
+        [
+          row("members-count-inner-row", 1, [
+            cell("members-count-spacer-cell", [], { width: "1fr" }),
+            cell(
+              "members-count-field-cell",
+              [
+                fieldP("members-count-field", "工作班成员人数", {
+                  prefix: "共",
+                  suffix: "人",
+                  innerBorder: true,
+                }),
+              ],
+              { width: 30 },
+            ),
+          ]),
+        ],
+        { columns: ["1fr", 30] },
+      ),
+    ], { width: "1fr" }),
   ]),
 ]);
 
@@ -226,11 +204,7 @@ const stationGrid = grid("station-grid", "all", [
   row("station-row", 1, [
     cell(
       "station-field-cell",
-      [
-        fieldP("station-field", "电站设备", {
-          prefix: "工作的变、配电站名称及设备名称：",
-        }),
-      ],
+      [fieldP("station-field", "电站设备", { prefix: "工作的变、配电站名称及设备名称：" })],
       { width: "1fr" },
     ),
   ]),
@@ -249,16 +223,8 @@ const workTaskTable: TableNodeV2 = {
   minRows: 4,
   // 行模板字段键按引擎约定不写死（""），渲染期由列 key 派生 工作地点_行号 / 工作内容_行号
   rowTemplate: [
-    tableTemplate(
-      "work-task-loc-tpl",
-      "工作地点",
-      fieldP("work-task-loc-p", ""),
-    ),
-    tableTemplate(
-      "work-task-content-tpl",
-      "工作内容",
-      fieldP("work-task-content-p", ""),
-    ),
+    tableTemplate("work-task-loc-tpl", "工作地点", fieldP("work-task-loc-p", "")),
+    tableTemplate("work-task-content-tpl", "工作内容", fieldP("work-task-content-p", "")),
   ],
   border: "inner",
 };
@@ -268,56 +234,36 @@ const workTaskGrid = grid(
   "all",
   [
     row("work-task-row", 1, [
-      cell(
-        "work-task-label-cell",
-        [staticP("work-task-label", "工作任务", { align: "center" })],
-        {
-          width: 30,
-        },
-      ),
+      cell("work-task-label-cell", [staticP("work-task-label", "工作任务", { align: "center" })], {
+        width: 30,
+      }),
       cell("work-task-table-cell", [workTaskTable], { width: "1fr" }),
     ]),
     row("schedule-row", 1, [
-      cell(
-        "schedule-label-cell",
-        [staticP("schedule-label", "计划工作时间", { align: "center" })],
-        {
-          width: 30,
-        },
-      ),
-      cell(
-        "schedule-fields-cell",
-        [
-          grid(
-            "schedule-grid",
-            "none",
-            [
-              row("schedule-inner-row", 1, [
-                cell(
-                  "schedule-from-cell",
-                  [
-                    dateField("schedule-from", "计划工作时间_开始", {
-                      prefix: "自",
-                    }),
-                  ],
-                  { width: "1fr" },
-                ),
-                cell(
-                  "schedule-to-cell",
-                  [
-                    dateField("schedule-to", "计划工作时间_截止", {
-                      prefix: "至",
-                    }),
-                  ],
-                  { width: "1fr" },
-                ),
-              ]),
-            ],
-            { columns: ["1fr", "1fr"] },
-          ),
-        ],
-        { width: "1fr" },
-      ),
+      cell("schedule-label-cell", [staticP("schedule-label", "计划工作时间", { align: "center" })], {
+        width: 30,
+      }),
+      cell("schedule-fields-cell", [
+        grid(
+          "schedule-grid",
+          "none",
+          [
+            row("schedule-inner-row", 1, [
+              cell(
+                "schedule-from-cell",
+                [dateField("schedule-from", "计划工作时间_开始", { prefix: "自" })],
+                { width: "1fr" },
+              ),
+              cell(
+                "schedule-to-cell",
+                [dateField("schedule-to", "计划工作时间_截止", { prefix: "至" })],
+                { width: "1fr" },
+              ),
+            ]),
+          ],
+          { columns: ["1fr", "1fr"] },
+        ),
+      ], { width: "1fr" }),
     ]),
   ],
   { columns: [30, "1fr"] },
@@ -329,19 +275,12 @@ const conditionGrid = grid("condition-grid", "outer", [
   row("condition-label-row", 1, [
     cell(
       "condition-label-cell",
-      [
-        staticP(
-          "condition-label",
-          "工作条件（停电或不停电，或邻近及保留带电设备名称）：\n",
-        ),
-      ],
+      [staticP("condition-label", "工作条件（停电或不停电，或邻近及保留带电设备名称）：\n")],
       { width: "1fr" },
     ),
   ]),
   row("condition-field-row", 1, [
-    cell("condition-field-cell", [fieldP("condition-field", "工作条件")], {
-      width: "1fr",
-    }),
+    cell("condition-field-cell", [fieldP("condition-field", "工作条件")], { width: "1fr" }),
   ]),
 ]);
 
@@ -349,63 +288,40 @@ const conditionGrid = grid("condition-grid", "outer", [
 
 const safetyGrid = grid("safety-grid", "outer", [
   row("notice-label-row", 1, [
-    cell(
-      "notice-label-cell",
-      [staticP("notice-label", "注意事项（安全措施）：")],
-      {
-        width: "1fr",
-      },
-    ),
-  ]),
-  row("notice-field-row", 1, [
-    cell("notice-field-cell", [fieldP("notice-field", "安全措施")], {
+    cell("notice-label-cell", [staticP("notice-label", "注意事项（安全措施）：")], {
       width: "1fr",
     }),
   ]),
+  row("notice-field-row", 1, [
+    cell("notice-field-cell", [fieldP("notice-field", "安全措施")], { width: "1fr" }),
+  ]),
   row("notice-remark-row", 1, [
-    cell(
-      "notice-remark-cell",
-      [fieldP("notice-remark-field", "安措备注", { prefix: "备注：" })],
-      {
-        width: "1fr",
-      },
-    ),
+    cell("notice-remark-cell", [fieldP("notice-remark-field", "安措备注", { prefix: "备注：" })], {
+      width: "1fr",
+    }),
   ]),
   row("issuer-row", 1, [
-    cell(
-      "issuer-cell",
-      [
-        grid(
-          "issuer-grid",
-          "none",
-          [
-            row("issuer-inner-row", 1, [
-              cell(
-                "issuer-sign-cell",
-                [
-                  fieldP("issuer-sign-field", "工作票签发人签名", {
-                    prefix: "工作票签发人签名：",
-                    action: "signature",
-                  }),
-                ],
-                { width: "1fr" },
-              ),
-              cell(
-                "issue-date-cell",
-                [
-                  dateField("issue-date-field", "签发日期", {
-                    prefix: "签发日期：",
-                  }),
-                ],
-                { width: "1fr" },
-              ),
-            ]),
-          ],
-          { columns: ["1fr", "1fr"] },
-        ),
-      ],
-      { width: "1fr" },
-    ),
+    cell("issuer-cell", [
+      grid(
+        "issuer-grid",
+        "none",
+        [
+          row("issuer-inner-row", 1, [
+            cell(
+              "issuer-sign-cell",
+              [fieldP("issuer-sign-field", "工作票签发人签名", { prefix: "工作票签发人签名：", action: "signature" })],
+              { width: "1fr" },
+            ),
+            cell(
+              "issue-date-cell",
+              [dateField("issue-date-field", "签发日期", { prefix: "签发日期：" })],
+              { width: "1fr" },
+            ),
+          ]),
+        ],
+        { columns: ["1fr", "1fr"] },
+      ),
+    ], { width: "1fr" }),
   ]),
 ]);
 
@@ -413,22 +329,14 @@ const safetyGrid = grid("safety-grid", "outer", [
 
 const supplementGrid = grid("supplement-grid", "outer", [
   row("supplement-label-row", 1, [
-    cell(
-      "supplement-label-cell",
-      [staticP("supplement-label", "补充安全措施：")],
-      {
-        width: "1fr",
-      },
-    ),
+    cell("supplement-label-cell", [staticP("supplement-label", "补充安全措施：")], {
+      width: "1fr",
+    }),
   ]),
   row("supplement-field-row", 1, [
-    cell(
-      "supplement-field-cell",
-      [fieldP("supplement-field", "补充安全措施")],
-      {
-        width: "1fr",
-      },
-    ),
+    cell("supplement-field-cell", [fieldP("supplement-field", "补充安全措施")], {
+      width: "1fr",
+    }),
   ]),
   row("supplement-remark-row", 1, [
     cell(
@@ -446,45 +354,27 @@ const confirmGrid = grid(
   "outer",
   [
     row("confirm-header-row", 1, [
-      cell(
-        "confirm-header-cell",
-        [staticP("confirm-header", "确认本工作票上述各项内容：")],
-        {
-          width: "1fr",
-        },
-      ),
+      cell("confirm-header-cell", [staticP("confirm-header", "确认本工作票上述各项内容：")], {
+        width: "1fr",
+      }),
       cell("confirm-header-spacer-cell", [], { width: "1fr" }),
     ]),
     row("confirm-sign-row", 1, [
       cell(
         "confirm-owner-cell",
-        [
-          fieldP("confirm-owner-sign", "工作负责人签名", {
-            prefix: "工作负责人签名：",
-            action: "signature",
-          }),
-        ],
+        [fieldP("confirm-owner-sign", "工作负责人签名", { prefix: "工作负责人签名：", action: "signature" })],
         { width: "1fr" },
       ),
       cell(
         "confirm-permitter-cell",
-        [
-          fieldP("confirm-permitter-sign", "工作许可人签名", {
-            prefix: "工作许可人签名：",
-            action: "signature",
-          }),
-        ],
+        [fieldP("confirm-permitter-sign", "工作许可人签名", { prefix: "工作许可人签名：", action: "signature" })],
         { width: "1fr" },
       ),
     ]),
     row("permit-time-row", 1, [
       cell(
         "permit-time-cell",
-        [
-          dateField("permit-time-field", "许可工作时间", {
-            prefix: "许可工作时间：",
-          }),
-        ],
+        [dateField("permit-time-field", "许可工作时间", { prefix: "许可工作时间：" })],
         { width: "1fr" },
       ),
       cell("permit-time-spacer-cell", [], { width: "1fr" }),
@@ -499,24 +389,14 @@ const confirmTaskGrid = grid("confirm-task-grid", "outer", [
   row("confirm-task-label-row", 1, [
     cell(
       "confirm-task-label-cell",
-      [
-        staticP(
-          "confirm-task-label",
-          "确认工作负责人布置的工作任务和安全措施：",
-        ),
-      ],
+      [staticP("confirm-task-label", "确认工作负责人布置的工作任务和安全措施：")],
       { width: "1fr" },
     ),
   ]),
   row("confirm-task-sign-row", 1, [
     cell(
       "confirm-task-sign-cell",
-      [
-        fieldP("confirm-task-sign", "工作班成员签名", {
-          prefix: "工作班成员签名：",
-          action: "text",
-        }),
-      ],
+      [fieldP("confirm-task-sign", "工作班成员签名", { prefix: "工作班成员签名：", action: "text" })],
       { width: "1fr" },
     ),
   ]),
@@ -529,23 +409,15 @@ const extensionGrid = grid(
   "outer",
   [
     row("extension-header-row", 1, [
-      cell(
-        "extension-header-cell",
-        [staticP("extension-header", "工作票延期：")],
-        {
-          width: "1fr",
-        },
-      ),
+      cell("extension-header-cell", [staticP("extension-header", "工作票延期：")], {
+        width: "1fr",
+      }),
       cell("extension-header-spacer-cell", [], { width: "1fr" }),
     ]),
     row("extension-expire-row", 1, [
       cell(
         "extension-expire-cell",
-        [
-          dateField("extension-expire-field", "有效期延长到", {
-            prefix: "有效期延长到：",
-          }),
-        ],
+        [dateField("extension-expire-field", "有效期延长到", { prefix: "有效期延长到：" })],
         { width: "1fr" },
       ),
       cell("extension-expire-spacer-cell", [], { width: "1fr" }),
@@ -553,42 +425,24 @@ const extensionGrid = grid(
     row("extension-owner-row", 1, [
       cell(
         "extension-owner-cell",
-        [
-          fieldP("extension-owner-sign", "延期工作负责人签名", {
-            prefix: "工作负责人签名：",
-            action: "signature",
-          }),
-        ],
+        [fieldP("extension-owner-sign", "延期工作负责人签名", { prefix: "工作负责人签名：", action: "signature" })],
         { width: "1fr" },
       ),
       cell(
         "extension-owner-date-cell",
-        [
-          dateField("extension-owner-date", "延期工作负责人签名日期", {
-            prefix: "日期：",
-          }),
-        ],
+        [dateField("extension-owner-date", "延期工作负责人签名日期", { prefix: "日期：" })],
         { width: "1fr" },
       ),
     ]),
     row("extension-permitter-row", 1, [
       cell(
         "extension-permitter-cell",
-        [
-          fieldP("extension-permitter-sign", "延期工作许可人签名", {
-            prefix: "工作许可人签名：",
-            action: "signature",
-          }),
-        ],
+        [fieldP("extension-permitter-sign", "延期工作许可人签名", { prefix: "工作许可人签名：", action: "signature" })],
         { width: "1fr" },
       ),
       cell(
         "extension-permitter-date-cell",
-        [
-          dateField("extension-permitter-date", "延期工作许可人签名日期", {
-            prefix: "日期：",
-          }),
-        ],
+        [dateField("extension-permitter-date", "延期工作许可人签名日期", { prefix: "日期：" })],
         { width: "1fr" },
       ),
     ]),
@@ -603,13 +457,9 @@ const completionGrid = grid(
   "outer",
   [
     row("completion-header-row", 1, [
-      cell(
-        "completion-header-cell",
-        [staticP("completion-header", "工作票终结：")],
-        {
-          width: "1fr",
-        },
-      ),
+      cell("completion-header-cell", [staticP("completion-header", "工作票终结：")], {
+        width: "1fr",
+      }),
       cell("completion-header-spacer-cell", [], { width: "1fr" }),
     ]),
     row("completion-end-row", 1, [
@@ -627,42 +477,24 @@ const completionGrid = grid(
     row("completion-owner-row", 1, [
       cell(
         "completion-owner-cell",
-        [
-          fieldP("completion-owner-sign", "工作负责人签名-终结", {
-            prefix: "工作负责人签名：",
-            action: "signature",
-          }),
-        ],
+        [fieldP("completion-owner-sign", "工作负责人签名-终结", { prefix: "工作负责人签名：", action: "signature" })],
         { width: "1fr" },
       ),
       cell(
         "completion-owner-date-cell",
-        [
-          dateField("completion-owner-date", "工作负责人签名-终结日期", {
-            prefix: "日期：",
-          }),
-        ],
+        [dateField("completion-owner-date", "工作负责人签名-终结日期", { prefix: "日期：" })],
         { width: "1fr" },
       ),
     ]),
     row("completion-permitter-row", 1, [
       cell(
         "completion-permitter-cell",
-        [
-          fieldP("completion-permitter-sign", "工作许可人签名-终结", {
-            prefix: "工作许可人签名：",
-            action: "signature",
-          }),
-        ],
+        [fieldP("completion-permitter-sign", "工作许可人签名-终结", { prefix: "工作许可人签名：", action: "signature" })],
         { width: "1fr" },
       ),
       cell(
         "completion-permitter-date-cell",
-        [
-          dateField("completion-permitter-date", "工作许可人签名-终结日期", {
-            prefix: "日期：",
-          }),
-        ],
+        [dateField("completion-permitter-date", "工作许可人签名-终结日期", { prefix: "日期：" })],
         { width: "1fr" },
       ),
     ]),
@@ -680,7 +512,7 @@ export function makeYunlvSecondTicketFullSchema(): FormSchemaV2 {
   return {
     version: 2,
     paper: { size: "A4", orientation: "portrait" },
-    baseRowHeight: 6,
+    baseRowHeight: 8,
     pages: [
       {
         id: "ticket-page-full",

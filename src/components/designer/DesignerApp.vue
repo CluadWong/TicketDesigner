@@ -1250,7 +1250,7 @@ function updateSelectedImageFit(event: Event): void {
 function updateBaseRowHeight(event: Event): void {
   const value = Math.max(
     1,
-    Math.floor(Number((event.target as HTMLInputElement).value) || 6),
+    Math.floor(Number((event.target as HTMLInputElement).value) || 8),
   );
   commit(updateBaseRowHeightV2(schema.value, value));
 }
