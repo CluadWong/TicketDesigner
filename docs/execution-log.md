@@ -646,3 +646,93 @@
 
 #### 结论
 P12 中可安全独立收尾的清理项已全部完成；剩余 D2/D3 属设计层/结构重构（A5），需用户拍板后方可做，不孤立推进。
+
+---
+
+### 2026-09-02 廿五续 · 删除 `demo/` 下无引用的 demo 文件
+
+用户要求核查 `E:\Project\ssh\TicketDesigner\demo` 下以 `demo` 开头的文件是否有引用，无引用则删除。
+
+#### 核查
+- 候选（5 个）：`demo copy.html`、`demo-table-flow.html`、`demo-v2.html`、`demo-word-flow.html`、`demo.html`。`云铝-第一种作业票.html` / `云铝-第二种作业票.html` 不以 `demo` 开头，不在本次范围。
+- 全项目 grep（排除 `node_modules` 与 `demo/` 自身）：5 个文件名**零代码引用**（仅 `.git/index` 有历史跟踪记录，非活跃引用）；`index.html` / `vite.config.ts` 无 demo 入口；`public/` 目录不存在，无静态资源映射。
+
+#### 改动
+- 经用户授权（个人目录之外、项目内清理）删除上述 5 个 `demo*` 文件（`rm -f`），保留 2 个 `云铝-*` 作业票样例。
+
+#### 验证
+- `vue-tsc --noEmit` 干净；`vitest run` **204/204（23 文件）**（独立静态 HTML，无构建/测试依赖，零回归）。
+- 未跑 `vite build`；未启动服务器；未提交 git。`git status` 将显示这 5 个文件为「未暂存删除」（按约定不经用户允许不提交）。
+
+#### 下一步
+- `demo/` 现仅含 2 个 `云铝-*` 作业票样例（用户手拖复现样本，不在本次清理范围）。主线已至 P11 收尾 / P12 安全清理完成，后续可转 P9.1c 专用控件 / P9.2 / 或推进 A5 分层重构。待用户指定。
+
+- **本轮（2026-09-03 二十六续）执行 A5 分层重构（Batch 0–2：内核瘦身 + 表面层）**：
+  1. **范围（用户拍板「内核瘦身+表面层」）**：仅做 architecture-layering-review.md §6.5 的 Batch 0（C2 地址契约）、Batch 1（内核瘦身 A1/A4/A5）、Batch 2（CanvasSurface 表面层）；P9.1c 专用控件 / P9.2 明确延后，不在本轮。
+  2. **C2 节点地址契约**：新增 `src/engine-v2/node-address.ts`，导出 `NODE_ID_ATTR="data-node-id"` / `LAYOUT_ID_ATTR="data-layout-id"` + `nodeIdSelector()` / `layoutIdSelector()`；`docs/engine.md` 新增 §18 记载内核输出、表面层经 `closest([${ATTR}])` 反查的消费约定。DesignerApp 拖拽/选中处理器全部改用常量（不再硬编码字符串）。
+  3. **A1 显式 mode**：`GridFormRenderer` / `GridSchemaNode` / `FormRenderer` 用 `mode?: "design"|"preview"|"fill"` 取代旧 `data != null` 三态推断；`resolvedMode` 未传 mode 时向后兼容旧 data+readonly 推断。DesignerApp 画布传 `:mode="previewMode ? 'preview' : 'design'"` + `:readonly="false"`（预览态=结构只读、字段仍按同一 `<p>` 路径可编辑，供 DOM 遍历采集，见十续）。
+  4. **A4 已落地（无码改）**：内核 G15 已 `emit("field-change")`，无 `inject("formFill")` 残留。
+  5. **A5 内核去选中态**：移除 `GridFormRenderer` / `GridSchemaNode` / `HtmlBlock` 的 `selectedNodeId` prop 与全部 `.layout-node--selected` 类绑定；删除内核 `@media print` 选中清除分支（D3 随之关闭）。选中高亮整体迁移到新建 `src/components/designer/CanvasSurface.vue` 表面层：包 `GridFormRenderer`，用 `MutationObserver` + `watch` 在渲染 DOM 上加/去 `.is-design-selected`（复刻原淡蓝底+内描边视觉），内核保持纯净。
+  6. **DesignerApp 接线**：画布 `<main>` 改为 `<CanvasSurface>`，透传 schema/data/mode/readonly/paginate/拖拽落点；`selectedNodeId` 仅作 DesignerApp 自身内部状态，经 `:selected-node-id` 传给表面层（预览态传 null）。拖拽源 `node-drag-start`、字段 `field-change` 由表面层透传。
+  7. **测试对齐**：`GridSchemaNode.test.ts` 用例 1 改写为内核纯净断言（data-node-id + 文本，无选中类）；`DesignerApp.test.ts` 两处 `.layout-node--selected` 断言改为 `.is-design-selected` 并补 double-flush（高亮在嵌套 nextTick 落地）；新增 `CanvasSurface.test.ts`（4 例）覆盖表面层选中高亮（含切换/清空）；`GridSchemaNode.fill.test.ts` 的 `data+readonly` 真·只读路径保持不变。
+  8. **回归修复**：初版曾把 preview 渲染成静态（canFill 仅 fill 态），导致 `DesignerApp.test.ts` 预览字段可编辑断言与 `GridSchemaNode.fill.test.ts` 只读断言双双失败。修正为 `canFill = resolvedMode !== "design" && !props.readonly`（等价于旧 `data!=null && !readonly`），并让 DesignerApp 预览传 `:readonly="false"`，两套断言同时转绿。
+  9. 验证：全量 **vitest 208/208（24 文件）**、`vue-tsc --noEmit` 干净（新增 CanvasSurface.test.ts 4 例，基线由 204 升至 208）。
+
+---
+
+## 二十七续 — A6 分层重构（Batch 3：拖拽落点侧下沉至 CanvasSurface 表面层）
+
+用户「继续」指令授权在 A5 验证报告后推进 Batch 3+（A6）。本轮按 architecture-layering-review.md §6.5 Batch 3 只做**落点侧**：把拖拽落点逻辑从 `DesignerApp` 下沉到新建 `CanvasSurface` 表面层，使 `DesignerApp` 退化为「薄壳 schema 提交代理」。拖拽**源**（内核 `GridSchemaNode` 的 `draggable`/`@dragstart`）按 §6.4/§6.5 留作独立子步骤，本轮不做（原因见下）。
+
+1. **C2 契约补强**：`src/engine-v2/node-address.ts` 新增 `PALETTE_DRAG_MIME = "application/x-ticket-node-kind"`（模板面板→画布拖拽 MIME），与内核 `NODE_MOVE_MIME`（节点重排，来自 `@/types`）并列；`DesignerApp` 拖拽源 `startPaletteDrag` 改用 `setData(PALETTE_DRAG_MIME, kind)`，删除旧局部常量 `DRAG_MIME`。
+2. **CanvasSurface.vue 全量重写接管落点**：内部状态 `dragOverCellId`/`dragOverIndex`/`legalDropCellIds`/`dragTargetEl`；新增根 `<div @dragover @dragleave @drop @dragend>` 监听 + `setDropHighlight`/`clearDropHighlight`/`computeInsertionIndex`/`onNodeDragStart`(经 `buildEditorNodeIndexV2` 算合法落点 cell 集、emit `node-drag-start`)/`onDragOver`/`onDragLeave`/`resetDragState`/`onDrop`(dataTransfer 含 `NODE_MOVE_MIME`→emit `drop-node`；含 `PALETTE_DRAG_MIME`→emit `drop-palette`)/`onDragEnd`。`.v2-drop-target` 高亮 CSS 迁此（含 `@media print` 清除）。emits 新增 `drop-node`/`drop-palette`/`drag-end`（保留 `node-drag-start`/`field-change`）。
+3. **内核契约不变**：`GridFormRenderer` 仍保留 `dragOverCellId`/`dragOverIndex` props（仅驱动 `.v2-insertion-line` 插入指示，由 CanvasSurface 内部状态供给）；`GridSchemaNode` 拖拽源不动（源下沉留待后续）。
+4. **DesignerApp.vue 退化为薄壳**：删除 `DRAG_MIME`/`draggedNodeId`/`dragOverCellId`/`dragOverIndex`/`legalDropCellIds`/`dragTargetEl`/`setDropHighlight`/`clearDropHighlight`/`onCanvasDragOver`/`computeInsertionIndex`/`onCanvasDragLeave`/`onCanvasDrop`；`onCanvasNodeDragStart` 简化为仅 `selectedNodeId = id`；新增 `onDropNode`（`moveNodeToIndexV2` 提交，原引用返回跳过、`selectedNodeId` 指向被移动节点）与 `onDropPalette`（`appendNodeToCellV2` 提交、`selectedNodeId` 指向新节点）。模板 `<main>` 去 `@dragover/@dragleave/@drop/@dragend` 保留 `@click`；`<CanvasSurface>` 去 `:drag-over-cell-id/:drag-over-index`、加 `@drop-node/@drop-palette`；删 `.v2-canvas :deep(.v2-drop-target)` CSS。
+5. **残留注释修正**：`DesignerApp` 两处过时引用（`onCanvasDrop` / `legalDropCellIds`）改指向 `CanvasSurface` / `onDropPalette`，并保留「已整体下沉至 CanvasSurface（A6，§6.5 Batch 3）」说明注释。Grep 确认无残留坏符号引用。
+6. **测试不变**：`CanvasSurface.test.ts` 仍 4 例（选中高亮）；`DesignerApp.test.ts` 拖拽两用例（跨格移动 / 同格内排序）经事件冒泡到新 `CanvasSurface` 根仍应绿。未新增 A6 落点单测（表面层↔内核协同已由 DesignerApp 端到端覆盖）。
+7. 验证：全量 **vitest 208/208（24 文件）**（与二十六续持平，A6 为纯抽取零回归）、**vue-tsc --noEmit** 干净（EXIT=0）。
+
+文档：本续记 execution-log；development-plan §0（最后更新 / §0.3 分层状态 A6 / §0.4 表）同步；MEMORY.md 加 A6 单行并更新拖拽重排条目；.workbuddy/memory/2026-09-03.md 补 二十七续。
+
+> 推迟（非本轮）：A6 拖拽**源**下沉（把 `draggable`/`@dragstart` 从内核 `GridSchemaNode` 移出、改由 CanvasSurface 画布级事件委托；因快照 `YunlvSecondTicketFull.test.ts.snap` / `FirstFiveRowsSnapshot.test.ts.snap` 硬编码每个节点 `draggable="true"`，移除需重生成快照，改动面更大，故单列子步骤）。Batch 4–6（A3/A2 统一渲染路径、B/C 类、D2/D3 清理）与 P9.1c/P9.2 维持延后。
+
+---
+
+## 二十七续（补正）— A6 拖拽源下沉至 CanvasSurface（Batch 3 收尾）
+
+用户「继续」指令推进原 二十七续 单列推迟的 A6 拖拽**源**子步骤。经代码核对，发现上一轮担心的「移除 `draggable` 需重生成快照」可**完全规避**：浏览器要求 `draggable` 必须是被拖元素自身的属性，故 `:draggable` 属性**保留在内核**（仅设计态为 true，快照 `draggable="true"` 不变），只把 `@dragstart` 的**处理逻辑**上移到表面层事件委托——既达成「内核不处理拖拽」的分层目标，又零快照改动。
+
+1. **内核 `GridSchemaNode.vue` 去拖拽源**：删除 `onNodeDragStart(node, event)` 函数（含 `stopPropagation` / 表格内部拦截 / 字段 p 需 Alt 拦截 / 写 `NODE_MOVE_MIME` / emit `node-drag-start`）；删除 `NODE_MOVE_MIME` 导入；`defineEmits` 移除 `node-drag-start`（仅留 `field-change`）；删除全部 6 处 `@dragstart="onNodeDragStart(node, $event)"` 与递归子节点 2 处 `@node-drag-start` 转发绑定。保留 `:draggable="nodeDraggable"`（`nodeDraggable = isDesign`）与 `isEditable`（仍用于 `contenteditable` 绑定，非死代码）。
+2. **`GridFormRenderer.vue` 去死链路**：`defineEmits` 移除 `node-drag-start`；删除 `<GridSchemaNode>` 上的 `@node-drag-start` 转发。内核自此彻底不再 emit `node-drag-start`。
+3. **`CanvasSurface.vue` 接管拖拽源（事件委托）**：根 `<div>` 新增 `@dragstart="onSurfaceDragStart"`；`onSurfaceDragStart(event)` 逻辑——`dragEnabled` 守卫 → `event.target.closest("[data-node-id]")` 取被拖节点 → 表格内部节点（`closest(".layout-table")` 且非自身）`preventDefault` 拦截 → 设计态字段 p（非复合、无 Alt）`preventDefault` 放行文本编辑 → 写 `NODE_MOVE_MIME` + `text/plain` + `effectAllowed="move"` → 复用既有 `onNodeDragStart(id)`（计算 `legalDropCellIds` 并向上 emit `node-drag-start` 给 DesignerApp）。移除 `<GridFormRenderer>` 上的 `@node-drag-start` 监听（内核已不再 emit）。
+4. **关键取舍**：`draggable` 属性留在内核而非表面层，是浏览器 DOM 约束（拖拽必须由被拖元素自身 `draggable="true"` 触发，表面层无法用单一委托给子元素加该属性）→ 分层目标（内核无拖拽*逻辑*）已达，且快照零改动。
+5. **测试承接**：`DesignerApp.test.ts` 两例拖拽（跨格移动 / 同格内排序）创建单个 `MockDataTransfer` 跨 `dragstart→dragover→drop` 复用，`dragstart` 现由表面层根委托处理并写入 `NODE_MOVE_MIME`，`dragover/drop` 仍按既有逻辑命中 → 两例经新路径转绿。未新增单测（端到端已覆盖）。
+6. 验证：全量 **vitest 208/208（24 文件）**（与 二十七续 持平，A6 源下沉零回归）、**vue-tsc --noEmit** 干净（EXIT=0）。`git status` 显示本回合改动：`GridSchemaNode.vue` / `GridFormRenderer.vue` / `CanvasSurface.vue` + 文档。
+7. 文档：development-plan §0（最后更新 二十七续 标注「+源下沉」/ §0.3 分层 A6 标注源亦完成 / §0.4 表行更新）、MEMORY.md A6 单行、2026-09-03.md 补本补正。
+8. **至此 A6（Batch 3）整体完成**：DesignerApp 与 GridFormRenderer 均不再持有拖拽源/落点逻辑，全部交互（选中高亮 + 拖拽源/落点 + 插入指示驱动）收敛于 CanvasSurface 表面层，渲染内核（GridFormRenderer/GridSchemaNode/HtmlBlock）保持纯净。
+
+---
+
+## 二十八续 — C1 统一编辑闸门（Batch 5 启动）
+
+§6.5 Batch 5 = B1+B2+C1+C3；B1 已由九续 `FormRenderer` + 独立 preview 页落地，故本回合启动 **C1**。
+
+- C1 原问题：非设计态的禁用靠每个编辑函数各写 `if (previewMode.value) return`，易漏——新增任何编辑操作若忘记加守卫，预览/填充态就能改结构。
+- 做法：`DesignerApp.vue` 新增单一 `editable = computed(() => !previewMode.value)`（仅设计态可改结构）作为统一闸门；原 6 处 `if (previewMode.value) return`（`addRootGrid` / `addGrid` / `addNodeToSelectedCell` / `startPaletteDrag` / `selectNode` / `selectNodeById`）改为 `if (!editable.value) return`；左侧模板区 6 个模板按钮 `:disabled="previewMode"` 改为 `:disabled="!editable"`，使「是否可编辑」单一来源。`previewMode` 仍保留用于画布 class / mode 透传 / 选中态置空 / 分页等**展示语义**，不被删除。
+- 范围：本回合仅收敛既有守卫为单一闸门（行为完全等价：`editable === !previewMode`），未新增编辑动作、未改变任何禁用语义；`addTableColumn` 等个别函数若仍缺守卫属既有缺口，未在本回合补（避免扩大范围，留待后续统一核查）。
+- 验证：全量 **vitest 208/208（24 文件）**（与 二十七续 持平，C1 纯收敛零回归）、**vue-tsc --noEmit** 干净（EXIT=0）。
+- 文档：development-plan §0（最后更新 / §0.3 分层 C1 / §0.4 表）同步；MEMORY.md 加 C1 单行；2026-09-03.md 补 二十八续。
+- 下一步可选（Batch 5 续 / Batch 6）：C3（非设计态隐藏右侧 Inspector 面板，纯 UI 低风险）、B2（填充数据导入导出——工具栏已有 保存/读取/导出/导入 按钮，需确认覆盖 schema 还是 fill data）、B3（设计器解耦 dev 样例）、B4（渲染期领域逻辑归 engine）、D2（打印责任分散）。
+
+---
+
+## 二十九续 — C3 非设计态隐藏配置面板（Batch 5 续）
+
+§6.5 Batch 5 = B1+B2+C1+C3；B1（九续）、C1（二十八续）已落地，本回合完成 **C3**。
+
+- C3 原问题：非设计态（预览 / 填充）下，右侧「节点检查」Inspector 配置面板仍渲染（只是无选中内容），预览/填充形态仍带着设计器外壳。
+- 做法：`DesignerApp.vue` 右侧 `<aside class="v2-sidebar v2-sidebar--right">`（纯节点配置：删除 / 面包屑路径 / 网格行列数·边框·列宽·单元格默认 / Schema 版本等）加 `v-if="editable"`，仅设计态可见；预览/填充态该面板从布局移除、画布随之占满，形成干净的「只看表单」形态。左侧模板/结构面板保持（其按钮已 `:disabled="!editable"` 在非设计态禁用，未在本回合改动）。
+- 范围：仅隐藏右侧配置面板；未引入独立预览/填充页面（文档 C3 备选项「或由独立页面承载」属更大改造，未做），也未动左侧面板。预览/填充态字段填写仍走画布内可编辑 `<p>`（canFill）。
+- 验证：全量 **vitest 208/208（24 文件）**（与二十八续持平，C3 纯 UI 零回归）、**vue-tsc --noEmit** 干净（EXIT=0）。
+- 文档：development-plan §0（最后更新 / §0.3 分层 C3 / §0.4 表）同步；MEMORY.md 加 C3 单行；2026-09-03.md 补 二十九续。
+- 至此 **Batch 5 已完成**（B1+C1+C3；B2 数据导入导出因工具栏已有按钮、需先确认覆盖范围而单列）。下一步：**B2**（确认并补完填充数据导入/导出）、**B3**（设计器解耦 dev 样例）、**B4**（渲染期领域逻辑归 engine）、**D2**（打印责任分散），以及延后的 P9.1c/P9.2。

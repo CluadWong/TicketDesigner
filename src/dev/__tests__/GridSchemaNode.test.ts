@@ -5,18 +5,18 @@ import GridSchemaRenderer from "@/components/renderer-v2/GridFormRenderer.vue";
 import { makeYunlvSecondTicketFirstFiveRowsSchema } from "@/dev/yunlv-second-ticket-first-five-rows";
 
 describe("GridSchemaNode selection state", () => {
-  it("adds a visible selected class without changing the node type", () => {
+  it("renders node id and text without any selection class (kernel is pure, A5)", () => {
     const wrapper = mount(GridSchemaNode, {
       props: {
         node: { id: "label", type: "text", text: "单位" },
         baseRowHeight: 8,
-        selectedNodeId: "label",
       },
     });
 
-    expect(wrapper.classes()).toContain("layout-node--selected");
+    // 内核在 A5 重构后不再感知选中态：不再接收 selectedNodeId，也不再输出选中类。
     expect(wrapper.attributes("data-node-id")).toBe("label");
     expect(wrapper.text()).toBe("单位");
+    expect(wrapper.classes()).not.toContain("layout-node--selected");
   });
 
   it("keeps field P empty while preserving data-field", () => {

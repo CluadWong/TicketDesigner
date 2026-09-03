@@ -124,9 +124,12 @@ describe("DesignerApp V2 selection and deletion", () => {
     const wrapper = mountDesigner();
     // 点击表格内的默认字段 P → 因不可单独选中，回退选中所属 Table
     await wrapper.find("tbody .layout-p").trigger("click");
+    // 选中高亮（A5）由 CanvasSurface 经 MutationObserver 异步注入 .is-design-selected，
+    // 内层 nextTick 才落地，故需两次 flush。
+    await nextTick();
     await nextTick();
     expect(wrapper.find('[data-node-id="work-task-table"]').classes()).toContain(
-      "layout-node--selected",
+      "is-design-selected",
     );
 
     // 表格面板列出 2 列（location / content），各有删除按钮
@@ -285,8 +288,9 @@ describe("DesignerApp V2 selection and deletion", () => {
     // 表格内的 P（wt-loc）不可单独选中，点击回退选中所属 Table
     await wrapper.find('[data-node-id="wt-loc"]').trigger("click");
     await nextTick();
+    await nextTick();
     expect(wrapper.find('[data-node-id="work-task-table"]').classes()).toContain(
-      "layout-node--selected",
+      "is-design-selected",
     );
 
     // 表格面板显示「列key_行号」派生字段提示，且不含单独字段名控件

@@ -16,20 +16,25 @@ import { paginatePage, paginateSchema } from "@/engine-v2/pagination";
 defineOptions({ name: "GridFormRenderer" });
 
 const emit = defineEmits<{
-  (e: "node-drag-start", id: string): void;
   (e: "field-change", field: string, value: string): void;
 }>();
 
 const props = withDefaults(
   defineProps<{
     schema: FormSchemaV2;
-    selectedNodeId?: string | null;
-    /** 填充态数据；为空时进入设计态（字段可编辑）。 */
+    /**
+     * 渲染模式（A1 / A5 分层重构）：显式声明调用方意图，取代旧版靠 `data != null` 推断三态。
+     * - design：设计态，字段以 contenteditable 就地占位（不回写 schema），结构可编辑。
+     * - preview：只读回显，带数据但字段不可输入。
+     * - fill：可填写，带数据且字段为真实可编辑控件。
+     * 未传时向后兼容：有 `data` 且非 `readonly` → fill，有 `data` 且 `readonly` → preview，否则 design。
+     */
+    mode?: "design" | "preview" | "fill";
+    /** 填充/预览态数据；用于字段取值与 Table 行数推导。设计态可为空（字段显示 default/占位）。 */
     data?: FormDataV2 | null;
     /**
-     * 只读预览：带数据渲染但字段不可输入（预览态）。
-     * 与 `data` 同时传入时用于「预览」而非「填充」——两者都显示数据，
-     * 区别只在于是否允许编辑。
+     * 只读预览：带数据渲染但字段不可输入（预览态）。与 `mode` 同时传入时以 `mode` 为准，
+     * 此属性保留作向后兼容的兜底闸门。
      */
     readonly?: boolean;
     /** 拖拽重排（P9）：当前悬停投放格与插入下标，透传给渲染树绘制插入指示线。 */
@@ -202,7 +207,6 @@ function pageSiblingSuppressBorders(children: FormNodeV2[], index: number): { to
       v-for="pp in displayedPages"
       :key="pp.id"
       class="grid-form-paper"
-      :class="{ 'grid-form-paper--selected': selectedNodeId === pp.id }"
       :style="paperStyle(pp.margin)"
       :data-node-id="pp.id"
     >
@@ -211,13 +215,12 @@ function pageSiblingSuppressBorders(children: FormNodeV2[], index: number): { to
         :key="child.node.id"
         :node="child.node"
         :base-row-height="schema.baseRowHeight"
-        :selected-node-id="selectedNodeId"
+        :mode="props.mode"
         :data="data"
         :readonly="props.readonly"
         :suppress-borders="suppressFor(pp, index, child.suppressBorders)"
         :drag-over-cell-id="dragOverCellId"
         :drag-over-index="dragOverIndex"
-        @node-drag-start="(id) => emit('node-drag-start', id)"
         @field-change="(field, value) => emit('field-change', field, value)"
       />
     </main>
@@ -248,10 +251,6 @@ function pageSiblingSuppressBorders(children: FormNodeV2[], index: number): { to
   box-shadow: 0 4px 12px rgb(15 23 42 / 14%);
 }
 
-.grid-form-paper--selected {
-  box-shadow: inset 0 0 0 3px #2563eb, 0 4px 12px rgb(15 23 42 / 14%);
-}
-
 @media print {
   .grid-form-canvas {
     height: auto;
@@ -264,10 +263,6 @@ function pageSiblingSuppressBorders(children: FormNodeV2[], index: number): { to
     margin: 0;
     box-shadow: none;
     break-after: page;
-  }
-
-  .grid-form-paper--selected {
-    box-shadow: none;
   }
 
   .grid-form-paper:last-child {

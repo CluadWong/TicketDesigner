@@ -367,3 +367,20 @@ updateNode(schema, nodeId, patch)
 ## 17. 旧代码清理
 
 `src/engine/paginate.ts`、`FormRenderer` 与 `FormSchema.body[]` 等迁移前遗留实现已在 P0 阶段移除。**2026-09-02 十八续：旧 v1 引擎目录 `src/engine/`（DOM 测量版，含其 `__tests__`）已整体删除**，此前为绕开其旧 Schema 类型而加的 `tsconfig.json` / `vitest.config.ts` `exclude` 也已撤销——分页实现自此只有一套：`src/engine-v2/pagination.ts`（确定性、DOM 无关）。剩余清理工作（旧类型残留等）归入 [development-plan.md](./development-plan.md) P12。清理目标仍是避免出现两套 Schema、分页和设计器状态。
+
+## 18. 节点地址契约（C2 / A5 分层重构）
+
+渲染内核与「设计表面层」之间的唯一可接受边界是**稳定的节点地址**。内核只负责暴露地址，表面层（拖拽源/落点、选中高亮、节点命中）据此反查，**不**反向依赖内核内部状态。
+
+### 输出属性（由 renderer-v2 输出）
+
+| 属性 | 挂在哪些节点 | 用途 |
+|---|---|---|
+| `data-node-id` | page / grid / cell / p / text / table / html / image | 节点唯一 id，设计态选中与拖拽源命中（`closest("[data-node-id]")`）。row **不**挂（行是 Grid 内部布局，不可独立选中）。 |
+| `data-layout-id` | Grid 的 row / cell、Table 单元格模板 | 拖拽落点判定——`closest("[data-layout-id]")` 命中目标格 / 行。 |
+
+### 消费方约定
+
+- 选择器常量与辅助函数集中在 `src/engine-v2/node-address.ts`（`NODE_ID_ATTR` / `LAYOUT_ID_ATTR` / `nodeIdSelector` / `layoutIdSelector`），消费侧应引用它们，避免多处硬编码属性名字符串而静默失效。
+- 地址属性是**契约而非实现细节**：改名须同步内核输出与表面层消费两侧，并回归 DesignerApp 拖拽/选中测试。
+- 选中高亮（`.is-design-selected`）由表面层 `designer/CanvasSurface.vue` 在渲染 DOM 上直接加/去类实现（A5），内核不再持有 `selectedNodeId`、不再输出 `.layout-node--selected`。

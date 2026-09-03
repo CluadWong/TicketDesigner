@@ -5,7 +5,6 @@ import type { HtmlNodeV2, FormDataV2 } from "@/types";
 
 const props = defineProps<{
   node: HtmlNodeV2;
-  selectedNodeId?: string | null;
   data?: FormDataV2 | null;
 }>();
 
@@ -64,7 +63,6 @@ watch(() => props.data, fill, { deep: true });
   <div
     ref="host"
     class="layout-html"
-    :class="{ 'layout-node--selected': selectedNodeId === node.id }"
     :data-node-id="node.id"
   ></div>
 </template>

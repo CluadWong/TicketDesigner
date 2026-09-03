@@ -67,6 +67,7 @@ function onFieldChange(field: string, value: string): void {
 <template>
   <GridFormRenderer
     :schema="schema"
+    :mode="props.mode"
     :data="data"
     :readonly="readonly"
     :bare="options?.bare"

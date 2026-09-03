@@ -18,24 +18,29 @@ import {
   resolveCellBoxV2,
   resolveGridGapV2,
   resolveTableRowCount,
-  NODE_MOVE_MIME,
 } from "@/types";
 
 defineOptions({ name: "GridSchemaNodeV2" });
 
 const emit = defineEmits<{
-  (e: "node-drag-start", id: string): void;
   (e: "field-change", field: string, value: string): void;
 }>();
 
 const props = defineProps<{
   node: FormNodeV2;
   baseRowHeight: number;
-  selectedNodeId?: string | null;
+  /**
+   * 渲染模式（A1 / A5）：显式声明调用方意图，取代旧版靠 `data != null` 推断三态。
+   * - design：设计态，字段 contenteditable 就地占位（不回写 schema），结构可拖拽/选中。
+   * - preview：只读回显，带数据但字段不可输入。
+   * - fill：可填写，带数据且字段为真实可编辑控件。
+   * 未传时向后兼容：有 `data` 且非 `readonly` → fill，有 `data` 且 `readonly` → preview，否则 design。
+   */
+  mode?: "design" | "preview" | "fill";
   data?: FormDataV2 | null;
   /**
-   * 只读预览（预览态）：带数据渲染，但字段一律不可输入。
-   * 与 `data` 同时传入时表示「预览」；仅传 `data` 表示「填充」（可输入）。
+   * 只读预览（预览态）：带数据渲染，但字段一律不可输入。与 `mode` 同时传入时以 `mode` 为准，
+   * 此属性保留作向后兼容的兜底闸门。
    */
   readonly?: boolean;
   /**
@@ -77,9 +82,27 @@ function cellSiblingSuppressBorders(
   return { left: !!prev && drawsOuterFrame(prev) };
 }
 
-const fillMode = computed(() => props.data != null);
-/** 是否允许在字段中输入（填充态且非只读预览）。 */
-const canFill = computed(() => fillMode.value && props.readonly !== true);
+/**
+ * 显式渲染模式（A1 / A5）：调用方优先用 `mode` 直接声明意图；未传时向后兼容旧调用，
+ * 由 `data` + `readonly` 推断（有 data 且非只读 → fill；有 data 且只读 → preview；否则 design）。
+ * 渲染内核只认这个显式模式，不再把「有没有 data」解释成「是不是填充态」。
+ */
+type RenderMode = "design" | "preview" | "fill";
+const resolvedMode = computed<RenderMode>(() => {
+  if (props.mode) return props.mode;
+  if (props.data != null) return props.readonly ? "preview" : "fill";
+  return "design";
+});
+/** 设计态：字段 contenteditable 就地占位、节点可拖拽。 */
+const isDesign = computed(() => resolvedMode.value === "design");
+/**
+ * 字段是否可输入：预览态即「交互填充态」——复用同一 `<p>` 渲染路径，字段可编辑、
+ * 值来自 data，用户输入经 DOM 遍历采集（不逐键回写响应式 data，见十续）。
+ * 故 preview 与 fill 都视为可输入；仅 design 态字段是占位、不承载真实数据。
+ * 但同时受 `readonly` 硬闸门约束：外部传入 readonly（如真·只读展示）时强制不可编辑。
+ * 等价于旧逻辑 `data != null && !readonly`。
+ */
+const canFill = computed(() => resolvedMode.value !== "design" && !props.readonly);
 
 const track = (value: number | `${number}fr` | "auto" | undefined): string => {
   if (value === undefined || value === "auto") return "auto";
@@ -239,42 +262,17 @@ function isCompositeField(node: PNodeV2): boolean {
 
 /** 设计态可编辑（contenteditable 临时文本，不回写）；填充态交由真实控件处理。 */
 function isEditable(node: PNodeV2): "true" | undefined {
-  return !fillMode.value && node.mode === "field" && !isCompositeField(node)
+  return isDesign.value && node.mode === "field" && !isCompositeField(node)
     ? "true"
     : undefined;
 }
 
 /** 该组件在设计态（非只读、非填充）下可作为拖拽源；预览 / 填充态禁用拖拽。 */
-const nodeDraggable = computed(() => !props.readonly && !fillMode.value);
+const nodeDraggable = computed(() => isDesign.value);
 
-/**
- * 拖拽重排（P9）起点：把节点 id 写入 dataTransfer 并向上 emit 同步选中态。
- * - 表格（含嵌套 Grid）内的节点不可作为独立组件拖拽（字段由列配置派生，不单独选中 / 配置）。
- * - 设计态整段可编辑字段（contenteditable）：仅按住 Alt 才允许整节点拖拽，
- *   否则放行文本编辑 / 选择，避免误触拖拽。
- */
-function onNodeDragStart(node: FormNodeV2, event: DragEvent): void {
-  // 阻止 DOM dragstart 冒泡到祖先节点（grid/page 等也绑定了 @dragstart），
-  // 否则祖先的 onNodeDragStart 会覆盖 dataTransfer 并误把自身当作被拖拽节点。
-  event.stopPropagation();
-  const hostEl = event.currentTarget as HTMLElement | null;
-  const tableEl = hostEl?.closest(".layout-table") ?? null;
-  // 表格自身的根 <table> 也带 .layout-table，需排除自身（仅拦「祖先」表格内的节点）。
-  if (tableEl && tableEl !== hostEl) {
-    event.preventDefault();
-    return;
-  }
-  if (node.type === "p" && isEditable(node) && !event.altKey) {
-    event.preventDefault();
-    return;
-  }
-  const dt = event.dataTransfer;
-  if (!dt) return;
-  dt.setData(NODE_MOVE_MIME, node.id);
-  dt.setData("text/plain", node.id);
-  dt.effectAllowed = "move";
-  emit("node-drag-start", node.id);
-}
+// 拖拽「源」逻辑（dragstart 的 setData / 规则判断）已下沉至 design/CanvasSurface.vue（A6 二十七续）。
+// 本组件仅保留 `:draggable`（浏览器要求 draggable 必须是被拖元素自身的属性，且仅设计态为 true）；
+// 内核不再绑定 @dragstart，也不再 emit `node-drag-start`（由表面层委托处理并向上透传）。
 
 /**
  * 失焦（blur）回写：用户离开字段时 emit 一次 `field-change(field, value)`，
@@ -357,7 +355,7 @@ const imageSrc = computed<string>(() => {
   if (imgError.value) return BROKEN_PLACEHOLDER;
   if (props.node.type !== "image") return BROKEN_PLACEHOLDER;
   const fromData =
-    fillMode.value && props.node.field
+    resolvedMode.value !== "design" && props.node.field
       ? props.data?.[props.node.field]
       : undefined;
   return fromData != null
@@ -388,8 +386,7 @@ function onImgError(): void {
     :class="[
       `layout-grid--${node.border}`,
       {
-        'layout-node--selected': selectedNodeId === node.id,
-        'layout-grid--no-top': suppressBorders?.top,
+                'layout-grid--no-top': suppressBorders?.top,
         'layout-grid--no-right': suppressBorders?.right,
         'layout-grid--no-bottom': suppressBorders?.bottom,
         'layout-grid--no-left': suppressBorders?.left,
@@ -397,8 +394,7 @@ function onImgError(): void {
     ]"
     :data-node-id="node.id"
     :draggable="nodeDraggable"
-    @dragstart="onNodeDragStart(node, $event)"
-  >
+      >
     <div
       v-for="(row, rowIndex) in node.rows"
       :key="row.id"
@@ -410,7 +406,7 @@ function onImgError(): void {
         v-for="cell in row.cells"
         :key="cell.id"
         class="layout-grid__cell"
-        :class="{ 'layout-node--selected': selectedNodeId === cell.id }"
+        :class="{}"
         :style="cellStyle(cell, node)"
         :data-layout-id="cell.id"
         :data-node-id="cell.id"
@@ -426,7 +422,7 @@ function onImgError(): void {
           <GridSchemaNode
             :node="child"
             :base-row-height="baseRowHeight"
-            :selected-node-id="selectedNodeId"
+            :mode="resolvedMode"
             :data="data"
             :readonly="props.readonly"
             :suppress-borders="
@@ -434,8 +430,7 @@ function onImgError(): void {
             "
             :drag-over-cell-id="dragOverCellId"
             :drag-over-index="dragOverIndex"
-            @node-drag-start="(id: string) => emit('node-drag-start', id)"
-            @field-change="(field: string, value: string) => emit('field-change', field, value)"
+                        @field-change="(field: string, value: string) => emit('field-change', field, value)"
           />
         </template>
         <div
@@ -449,12 +444,11 @@ function onImgError(): void {
   <div
     v-else-if="node.type === 'text'"
     class="layout-text"
-    :class="{ 'layout-node--selected': selectedNodeId === node.id }"
+    :class="{}"
     :style="textStyle(node)"
     :data-node-id="node.id"
     :draggable="nodeDraggable"
-    @dragstart="onNodeDragStart(node, $event)"
-  >
+      >
     {{ node.text }}
   </div>
 
@@ -466,15 +460,13 @@ function onImgError(): void {
       'layout-p--composite': isCompositeField(node),
       'layout-p--underline': node.underline && !isCompositeField(node),
       'layout-p--inner-border': node.innerBorder,
-      'layout-node--selected': selectedNodeId === node.id,
-    }"
+          }"
     :style="pStyle(node)"
     :contenteditable="isCompositeField(node) ? undefined : (canFill ? 'true' : isEditable(node))"
     :data-field="node.field"
     :data-node-id="node.id"
     :draggable="nodeDraggable"
-    @dragstart="onNodeDragStart(node, $event)"
-    @blur="onFillBlur(node.field, $event)"
+        @blur="onFillBlur(node.field, $event)"
   >
     <span v-if="node.prefix" class="layout-p__label">{{ node.prefix }}</span>
 
@@ -521,13 +513,11 @@ function onImgError(): void {
     class="layout-table"
     :class="[
       `layout-table--${node.border ?? 'all'}`,
-      { 'layout-node--selected': selectedNodeId === node.id },
     ]"
     :data-node-id="node.id"
     :data-field="node.field"
     :draggable="nodeDraggable"
-    @dragstart="onNodeDragStart(node, $event)"
-  >
+      >
     <thead>
       <tr
         class="layout-table__row layout-table__header"
@@ -577,13 +567,12 @@ function onImgError(): void {
             <GridSchemaNode
               :node="bindRowCell(child, column.key, rowIndex)"
               :base-row-height="baseRowHeight"
-              :selected-node-id="selectedNodeId"
+              :mode="resolvedMode"
               :data="data"
               :readonly="props.readonly"
               :drag-over-cell-id="dragOverCellId"
               :drag-over-index="dragOverIndex"
-              @node-drag-start="(id: string) => emit('node-drag-start', id)"
-              @field-change="(field: string, value: string) => emit('field-change', field, value)"
+                            @field-change="(field: string, value: string) => emit('field-change', field, value)"
             />
           </template>
           <div
@@ -599,19 +588,17 @@ function onImgError(): void {
     </tbody>
   </table>
 
-  <HtmlBlock
-    v-else-if="node.type === 'html'"
-    :node="node"
-    :selected-node-id="selectedNodeId"
-    :data="data"
-    :draggable="nodeDraggable"
-    @dragstart="onNodeDragStart(node, $event)"
-  />
+    <HtmlBlock
+      v-else-if="node.type === 'html'"
+      :node="node"
+      :data="data"
+      :draggable="nodeDraggable"
+          />
 
   <img
     v-else
     class="layout-image"
-    :class="{ 'layout-node--selected': selectedNodeId === node.id }"
+    :class="{}"
     :data-node-id="node.id"
     :data-field="node.field"
     :src="imageSrc"
@@ -623,8 +610,7 @@ function onImgError(): void {
     }"
     @error="onImgError"
     :draggable="nodeDraggable"
-    @dragstart="onNodeDragStart(node, $event)"
-  />
+      />
 </template>
 
 <style scoped>
@@ -904,13 +890,6 @@ function onImgError(): void {
   object-position: center;
 }
 
-.layout-node--selected {
-  position: relative;
-  z-index: 2;
-  background-color: rgb(37 99 235 / 12%) !important;
-  box-shadow: inset 0 0 0 2px #2563eb !important;
-}
-
 .v2-insertion-line {
   flex: 0 0 auto;
   width: 100%;
@@ -920,16 +899,5 @@ function onImgError(): void {
   box-shadow: 0 0 0 1px rgb(37 99 235 / 40%);
   border-radius: 1px;
   pointer-events: none;
-}
-
-@media print {
-  .layout-node--selected {
-    background-color: transparent !important;
-    box-shadow: none !important;
-  }
-  /* 打印时去除字段 P 及其复合输入的下划线（屏幕预览仍保留，便于设计者定位填值线）。 */
-  .layout-p--underline {
-    border-bottom: none !important;
-  }
 }
 </style>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, onUnmounted, reactive } from "vue";
-import { GridFormRenderer as GridSchemaRenderer } from "@/components/renderer-v2";
+import CanvasSurface from "./CanvasSurface.vue";
+import { NODE_ID_ATTR, LAYOUT_ID_ATTR, PALETTE_DRAG_MIME } from "@/engine-v2/node-address";
 import { makeYunlvSecondTicketFullSchema } from "@/dev/yunlv-second-ticket-full";
 import demoData from "@/dev/demoData";
 import {
@@ -21,7 +22,6 @@ import {
   mergeGridCellsV2,
   splitGridCellV2,
   moveNodeToIndexV2,
-  NODE_MOVE_MIME,
   updateGridBorderV2,
   updateTableBorderV2,
   updateGridCellDefaultsV2,
@@ -58,6 +58,7 @@ import { isSelectableSchemaNodeV2 } from "@/types";
 import { paginateSchema } from "@/engine-v2/pagination";
 import StatusBar from "./StatusBar.vue";
 import NodeTreeItem, { type TreeNode } from "./NodeTreeItem.vue";
+import { collectFieldValues } from "@/components/renderer-v2";
 
 const props = defineProps<{ initialSchema?: FormSchemaV2 }>();
 
@@ -179,8 +180,9 @@ const selectedCellContext = computed<{
   };
 });
 // 选中组件位置信息现由拖拽重排（P9）在 drop 时通过 moveNodeToIndexV2 处理，不再维护 canMoveUp/Down 计算。
-// 拖拽重排（P9）：跨格 / 跨 Grid 移动的目标投放点由 onCanvasNodeDragStart 在拖拽起始时
-// 计算（legalDropCellIds），不再维护独立下拉列表；同格重排也允许（仅排除自身后代容器）。
+// 拖拽重排（P9）：跨格 / 跨 Grid 移动的目标投放点由 CanvasSurface 在拖拽起始时
+// 计算（legalDropCellIds，现位于 CanvasSurface 内部状态），不再维护独立下拉列表；
+// 同格重排也允许（仅排除自身后代容器）。本组件只负责在 drop 时提交 schema。
 
 const insertionSlot = computed(() => {
   const slotId = selectedInsertionSlotId.value;
@@ -240,15 +242,19 @@ const nodeTree = computed(() =>
 );
 
 const STORAGE_KEY = "ticket-designer-schema-v2";
+const DATA_STORAGE_KEY = "ticket-designer-fill-data-v2";
 const MAX_HISTORY = 100;
 const dirty = ref(false);
 const undoStack = ref<FormSchemaV2[]>([]);
 const redoStack = ref<FormSchemaV2[]>([]);
 const fileInput = ref<HTMLInputElement | null>(null);
+const fillDataFileInput = ref<HTMLInputElement | null>(null);
+const canvasEl = ref<HTMLElement | null>(null);
 /**
  * 视图模式：
  * - `design`：设计态，可编辑结构、可选中/添加组件；
- * - `preview`：**预览态，只读** —— 带数据渲染，但不可添加组件、不可选中、字段不可输入；
+ * - `preview`：**结构只读的交互填充态** —— 带数据渲染，不可添加/选中/重排组件，
+ *   但字段 P 仍按同一 `<p>` 路径可编辑（值经 DOM 遍历采集，见十续）；
  * - `fill`：填充态（已移除，字段回写改由预览态 DOM 遍历采集）。
  */
 type ViewMode = "design" | "preview";
@@ -263,6 +269,9 @@ const viewMode = ref<ViewMode>("design");
 const paginate = ref(true);
 /** 非设计态：结构一律不可编辑（不可选中、不可拖拽、不可添加/删除组件）。 */
 const previewMode = computed(() => viewMode.value !== "design");
+/** 统一编辑闸门（C1，二十七续续）：仅设计态可改结构；所有结构性编辑动作经此单一判定，
+ * 避免逐处手写 `if (previewMode) return` 遗漏守卫（新增编辑操作只需在此闸门下登记）。 */
+const editable = computed(() => !previewMode.value);
 // 预览/填写态的表单数据。使用响应式对象，字段输入可即时回写并被渲染层读取。
 const previewFormData = reactive<{ value: FormDataV2 | null }>({ value: null });
 const previewData = computed<FormDataV2 | null>(() => previewFormData.value);
@@ -429,6 +438,83 @@ function triggerImport(): void {
   fileInput.value?.click();
 }
 
+/** 填充数据导入（B2 数据入口）：解析 FormDataV2 JSON，进入预览态展示填写结果。 */
+function importFillDataFile(event: Event): void {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const parsed = JSON.parse(String(reader.result)) as FormDataV2;
+      previewFormData.value = parsed;
+      // 直接进预览态，避免 toggleViewMode 用 demoData 覆盖刚导入的数据。
+      viewMode.value = "preview";
+      clearSelection();
+    } catch (error) {
+      alert(`导入数据失败：${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      input.value = "";
+    }
+  };
+  reader.onerror = () => {
+    alert("数据文件读取失败");
+    input.value = "";
+  };
+  reader.readAsText(file);
+}
+
+function triggerImportFillData(): void {
+  fillDataFileInput.value?.click();
+}
+
+/** 填充数据导出（B2 结果出口）：遍历渲染 DOM 采集当前填写值并下载 JSON。仅预览态可用。 */
+function exportFillDataFile(): void {
+  const root = canvasEl.value;
+  if (!root || !previewMode.value) return;
+  try {
+    const values = collectFieldValues(root);
+    const blob = new Blob([JSON.stringify(values, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `ticket-fill-data-${Date.now()}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    alert(`导出数据失败：${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/** 保存当前填写数据到本地（仅数据，与 schema 存储键隔离）。 */
+function saveFillDataToLocal(): void {
+  const root = canvasEl.value;
+  if (!root || !previewMode.value) return;
+  try {
+    const values = collectFieldValues(root);
+    localStorage.setItem(DATA_STORAGE_KEY, JSON.stringify(values));
+  } catch (error) {
+    alert(`保存数据失败：${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/** 从本地读取填写数据并进入预览态。 */
+function loadFillDataFromLocal(): void {
+  const text = localStorage.getItem(DATA_STORAGE_KEY);
+  if (!text) {
+    alert("本地没有已保存的填写数据");
+    return;
+  }
+  try {
+    const parsed = JSON.parse(text) as FormDataV2;
+    previewFormData.value = parsed;
+    viewMode.value = "preview";
+    clearSelection();
+  } catch (error) {
+    alert(`读取数据失败：${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
 function onKeydown(event: KeyboardEvent): void {
   const mod = event.ctrlKey || event.metaKey;
   if (!mod) return;
@@ -475,7 +561,7 @@ function resetBlank(): void {
 
 function addRootGrid(): void {
   // 预览/填充态一律不允许改动结构（预览态本身也不可添加组件）。
-  if (previewMode.value) return;
+  if (!editable.value) return;
   const grid = createGridNodeV2();
   commit(insertRootGridV2(schema.value, grid));
   selectedNodeId.value = grid.id;
@@ -487,10 +573,11 @@ function addRootGrid(): void {
 /**
  * 添加 Grid：若当前已选中某个 cell（insertionSlot 存在），则把 Grid 嵌进该 cell；
  * 否则退化为在页面根追加一个新 Grid（与旧「添加 Grid」行为一致）。
- * 同时支持从模板拖拽到任意 cell（见 startPaletteDrag / onCanvasDrop）。
+ * 同时支持从模板拖拽到任意 cell（startPaletteDrag 写 PALETTE_DRAG_MIME，
+ * CanvasSurface 的 onDrop 触发本组件 onDropPalette 完成落点提交）。
  */
 function addGrid(): void {
-  if (previewMode.value) return;
+  if (!editable.value) return;
   if (insertionSlot.value) {
     addNodeToSelectedCell("grid");
   } else {
@@ -518,7 +605,7 @@ function addNodeToSelectedCell(
   kind: "text" | "field" | "table" | "html" | "image" | "grid",
 ): void {
   // 预览/填充态不允许添加组件。
-  if (previewMode.value) return;
+  if (!editable.value) return;
   const ownerCell = insertionSlot.value;
   if (!ownerCell) return;
   const child = createNodeByKind(kind);
@@ -527,142 +614,21 @@ function addNodeToSelectedCell(
 }
 
 // ── 拖拽生成：从模板拖到画布指定格 ──
-const DRAG_MIME = "application/x-ticket-node-kind";
-/** 拖拽重排（P9）：当前被拖拽的已有节点 id 与合法投放格集合。 */
-const draggedNodeId = ref<string | null>(null);
-const dragOverCellId = ref<string | null>(null);
-const dragOverIndex = ref<number>(-1);
-const legalDropCellIds = ref<Set<string>>(new Set());
-let dragTargetEl: HTMLElement | null = null;
-
-function setDropHighlight(cell: HTMLElement | null): void {
-  if (dragTargetEl && dragTargetEl !== cell) {
-    dragTargetEl.classList.remove("v2-drop-target");
-  }
-  if (cell && cell !== dragTargetEl) {
-    cell.classList.add("v2-drop-target");
-  }
-  dragTargetEl = cell;
-}
-
-function clearDropHighlight(): void {
-  if (dragTargetEl) {
-    dragTargetEl.classList.remove("v2-drop-target");
-    dragTargetEl = null;
-  }
-}
-
+// 落点判定 / 插入指示 / 落点高亮 / 合法投放格计算已下沉至 CanvasSurface 表面层（A6 分层重构，
+// 见 docs/architecture-layering-review.md §6.5 Batch 3）。本文件仅保留「模板拖拽起点」与
+// 「落点后提交 schema」两处薄逻辑，设计交互不再由壳层直接处理 DOM 拖拽事件。
 function startPaletteDrag(
   kind: "text" | "field" | "table" | "html" | "image" | "grid",
   event: DragEvent,
 ): void {
-  if (previewMode.value) return;
-  event.dataTransfer?.setData(DRAG_MIME, kind);
+  if (!editable.value) return;
+  event.dataTransfer?.setData(PALETTE_DRAG_MIME, kind);
   if (event.dataTransfer) event.dataTransfer.effectAllowed = "copy";
 }
 
-function onCanvasDragOver(event: DragEvent): void {
-  const dt = event.dataTransfer;
-  if (!dt) return;
-  const hasPalette = Array.from(dt.types).includes(DRAG_MIME);
-  const hasMove = Array.from(dt.types).includes(NODE_MOVE_MIME);
-  if (previewMode.value || (!hasPalette && !hasMove)) return;
-  if (hasPalette) {
-    event.preventDefault();
-    const cell = (event.target as HTMLElement).closest<HTMLElement>(
-      "[data-layout-id]",
-    );
-    setDropHighlight(cell ?? null);
-    dragOverCellId.value = null;
-    dragOverIndex.value = -1;
-    return;
-  }
-  // 已有节点拖拽重排：仅在合法投放格上允许投放，并显示插入指示线。
-  setDropHighlight(null);
-  const cell = (event.target as HTMLElement).closest<HTMLElement>(
-    "[data-layout-id]",
-  );
-  const cellId = cell?.dataset.layoutId ?? null;
-  if (cell && cellId && legalDropCellIds.value.has(cellId)) {
-    event.preventDefault();
-    dragOverCellId.value = cellId;
-    dragOverIndex.value = computeInsertionIndex(cell, event.clientY);
-  } else {
-    dragOverCellId.value = null;
-    dragOverIndex.value = -1;
-  }
-}
-
-/** 按指针 Y 计算在目标格 children 中的插入下标：取第一个「中点低于指针」的子节点下标；
- *  若全部在中点之上，则追加到末尾（children.length）。 */
-function computeInsertionIndex(cellEl: HTMLElement, clientY: number): number {
-  const childEls = Array.from(cellEl.children).filter(
-    (el): el is HTMLElement =>
-      el instanceof HTMLElement && el.hasAttribute("data-node-id"),
-  );
-  for (let i = 0; i < childEls.length; i += 1) {
-    const rect = childEls[i].getBoundingClientRect();
-    if (clientY < rect.top + rect.height / 2) return i;
-  }
-  return childEls.length;
-}
-
-function onCanvasDragLeave(event: DragEvent): void {
-  const related = event.relatedTarget as HTMLElement | null;
-  if (!related || !related.closest("[data-layout-id]")) {
-    clearDropHighlight();
-    dragOverCellId.value = null;
-    dragOverIndex.value = -1;
-  }
-}
-
-function onCanvasDrop(event: DragEvent): void {
-  if (previewMode.value) return;
-  const dt = event.dataTransfer;
-  if (!dt) return;
-  clearDropHighlight();
-  event.preventDefault();
-  const kind = (dt.getData(DRAG_MIME) ?? "") as
-    | "text"
-    | "field"
-    | "table"
-    | "html"
-    | "image"
-    | "grid";
-  if (kind) {
-    // 模板拖拽生成新节点（既有逻辑）
-    const cell = (event.target as HTMLElement).closest<HTMLElement>(
-      "[data-layout-id]",
-    );
-    const cellId = cell?.dataset.layoutId;
-    if (!cellId) return;
-    const slot = nodeIndex.value.get(cellId)?.node;
-    if (
-      !slot ||
-      (slot.type !== "grid-cell" && slot.type !== "table-cell-template")
-    )
-      return;
-    const child = createNodeByKind(kind);
-    commit(appendNodeToCellV2(schema.value, cellId, child));
-    selectedNodeId.value = child.id;
-    return;
-  }
-  // 已有节点拖拽重排（P9）：跨格 / 跨 Grid / 格内排序统一走 moveNodeToIndexV2
-  const moveId = dt.getData(NODE_MOVE_MIME) ?? "";
-  const cellId = dragOverCellId.value;
-  const idx = dragOverIndex.value;
-  const legal = legalDropCellIds.value;
-  dragOverCellId.value = null;
-  dragOverIndex.value = -1;
-  draggedNodeId.value = null;
-  legalDropCellIds.value = new Set();
-  if (!moveId || !cellId || idx < 0) return;
-  if (!legal.has(cellId)) return;
-  const next = moveNodeToIndexV2(schema.value, moveId, cellId, idx);
-  if (next === schema.value) return; // 原位 / 非法：不产生新结构
-  commit(next, "move:" + moveId);
-  selectedNodeId.value = moveId;
-}
+// ── 拖拽落点逻辑（onCanvasDragOver / computeInsertionIndex / onCanvasDragLeave /
+//    onCanvasDrop）已整体下沉至 CanvasSurface 表面层（A6，§6.5 Batch 3）。
+// 本壳层只通过 @drop-node / @drop-palette 接收表面层语义事件并提交 schema（见下方 onDropNode / onDropPalette）。
 
 function removeSelectedNode(): void {
   if (
@@ -700,64 +666,50 @@ function splitSelectedCell(): void {
 // ── 拖拽重排已有节点（P9）──
 // 取代旧的「上/下排序按钮 + 移动到目标格下拉」：选中即同步到拖拽源，
 // 跨格 / 跨 Grid / 格内排序统一由 moveNodeToIndexV2 在 drop 时提交。
+// ── 拖拽重排（P9）：落点判定 / 合法投放格由 CanvasSurface 表面层完成；此处只接收语义事件并提交 schema ──
 function onCanvasNodeDragStart(id: string): void {
-  if (previewMode.value) return;
-  draggedNodeId.value = id;
+  // 拖拽起点：同步选中态（落点逻辑在表面上处理）。
   selectedNodeId.value = id;
-  // 合法投放格：排除被移动节点自身及其后代容器（含嵌套 Grid / Table 内部格），
-  // 但允许其「当前所在格」（用于格内排序）。语义与旧 listDropTargetsV2 一致。
-  const index = buildEditorNodeIndexV2(schema.value);
-  const legal: string[] = [];
-  const isDescendantOfDragged = (cellId: string): boolean => {
-    let cursor: string | undefined = cellId;
-    while (cursor) {
-      if (cursor === id) return true;
-      cursor = index.get(cursor)?.parent?.id;
-    }
-    return false;
-  };
-  schema.value.pages.forEach((page) => {
-    const walk = (children: FormNodeV2[]): void => {
-      children.forEach((child) => {
-        if (child.type === "grid") {
-          child.rows.forEach((row) =>
-            row.cells.forEach((cell) => {
-              if (!isDescendantOfDragged(cell.id)) legal.push(cell.id);
-              walk(cell.children);
-            }),
-          );
-        } else if (child.type === "table") {
-          child.rowTemplate.forEach((tpl) => {
-            if (!isDescendantOfDragged(tpl.id)) legal.push(tpl.id);
-          });
-        }
-      });
-    };
-    walk(page.children);
-  });
-  legalDropCellIds.value = new Set(legal);
 }
 
-function onCanvasDragEnd(): void {
-  draggedNodeId.value = null;
-  legalDropCellIds.value = new Set();
-  dragOverCellId.value = null;
-  dragOverIndex.value = -1;
-  clearDropHighlight();
+function onDropNode(detail: {
+  moveId: string;
+  cellId: string;
+  index: number;
+}): void {
+  const next = moveNodeToIndexV2(schema.value, detail.moveId, detail.cellId, detail.index);
+  if (next === schema.value) return; // 原位 / 非法：不产生新结构
+  commit(next, "move:" + detail.moveId);
+  selectedNodeId.value = detail.moveId;
+}
+
+function onDropPalette(detail: {
+  kind: "text" | "field" | "table" | "html" | "image" | "grid";
+  cellId: string;
+}): void {
+  const slot = nodeIndex.value.get(detail.cellId)?.node;
+  if (
+    !slot ||
+    (slot.type !== "grid-cell" && slot.type !== "table-cell-template")
+  )
+    return;
+  const child = createNodeByKind(detail.kind);
+  commit(appendNodeToCellV2(schema.value, detail.cellId, child));
+  selectedNodeId.value = child.id;
 }
 
 function selectNode(event: MouseEvent): void {
-  if (previewMode.value) return;
+  if (!editable.value) return;
   const target = event.target as HTMLElement;
   selectedInsertionSlotId.value =
-    target.closest<HTMLElement>("[data-layout-id]")?.dataset.layoutId ?? null;
+    target.closest<HTMLElement>(`[${LAYOUT_ID_ATTR}]`)?.dataset.layoutId ?? null;
   const ids: string[] = [];
-  let cursor = target.closest<HTMLElement>("[data-node-id]");
+  let cursor = target.closest<HTMLElement>(`[${NODE_ID_ATTR}]`);
   while (cursor) {
     const id = cursor.dataset.nodeId;
     if (id) ids.push(id);
     cursor =
-      cursor.parentElement?.closest<HTMLElement>("[data-node-id]") ?? null;
+      cursor.parentElement?.closest<HTMLElement>(`[${NODE_ID_ATTR}]`) ?? null;
   }
   const selectableIds = ids.filter((id) => {
     return isStyleEditableNodeId(id);
@@ -819,7 +771,7 @@ function selectIssue(issue: SchemaIssueV2): void {
 }
 
 function selectNodeById(id: string): void {
-  if (previewMode.value) return;
+  if (!editable.value) return;
   const ref = nodeIndex.value.get(id);
   if (!ref || !isSelectableSchemaNodeV2(ref.node)) return;
   selectedNodeId.value = id;
@@ -1389,6 +1341,31 @@ function updateSelectedSafetyField(event: Event): void {
         </button>
       </div>
       <div class="v2-toolbar__group">
+        <span class="v2-toolbar__label">填充数据</span>
+        <button class="v2-toolbar__button" type="button" @click="triggerImportFillData">
+          导入
+        </button>
+        <button
+          class="v2-toolbar__button"
+          type="button"
+          :disabled="!previewMode"
+          @click="exportFillDataFile"
+        >
+          导出
+        </button>
+        <button class="v2-toolbar__button" type="button" @click="loadFillDataFromLocal">
+          读取
+        </button>
+        <button
+          class="v2-toolbar__button"
+          type="button"
+          :disabled="!previewMode"
+          @click="saveFillDataToLocal"
+        >
+          保存
+        </button>
+      </div>
+      <div class="v2-toolbar__group">
         <button
           class="v2-toolbar__button"
           type="button"
@@ -1413,6 +1390,13 @@ function updateSelectedSafetyField(event: Event): void {
         class="v2-toolbar__file"
         @change="importFile"
       />
+      <input
+        ref="fillDataFileInput"
+        type="file"
+        accept=".json,application/json"
+        class="v2-toolbar__file"
+        @change="importFillDataFile"
+      />
     </header>
 
     <div class="v2-designer__body">
@@ -1425,7 +1409,7 @@ function updateSelectedSafetyField(event: Event): void {
           type="button"
           draggable="true"
           data-palette="text"
-          :disabled="previewMode"
+          :disabled="!editable"
           @dragstart="startPaletteDrag('text', $event)"
           @click="addNodeToSelectedCell('text')"
         >
@@ -1436,7 +1420,7 @@ function updateSelectedSafetyField(event: Event): void {
           type="button"
           draggable="true"
           data-palette="field"
-          :disabled="previewMode"
+          :disabled="!editable"
           @dragstart="startPaletteDrag('field', $event)"
           @click="addNodeToSelectedCell('field')"
         >
@@ -1447,7 +1431,7 @@ function updateSelectedSafetyField(event: Event): void {
           type="button"
           draggable="true"
           data-palette="image"
-          :disabled="previewMode"
+          :disabled="!editable"
           @dragstart="startPaletteDrag('image', $event)"
           @click="addNodeToSelectedCell('image')"
         >
@@ -1458,7 +1442,7 @@ function updateSelectedSafetyField(event: Event): void {
           type="button"
           draggable="true"
           data-palette="html"
-          :disabled="previewMode"
+          :disabled="!editable"
           @dragstart="startPaletteDrag('html', $event)"
           @click="addNodeToSelectedCell('html')"
         >
@@ -1471,7 +1455,7 @@ function updateSelectedSafetyField(event: Event): void {
           type="button"
           draggable="true"
           data-palette="grid"
-          :disabled="previewMode"
+          :disabled="!editable"
           @dragstart="startPaletteDrag('grid', $event)"
           @click="addGrid"
         >
@@ -1482,7 +1466,7 @@ function updateSelectedSafetyField(event: Event): void {
           type="button"
           draggable="true"
           data-palette="table"
-          :disabled="previewMode"
+          :disabled="!editable"
           @dragstart="startPaletteDrag('table', $event)"
           @click="addNodeToSelectedCell('table')"
         >
@@ -1509,27 +1493,25 @@ function updateSelectedSafetyField(event: Event): void {
       </aside>
 
       <main
+        ref="canvasEl"
         class="v2-canvas"
         :class="{ 'v2-canvas--preview': previewMode }"
         @click="selectNode"
-        @dragover="onCanvasDragOver"
-        @dragleave="onCanvasDragLeave"
-        @drop="onCanvasDrop"
-        @dragend="onCanvasDragEnd"
       >
-        <GridSchemaRenderer
+        <CanvasSurface
           :schema="schema"
+          :mode="previewMode ? 'preview' : 'design'"
           :selected-node-id="previewMode ? null : selectedNodeId"
           :data="previewData"
           :readonly="false"
           :paginate="previewMode || paginate"
-          :drag-over-cell-id="dragOverCellId"
-          :drag-over-index="dragOverIndex"
           @node-drag-start="onCanvasNodeDragStart"
+          @drop-node="onDropNode"
+          @drop-palette="onDropPalette"
         />
       </main>
 
-      <aside class="v2-sidebar v2-sidebar--right">
+      <aside v-if="editable" class="v2-sidebar v2-sidebar--right">
         <div class="v2-sidebar__heading">节点检查</div>
         <div class="v2-inspector-row v2-inspector-row--head">
           <span>当前节点</span>
@@ -2281,6 +2263,13 @@ function updateSelectedSafetyField(event: Event): void {
   gap: 6px;
 }
 
+.v2-toolbar__label {
+  align-self: center;
+  margin-right: 2px;
+  font-size: 12px;
+  color: #9fb3c8;
+}
+
 .v2-toolbar__group:first-of-type {
   margin-left: auto;
 }
@@ -2424,11 +2413,7 @@ function updateSelectedSafetyField(event: Event): void {
   overflow: hidden;
 }
 
-.v2-canvas :deep(.v2-drop-target) {
-  outline: 2px dashed #2563eb;
-  outline-offset: -2px;
-  background: #eff6ff;
-}
+/* 落点高亮样式已随拖拽逻辑一并下沉至 CanvasSurface（A6）。 */
 
 .v2-inspector-row {
   display: flex;
