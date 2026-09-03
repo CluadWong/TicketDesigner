@@ -1327,6 +1327,7 @@ function updateSelectedSafetyField(event: Event): void {
         </button>
       </div>
       <div class="v2-toolbar__group">
+        <span class="v2-toolbar__label">模板</span>
         <button class="v2-toolbar__button" type="button" @click="saveToLocal">
           保存
         </button>
@@ -1342,27 +1343,39 @@ function updateSelectedSafetyField(event: Event): void {
       </div>
       <div class="v2-toolbar__group">
         <span class="v2-toolbar__label">填充数据</span>
-        <button class="v2-toolbar__button" type="button" @click="triggerImportFillData">
-          导入
+        <button
+          class="v2-toolbar__button"
+          type="button"
+          title="选择填写数据 JSON 文件并进入预览态"
+          @click="triggerImportFillData"
+        >
+          导入数据
         </button>
         <button
           class="v2-toolbar__button"
           type="button"
+          title="需先进入预览态填写，再导出当前填写值"
           :disabled="!previewMode"
           @click="exportFillDataFile"
         >
-          导出
-        </button>
-        <button class="v2-toolbar__button" type="button" @click="loadFillDataFromLocal">
-          读取
+          导出数据
         </button>
         <button
           class="v2-toolbar__button"
           type="button"
+          title="读取本地已保存的填写数据并进入预览态"
+          @click="loadFillDataFromLocal"
+        >
+          读取数据
+        </button>
+        <button
+          class="v2-toolbar__button"
+          type="button"
+          title="需先进入预览态填写，再保存到本地"
           :disabled="!previewMode"
           @click="saveFillDataToLocal"
         >
-          保存
+          保存数据
         </button>
       </div>
       <div class="v2-toolbar__group">

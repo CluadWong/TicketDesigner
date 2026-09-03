@@ -267,12 +267,9 @@ function isEditable(node: PNodeV2): "true" | undefined {
     : undefined;
 }
 
-/** 该组件在设计态（非只读、非填充）下可作为拖拽源；预览 / 填充态禁用拖拽。 */
-const nodeDraggable = computed(() => isDesign.value);
-
-// 拖拽「源」逻辑（dragstart 的 setData / 规则判断）已下沉至 design/CanvasSurface.vue（A6 二十七续）。
-// 本组件仅保留 `:draggable`（浏览器要求 draggable 必须是被拖元素自身的属性，且仅设计态为 true）；
-// 内核不再绑定 @dragstart，也不再 emit `node-drag-start`（由表面层委托处理并向上透传）。
+// 拖拽「源」逻辑（dragstart 的 setData / 规则判断）与 `draggable` 属性均已下沉至设计表面层 design/CanvasSurface.vue（A6 二十七续 + 三十一续）。
+// 内核不再绑定 @dragstart、不再持有 `:draggable`、也不再 emit `node-drag-start`；
+// 表面层在 design 态对 `[data-node-id]:not(.layout-grid__cell)` 元素设置 `draggable="true"`（浏览器要求 draggable 必须是被拖元素自身属性）。
 
 /**
  * 失焦（blur）回写：用户离开字段时 emit 一次 `field-change(field, value)`，
@@ -393,8 +390,7 @@ function onImgError(): void {
       },
     ]"
     :data-node-id="node.id"
-    :draggable="nodeDraggable"
-      >
+          >
     <div
       v-for="(row, rowIndex) in node.rows"
       :key="row.id"
@@ -447,8 +443,7 @@ function onImgError(): void {
     :class="{}"
     :style="textStyle(node)"
     :data-node-id="node.id"
-    :draggable="nodeDraggable"
-      >
+          >
     {{ node.text }}
   </div>
 
@@ -465,8 +460,7 @@ function onImgError(): void {
     :contenteditable="isCompositeField(node) ? undefined : (canFill ? 'true' : isEditable(node))"
     :data-field="node.field"
     :data-node-id="node.id"
-    :draggable="nodeDraggable"
-        @blur="onFillBlur(node.field, $event)"
+            @blur="onFillBlur(node.field, $event)"
   >
     <span v-if="node.prefix" class="layout-p__label">{{ node.prefix }}</span>
 
@@ -516,8 +510,7 @@ function onImgError(): void {
     ]"
     :data-node-id="node.id"
     :data-field="node.field"
-    :draggable="nodeDraggable"
-      >
+          >
     <thead>
       <tr
         class="layout-table__row layout-table__header"
@@ -592,8 +585,7 @@ function onImgError(): void {
       v-else-if="node.type === 'html'"
       :node="node"
       :data="data"
-      :draggable="nodeDraggable"
-          />
+                />
 
   <img
     v-else
@@ -609,8 +601,7 @@ function onImgError(): void {
       objectFit: node.objectFit,
     }"
     @error="onImgError"
-    :draggable="nodeDraggable"
-      />
+          />
 </template>
 
 <style scoped>

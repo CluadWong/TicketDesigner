@@ -736,3 +736,48 @@ P12 中可安全独立收尾的清理项已全部完成；剩余 D2/D3 属设计
 - 验证：全量 **vitest 208/208（24 文件）**（与二十八续持平，C3 纯 UI 零回归）、**vue-tsc --noEmit** 干净（EXIT=0）。
 - 文档：development-plan §0（最后更新 / §0.3 分层 C3 / §0.4 表）同步；MEMORY.md 加 C3 单行；2026-09-03.md 补 二十九续。
 - 至此 **Batch 5 已完成**（B1+C1+C3；B2 数据导入导出因工具栏已有按钮、需先确认覆盖范围而单列）。下一步：**B2**（确认并补完填充数据导入/导出）、**B3**（设计器解耦 dev 样例）、**B4**（渲染期领域逻辑归 engine）、**D2**（打印责任分散），以及延后的 P9.1c/P9.2。
+
+---
+
+## 三十续 — B2 填充数据导入/导出（Batch 6 启动/完成）
+
+§6.5 Batch 5 = B1+C1+C3（已落地）；本回合完成 **B2**：工具栏早有 保存/读取/导出/导入 四个按钮，但此前只覆盖 `schema`（`serializeFormSchemaV2`/`parseFormSchemaV2`）。表单的**填写数据（FormDataV2）** 与 schema 是完全独立的两类状态，须有独立的数据入口与结果出口。
+
+1. **独立存储键隔离**：新增 `DATA_STORAGE_KEY = "ticket-designer-fill-data-v2"`，与既有 schema 的 `STORAGE_KEY` 完全隔离；填充数据生命周期不污染 schema，也不被 schema 的读写牵连。
+2. **DesignerApp.vue 改造**：
+   - 引入 `collectFieldValues`（来自 `@/components/renderer-v2`）——遍历渲染 DOM 的 `[data-field]` 采集当前填写值。因 `data-field` 在设计/预览/填充三态均存在，导出须门控到预览态，避免采到设计态占位文本。
+   - 新增 `fillDataFileInput` / `canvasEl` 两个 ref（`<main ref="canvasEl">` 即画布挂载根，供采集）。
+   - 五个函数（与 schema 完全解耦）：`importFillDataFile(event)`（解析 FormDataV2 JSON → `previewFormData.value` 且 `viewMode="preview"`）、`triggerImportFillData()`（`fillDataFileInput.value?.click()`）、`exportFillDataFile()`（`collectFieldValues(canvasEl.value)` 仅在 `previewMode` 时下载 JSON）、`saveFillDataToLocal()`（同上采集 → `localStorage.setItem(DATA_STORAGE_KEY, …)`，仅 `previewMode`）、`loadFillDataFromLocal()`（读 `DATA_STORAGE_KEY` → `previewFormData` + `viewMode="preview"`）。
+   - 工具栏新增 `<div class="v2-toolbar__group">`「填充数据」组（导入/导出/读取/保存；导出/保存 `:disabled="!previewMode"`）；新增隐藏 `<input ref="fillDataFileInput" type="file" @change="importFillDataFile">`；`<main ref="canvasEl">`；新增 CSS `.v2-toolbar__label`。
+3. **测试对齐（新增 `DesignerApp.fillData.test.ts` 2 例）**：断言「填充数据」组含 导入/导出/读取/保存 四按钮；设计态下 导出/保存 `disabled`、导入/读取 `enabled`；预览态下 导出/保存 `enabled`。类型坑：首版误从 `@vue/test-utils` 导入 `nextTick`（未导出）且把查找结果类型写成 `ReturnType<typeof mount>`（实应为 `DOMWrapper`），`vue-tsc` 报 TS2740；修正为从 `vue` 导入 `nextTick` 并显式 `DOMWrapper<Element>` / `DOMWrapper<HTMLButtonElement>`，复跑干净。
+4. 验证：全量 **vitest 210/210（25 文件）**（新增 2 例，基线由 208 升至 210）、**vue-tsc --noEmit** 干净（EXIT=0）。
+5. 文档：development-plan §0（最后更新 / §0.3 分层 / §0.4 表）同步；MEMORY.md 加 B2 单行；2026-09-03.md 补 三十续。
+6. 至此 **Batch 5 + B2 完成**。下一步：**B3**（设计器解耦 dev 样例）/ **B4**（渲染期领域逻辑归 engine）/ **D2**（打印责任分散），以及延后的 P9.1c/P9.2 / A2（设计态 contenteditable 用户确认维持）。
+
+---
+
+## 三十一续 — A6 拖拽源 `:draggable` 属性彻底移出内核（分层收尾）
+
+用户「推进 A6」指令，经 AskUserQuestion 确认选择 **「A6 残留：移除 :draggable」**——把 二十七续补正 为规避快照重生成而**保留在内核**的 `:draggable` 属性也彻底下沉到表面层，使渲染内核（`GridFormRenderer`/`GridSchemaNode`/`HtmlBlock`）对拖拽的「属性 + 逻辑」完全零持有。
+
+1. **内核 `GridSchemaNode.vue` 去 `:draggable`**：删除 `const nodeDraggable = computed(() => isDesign.value)` 及其注释块；删除全部 6 处 `:draggable="nodeDraggable"` 绑定（`layout-grid`/`layout-text`/`layout-p`/`layout-table`/`HtmlBlock` 透传/`layout-image`）。内核自此对拖拽**零属性、零逻辑**（二十七续补正 已移走 `@dragstart` 与 `node-drag-start` emit）。
+2. **表面层 `CanvasSurface.vue` 接管 `draggable` 属性**：在既有 `scheduleApply`（MutationObserver 驱动的选择高亮周期）内新增 `applyNodeDraggable()`：
+   ```ts
+   function applyNodeDraggable(): void {
+     const el = root.value;
+     if (!el) return;
+     const design = dragEnabled.value;
+     el
+       .querySelectorAll<HTMLElement>("[data-node-id]:not(.layout-grid__cell)")
+       .forEach((n) => {
+         if (design) n.setAttribute("draggable", "true");
+         else n.removeAttribute("draggable");
+       });
+   }
+   ```
+   `scheduleApply()` 在重新 observe 前依次调用 `applySelectionHighlight(); applyNodeDraggable();`。选择器用 `[data-node-id]:not(.layout-grid__cell)`——`data-node-id` 同时挂在节点与 cell 上，cell 不可拖，故排除（盲选会把 cell 也标 draggable 并扰动快照）。
+3. **浏览器约束的内在原因**：`draggable` 必须是被拖元素**自身属性**，父级事件委托无法代子元素挂该属性。故表面层在 MutationObserver 周期里对每个节点根元素 `setAttribute("draggable","true")`（design 态）/ `removeAttribute`（非 design 态），行为与 二十七续补正「内核 `:draggable="isDesign"`」完全等价，但属性归属归到了正确的层。
+4. **快照更新（必然）**：移除内核 `:draggable` 后，直接 mount `GridFormRenderer` 的两个快照测试 `FirstFiveRowsSnapshot` / `YunlvSecondTicketFull` 不再含 `draggable="true"`，按预期失败 2 例；`vitest run -u` 重生成两处快照（`src/components/renderer-v2/__tests__/__snapshots__/FirstFiveRowsSnapshot.test.ts.snap` 与 `src/dev/__tests__/__snapshots__/YunlvSecondTicketFull.test.ts.snap`），唯一改动是节点元素去掉 `draggable="true"`。
+5. **行为等价验证**：`DesignerApp` 拖拽两用例（跨格移动 / 同格内排序）仍通过，证明表面层 `draggable` 与内核版本行为等价、无回归。全量 **vitest 210/210（25 文件）**（仅 2 快照更新、无用例增删）、**vue-tsc --noEmit** 干净（EXIT=0）。
+6. 文档：development-plan §0（最后更新 / §0.3 分层 A6 / §0.4 表）同步；MEMORY.md A6 单行更新（内核已无 `:draggable`）；2026-09-03.md 补 三十一续。
+7. **至此 A6（Batch 3）彻底收尾**：内核 `GridSchemaNode` 不再有 `:draggable`、`@dragstart`、`node-drag-start`——拖拽「属性 + 源逻辑 + 落点」全部收敛于 `CanvasSurface` 表面层，渲染内核保持纯净。

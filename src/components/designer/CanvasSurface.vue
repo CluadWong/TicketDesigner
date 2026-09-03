@@ -69,10 +69,28 @@ function applySelectionHighlight(): void {
   if (target) target.classList.add("is-design-selected");
 }
 
+/**
+ * 拖拽可拖属性（A6 三十一续）：内核不再声明 `:draggable`；由表面层在 design 态
+ * 对节点根元素（含 HtmlBlock 根，排除 cell）设置 `draggable="true"`，预览/填充态移除。
+ * 随选中高亮同一 MutationObserver 周期重应用，覆盖新增/删除节点与分页切分。
+ */
+function applyNodeDraggable(): void {
+  const el = root.value;
+  if (!el) return;
+  const design = dragEnabled.value;
+  el
+    .querySelectorAll<HTMLElement>("[data-node-id]:not(.layout-grid__cell)")
+    .forEach((n) => {
+      if (design) n.setAttribute("draggable", "true");
+      else n.removeAttribute("draggable");
+    });
+}
+
 function scheduleApply(): void {
   observer?.disconnect();
   nextTick(() => {
     applySelectionHighlight();
+    applyNodeDraggable();
     if (root.value) {
       observer?.observe(root.value, { childList: true, subtree: true });
     }
@@ -183,8 +201,8 @@ function onNodeDragStart(id: string): void {
 }
 
 /**
- * 拖拽源下沉（A6 二十七续）：原生 `dragstart` 经事件委托冒泡到表面层根。
- * 内核不再绑定 @dragstart（仅保留 :draggable 属性——浏览器要求 draggable 必须是被拖元素自身的属性，且仅设计态为 true）。
+ * 拖拽源下沉（A6 二十七续 + 三十一续）：原生 `dragstart` 经事件委托冒泡到表面层根。
+ * 内核不再绑定 @dragstart、也不再持有 `:draggable`（draggable 属性由本表面层 applyNodeDraggable 在 design 态设置）。
  * 此处确定被拖节点、套用与旧内核一致的拦截规则（表格内部节点 / 设计态字段 p 需 Alt），
  * 写入 NODE_MOVE_MIME，再复用 onNodeDragStart 计算合法投放格并向上透传选中态。
  */

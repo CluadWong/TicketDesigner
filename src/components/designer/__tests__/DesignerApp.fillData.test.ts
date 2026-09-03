@@ -21,30 +21,30 @@ function buttonByText(
 }
 
 describe("B2 填充数据导入/导出生命周期（三十续）", () => {
-  it("设计态：填充数据组含 导入/导出/读取/保存，且导出/保存禁用", () => {
+  it("设计态：填充数据组含 导入数据/导出数据/读取数据/保存数据，且导出/保存禁用", () => {
     const wrapper = mount(DesignerApp);
     const group = findFillDataGroup(wrapper);
-    const importBtn = buttonByText(group, "导入");
-    const exportBtn = buttonByText(group, "导出");
-    const loadBtn = buttonByText(group, "读取");
-    const saveBtn = buttonByText(group, "保存");
+    const importBtn = buttonByText(group, "导入数据");
+    const exportBtn = buttonByText(group, "导出数据");
+    const loadBtn = buttonByText(group, "读取数据");
+    const saveBtn = buttonByText(group, "保存数据");
 
     expect(importBtn.exists()).toBe(true);
     expect(loadBtn.exists()).toBe(true);
-    // 入口（导入/读取）设计态可用；结果出口（导出/保存）仅预览态可用。
+    // 入口（导入数据/读取数据）设计态可用；结果出口（导出数据/保存数据）仅预览态可用。
     expect(importBtn.attributes("disabled")).toBeUndefined();
     expect(loadBtn.attributes("disabled")).toBeUndefined();
     expect(exportBtn.attributes("disabled")).toBeDefined();
     expect(saveBtn.attributes("disabled")).toBeDefined();
   });
 
-  it("预览态：导出/保存转为可用", async () => {
+  it("预览态：导出数据/保存数据转为可用", async () => {
     const wrapper = mount(DesignerApp);
     await wrapper.find('[data-view-mode="preview"]').trigger("click");
     await vueNextTick();
 
     const group = findFillDataGroup(wrapper);
-    expect(buttonByText(group, "导出").attributes("disabled")).toBeUndefined();
-    expect(buttonByText(group, "保存").attributes("disabled")).toBeUndefined();
+    expect(buttonByText(group, "导出数据").attributes("disabled")).toBeUndefined();
+    expect(buttonByText(group, "保存数据").attributes("disabled")).toBeUndefined();
   });
 });
