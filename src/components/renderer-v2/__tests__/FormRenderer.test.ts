@@ -14,7 +14,7 @@ import { parseTolerantFormSchemaV2 } from "@/types";
 const sampleSchema = makeYunlvSecondTicketFirstFiveRowsSchema();
 
 describe("FormRenderer（G8 公共入口）", () => {
-  it("preview 模式：携带数据回显，渲染为只读控件（与填写态同一结构），不可编辑", () => {
+  it("preview 模式（默认）：携带数据回显，且字段可编辑（与用户诉求一致，预览态也能输入数据）", () => {
     const wrapper = mount(FormRenderer, {
       props: {
         schema: sampleSchema,
@@ -24,7 +24,23 @@ describe("FormRenderer（G8 公共入口）", () => {
     });
     // 标题（文本节点）仍作为静态文本回显
     expect(wrapper.text()).toContain("云南铝业股份有限公司 电气第二种工作票");
-    // 预览与填写复用同一 <p> 渲染路径，仅 readonly 差异 —— 值落在文本，字段不可编辑
+    // 预览与填写复用同一 <p> 渲染路径；默认 readonly=false → 字段可输入（contenteditable=true）
+    const field = wrapper.find('[data-field="单位"]');
+    expect(field.exists()).toBe(true);
+    expect(field.text()).toContain("121");
+    expect(field.attributes("contenteditable")).toBe("true");
+  });
+
+  it("preview 模式（options.readonly=true）：强制只读回显，字段不可编辑", () => {
+    const wrapper = mount(FormRenderer, {
+      props: {
+        schema: sampleSchema,
+        data: { ...(demoData as Record<string, unknown>) } as never,
+        mode: "preview",
+        options: { readonly: true },
+      },
+    });
+    // 仅浏览详情场景：字段不可编辑
     const field = wrapper.find('[data-field="单位"]');
     expect(field.exists()).toBe(true);
     expect(field.text()).toContain("121");

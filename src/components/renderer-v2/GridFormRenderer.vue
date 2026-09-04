@@ -36,9 +36,11 @@ const props = withDefaults(
     data?: FormDataV2 | null;
     /**
      * 只读闸门：为 `true` 时字段一律不可输入（真·只读回显/打印浏览）。
-     * 与 `mode` **正交**——`mode="preview"` + `readonly` 才是消费页的只读回显
-     * （`FormRenderer` 即如此映射：非 fill 一律补 `readonly`）；
-     * `mode="preview"` 且不传 `readonly` 时字段仍可输入（设计器预览态显式传 `:readonly="false"`）。
+     * 与 `mode` **正交**——`mode` 不决定可编辑性：
+     * - `FormRenderer` 默认 `readonly=false`，故 `preview` / `fill` 两种消费模式都可输入
+     *   （契合「预览即消费模板、输入数据以配合业务流程流转」的语义，三态口径一致）；
+     * - 仅「仅浏览详情」场景由消费页显式传 `options.readonly=true` 强制只读回显；
+     * - 设计器预览态显式传 `:readonly="false"`（查看输入交互效果，亦不回写 schema）。
      */
     readonly?: boolean;
     /**

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, onUnmounted, reactive } from "vue";
 import CanvasSurface from "./CanvasSurface.vue";
+import PaperViewport from "@/components/renderer-v2/PaperViewport.vue";
 import { NODE_ID_ATTR, LAYOUT_ID_ATTR, PALETTE_DRAG_MIME } from "@/engine-v2/node-address";
 import type { SampleEntry } from "@/samples/types";
 import { resolveCellBoxV2 } from "@/engine-v2/derivation";
@@ -1529,17 +1530,20 @@ function updateSelectedSafetyField(event: Event): void {
         :class="{ 'v2-canvas--preview': previewMode }"
         @click="selectNode"
       >
-        <CanvasSurface
-          :schema="schema"
-          :mode="previewMode ? 'preview' : 'design'"
-          :selected-node-id="previewMode ? null : selectedNodeId"
-          :data="previewData"
-          :readonly="false"
-          :paginate="previewMode || paginate"
-          @node-drag-start="onCanvasNodeDragStart"
-          @drop-node="onDropNode"
-          @drop-palette="onDropPalette"
-        />
+        <PaperViewport :fit-on-mount="false">
+          <CanvasSurface
+            :schema="schema"
+            :mode="previewMode ? 'preview' : 'design'"
+            :selected-node-id="previewMode ? null : selectedNodeId"
+            :data="previewData"
+            :readonly="false"
+            :bare="true"
+            :paginate="previewMode || paginate"
+            @node-drag-start="onCanvasNodeDragStart"
+            @drop-node="onDropNode"
+            @drop-palette="onDropPalette"
+          />
+        </PaperViewport>
       </main>
 
       <aside v-if="editable" class="v2-sidebar v2-sidebar--right">

@@ -8,6 +8,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+      // jsdom 下真实 UMD 默认导出在 CJS 互操作中不可调用，用轻量替身覆盖（生产构建走 vite.config，不受影响）。
+      '@panzoom/panzoom': fileURLToPath(new URL('./src/test-utils/panzoom-stub.ts', import.meta.url)),
     },
   },
   test: {

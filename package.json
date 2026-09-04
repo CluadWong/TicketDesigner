@@ -11,6 +11,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@panzoom/panzoom": "^4.6.2",
     "dompurify": "^3.4.14",
     "vue": "^3.5.0"
   },
