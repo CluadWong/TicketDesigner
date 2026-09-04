@@ -89,7 +89,7 @@
 |---|---|---|---|---|
 | **D1** | 渲染组件死代码 | `useTextarea(_node)` 恒 `true`、`inputElType(_node)` 恒 `"text"`，`component :is` 的 `input` 分支永不命中 | 字段统一为字符串类型后遗留（**已解决**：八续/九续 删除 `useTextarea`/`inputElType`，grep 确认 `src` 内无残留） | **P4** |
 | **D2** | 打印责任分散 | `window.print()` 在设计器工具栏，`@media print` 样式在渲染组件 | ✅ 2026-09-03 已收口：**呈现**（`page-size-style.ts` 注入 `@page` + 渲染组件 `@media print`）与**触发**（新增 `renderer-v2/print-form.ts` 的 `printForm()`）同归渲染内核；`FormRenderer` 以 `defineExpose({ print })` 向消费页暴露打印能力；`DesignerApp.printDocument()` 与 preview 演示页均改调同一入口，宿主不再各自 `window.print()`。「何时打印」仍由宿主决定，内核不自动打印 | **P4（已收口）** |
-| **D3** | 渲染组件内为设计态服务的样式分支 | `@media print .layout-node--selected{...}`、`.layout-p--underline` 打印移除等 | 随 A5 一并清理（**暂缓**：A5 移除渲染组件 `selectedNodeId` 尚未获批，孤立清理会改变打印行为，待 A5 落地后处理） | **P4** |
+| **D3** | 渲染组件内为设计态服务的样式分支 | 插入指示线 `.v2-insertion-line`、拖拽悬停态 `dragOverCellId`/`dragOverIndex`（内核曾按此渲染插入线） | ✅ **2026-09-04 已收口**：A5 已移除内核 `selectedNodeId` 与 `@media print .layout-node--selected` 清除分支；本轮把**剩余的设计态 DOM 分支**（`.v2-insertion-line` + 两个拖拽悬停 props）整体移出内核，改由表面层 `CanvasSurface` 用 overlay 绝对定位绘制（命中 `[data-layout-id]` + 子节点 `getBoundingClientRect` 定位）。内核对外 props 只剩 schema/数据/版式相关项；新增 `RendererNoDesignState.test.ts`（3 例）锁死「任意模式都不渲染设计态交互 DOM」 | **P4（已收口）** |
 
 ---
 
@@ -172,4 +172,4 @@
 3. **按新结构实施拖拽重排（A6）**：dragstart 走画布委托；移除旧的「上/下排序按钮 + 目标格下拉」（原规划 P3/P5）。
 4. ✅ **统一渲染路径（A3）——已完成（2026-09-04）**：填充/预览同构且渲染结果逐字符一致，只读差异只落在 `contenteditable`，由 `RenderPathIsomorphism.test.ts` 锁死；contenteditable 按 §4 拍板结果（选项①）**保留不动**。
 5. **外壳与数据（B1 + B2 + C1 + C3）**：独立预览/填充入口、数据导入导出、编辑动作统一闸门、非设计态不渲染 Inspector。
-6. **清理（B3 + B4 + D2 + D3）**：样例外置、`engine` 归位、打印责任与样式分支整理。
+6. **清理（B3 + B4 + D2 + D3）**：样例外置、`engine` 归位、打印责任与样式分支整理。**D2/D3 已收口（2026-09-04）**：打印 `@page`/`@media print` 归内核，`selectedNodeId`/`@media print` 选中清除分支与插入指示线等设计态 DOM 已移出内核到表面层。

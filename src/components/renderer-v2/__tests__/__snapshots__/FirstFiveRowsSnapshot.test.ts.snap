@@ -6,21 +6,16 @@ exports[`前五行渲染基线（P4.5 快照） > DOM 结构快照与基线一�
     <div data-v-af1345cc="" data-v-d627bc46="" class="layout-grid layout-grid--none" data-node-id="ticket-title-layout">
       <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 1fr; min-height: 16mm;" data-layout-id="row-title">
         <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="cell-title" data-node-id="cell-title">
-          <!--v-if-->
           <div data-v-af1345cc="" class="layout-text" style="justify-content: center; align-items: center; text-align: center; font-size: 22px; font-weight: bold;" data-node-id="title-text">云南铝业股份有限公司 电气第二种工作票</div>
-          <!--v-if-->
         </div>
       </div>
     </div>
     <div data-v-af1345cc="" data-v-d627bc46="" class="layout-grid layout-grid--all" data-node-id="ticket-layout">
       <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 14mm 1fr 14mm 1fr; min-height: 8mm;" data-layout-id="row-unit-number">
         <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="cell-u-l" data-node-id="cell-u-l">
-          <!--v-if-->
           <div data-v-af1345cc="" class="layout-text" style="justify-content: center; align-items: center; text-align: center;" data-node-id="unit-label">单位</div>
-          <!--v-if-->
         </div>
         <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="cell-u-f" data-node-id="cell-u-f">
-          <!--v-if-->
           <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--underline" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" contenteditable="true" data-field="单位" data-node-id="unit-field">
             <!--v-if-->
             <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
@@ -29,15 +24,11 @@ exports[`前五行渲染基线（P4.5 快照） > DOM 结构快照与基线一�
          包裹，否则 contenteditable <p> 的数据晚到时文本子节点不会重新 patch）。 --><span data-v-af1345cc="" class="layout-p__value"></span>
             <!--v-if-->
           </p>
-          <!--v-if-->
         </div>
         <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="cell-n-l" data-node-id="cell-n-l">
-          <!--v-if-->
           <div data-v-af1345cc="" class="layout-text" style="justify-content: center; align-items: center; text-align: center;" data-node-id="number-label">编号</div>
-          <!--v-if-->
         </div>
         <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="cell-n-f" data-node-id="cell-n-f">
-          <!--v-if-->
           <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--underline" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" contenteditable="true" data-field="编号" data-node-id="number-field">
             <!--v-if-->
             <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
@@ -46,14 +37,11 @@ exports[`前五行渲染基线（P4.5 快照） > DOM 结构快照与基线一�
          包裹，否则 contenteditable <p> 的数据晚到时文本子节点不会重新 patch）。 --><span data-v-af1345cc="" class="layout-p__value"></span>
             <!--v-if-->
           </p>
-          <!--v-if-->
         </div>
       </div>
       <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 14mm 1fr 14mm 1fr; min-height: 8mm;" data-layout-id="row-owner-team">
         <div data-v-af1345cc="" class="layout-grid__cell" style="grid-column: span 4; padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="cell-o-l" data-node-id="cell-o-l">
-          <!--v-if-->
           <div data-v-af1345cc="" class="layout-text" style="justify-content: flex-start; align-items: center;" data-node-id="owner-label">工作负责人（监护人）：</div>
-          <!--v-if-->
           <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--underline" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" contenteditable="true" data-field="工作负责人（监护人）" data-node-id="owner-field">
             <!--v-if-->
             <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
@@ -62,9 +50,7 @@ exports[`前五行渲染基线（P4.5 快照） > DOM 结构快照与基线一�
          包裹，否则 contenteditable <p> 的数据晚到时文本子节点不会重新 patch）。 --><span data-v-af1345cc="" class="layout-p__value"></span>
             <!--v-if-->
           </p>
-          <!--v-if-->
           <div data-v-af1345cc="" class="layout-text" style="justify-content: flex-start; align-items: center;" data-node-id="team-label">班组：</div>
-          <!--v-if-->
           <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--underline" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" contenteditable="true" data-field="班组" data-node-id="team-field">
             <!--v-if-->
             <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
@@ -73,14 +59,11 @@ exports[`前五行渲染基线（P4.5 快照） > DOM 结构快照与基线一�
          包裹，否则 contenteditable <p> 的数据晚到时文本子节点不会重新 patch）。 --><span data-v-af1345cc="" class="layout-p__value"></span>
             <!--v-if-->
           </p>
-          <!--v-if-->
         </div>
       </div>
       <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 14mm 1fr 14mm 1fr; min-height: 8mm;" data-layout-id="row-members">
         <div data-v-af1345cc="" class="layout-grid__cell" style="grid-column: span 4; padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="cell-m-l" data-node-id="cell-m-l">
-          <!--v-if-->
           <div data-v-af1345cc="" class="layout-text" style="justify-content: flex-start; align-items: center;" data-node-id="members-label">工作班成员（不包括工作负责人）：</div>
-          <!--v-if-->
           <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--underline" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" contenteditable="true" data-field="工作班成员" data-node-id="members-field">
             <!--v-if-->
             <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
@@ -89,19 +72,15 @@ exports[`前五行渲染基线（P4.5 快照） > DOM 结构快照与基线一�
          包裹，否则 contenteditable <p> 的数据晚到时文本子节点不会重新 patch）。 --><span data-v-af1345cc="" class="layout-p__value"></span>
             <!--v-if-->
           </p>
-          <!--v-if-->
           <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--composite" style="justify-content: center; align-items: center; text-align: center; white-space: pre-wrap;" data-field="工作班成员人数" data-node-id="member-count-field"><span data-v-af1345cc="" class="layout-p__label">共</span>
             <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
          设计/预览/填写共用同一结构，仅 contenteditable 差异。 --><span data-v-af1345cc="" class="layout-p__input layout-p--underline" contenteditable="true" data-field="工作班成员人数"></span><span data-v-af1345cc="" class="layout-p__label">人</span>
           </p>
-          <!--v-if-->
         </div>
       </div>
       <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 14mm 1fr 14mm 1fr; min-height: 8mm;" data-layout-id="row-station">
         <div data-v-af1345cc="" class="layout-grid__cell" style="grid-column: span 4; padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="cell-s-l" data-node-id="cell-s-l">
-          <!--v-if-->
           <div data-v-af1345cc="" class="layout-text" style="justify-content: flex-start; align-items: center;" data-node-id="station-label">工作的变、配电站名称及设备名称：</div>
-          <!--v-if-->
           <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--underline" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" contenteditable="true" data-field="电站设备" data-node-id="station-field">
             <!--v-if-->
             <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
@@ -110,17 +89,13 @@ exports[`前五行渲染基线（P4.5 快照） > DOM 结构快照与基线一�
          包裹，否则 contenteditable <p> 的数据晚到时文本子节点不会重新 patch）。 --><span data-v-af1345cc="" class="layout-p__value"></span>
             <!--v-if-->
           </p>
-          <!--v-if-->
         </div>
       </div>
       <div data-v-af1345cc="" class="layout-grid__row" style="grid-template-columns: 14mm 1fr 14mm 1fr; min-height: 40mm;" data-layout-id="row-work-task">
         <div data-v-af1345cc="" class="layout-grid__cell" style="padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="cell-wt-label" data-node-id="cell-wt-label">
-          <!--v-if-->
           <div data-v-af1345cc="" class="layout-text" style="justify-content: center; align-items: center; text-align: center; font-weight: bold; writing-mode: vertical-rl;" data-node-id="work-task-label">工作任务</div>
-          <!--v-if-->
         </div>
         <div data-v-af1345cc="" class="layout-grid__cell" style="grid-column: span 3; padding: 0mm; align-items: center; justify-content: flex-start;" data-layout-id="cell-wt-r1" data-node-id="cell-wt-r1">
-          <!--v-if-->
           <table data-v-af1345cc="" class="layout-table layout-table--all" data-node-id="work-task-table" data-field="工作任务">
             <thead data-v-af1345cc="">
               <tr data-v-af1345cc="" class="layout-table__row layout-table__header" style="grid-template-columns: 1fr 1fr; min-height: 8mm;">
@@ -131,7 +106,6 @@ exports[`前五行渲染基线（P4.5 快照） > DOM 结构快照与基线一�
             <tbody data-v-af1345cc="">
               <tr data-v-af1345cc="" class="layout-table__row" style="grid-template-columns: 1fr 1fr; min-height: 8mm;">
                 <td data-v-af1345cc="" class="layout-table__cell" style="justify-content: center;" data-layout-id="wt-loc-tpl">
-                  <!--v-if-->
                   <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--underline" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" contenteditable="true" data-field="工作地点_1" data-node-id="wt-loc">
                     <!--v-if-->
                     <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
@@ -140,10 +114,8 @@ exports[`前五行渲染基线（P4.5 快照） > DOM 结构快照与基线一�
          包裹，否则 contenteditable <p> 的数据晚到时文本子节点不会重新 patch）。 --><span data-v-af1345cc="" class="layout-p__value"></span>
                     <!--v-if-->
                   </p>
-                  <!--v-if-->
                 </td>
                 <td data-v-af1345cc="" class="layout-table__cell" style="justify-content: center;" data-layout-id="wt-con-tpl">
-                  <!--v-if-->
                   <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--underline" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" contenteditable="true" data-field="工作内容_1" data-node-id="wt-con">
                     <!--v-if-->
                     <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
@@ -152,12 +124,10 @@ exports[`前五行渲染基线（P4.5 快照） > DOM 结构快照与基线一�
          包裹，否则 contenteditable <p> 的数据晚到时文本子节点不会重新 patch）。 --><span data-v-af1345cc="" class="layout-p__value"></span>
                     <!--v-if-->
                   </p>
-                  <!--v-if-->
                 </td>
               </tr>
               <tr data-v-af1345cc="" class="layout-table__row" style="grid-template-columns: 1fr 1fr; min-height: 8mm;">
                 <td data-v-af1345cc="" class="layout-table__cell" style="justify-content: center;" data-layout-id="wt-loc-tpl">
-                  <!--v-if-->
                   <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--underline" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" contenteditable="true" data-field="工作地点_2" data-node-id="wt-loc">
                     <!--v-if-->
                     <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
@@ -166,10 +136,8 @@ exports[`前五行渲染基线（P4.5 快照） > DOM 结构快照与基线一�
          包裹，否则 contenteditable <p> 的数据晚到时文本子节点不会重新 patch）。 --><span data-v-af1345cc="" class="layout-p__value"></span>
                     <!--v-if-->
                   </p>
-                  <!--v-if-->
                 </td>
                 <td data-v-af1345cc="" class="layout-table__cell" style="justify-content: center;" data-layout-id="wt-con-tpl">
-                  <!--v-if-->
                   <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--underline" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" contenteditable="true" data-field="工作内容_2" data-node-id="wt-con">
                     <!--v-if-->
                     <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
@@ -178,12 +146,10 @@ exports[`前五行渲染基线（P4.5 快照） > DOM 结构快照与基线一�
          包裹，否则 contenteditable <p> 的数据晚到时文本子节点不会重新 patch）。 --><span data-v-af1345cc="" class="layout-p__value"></span>
                     <!--v-if-->
                   </p>
-                  <!--v-if-->
                 </td>
               </tr>
               <tr data-v-af1345cc="" class="layout-table__row" style="grid-template-columns: 1fr 1fr; min-height: 8mm;">
                 <td data-v-af1345cc="" class="layout-table__cell" style="justify-content: center;" data-layout-id="wt-loc-tpl">
-                  <!--v-if-->
                   <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--underline" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" contenteditable="true" data-field="工作地点_3" data-node-id="wt-loc">
                     <!--v-if-->
                     <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
@@ -192,10 +158,8 @@ exports[`前五行渲染基线（P4.5 快照） > DOM 结构快照与基线一�
          包裹，否则 contenteditable <p> 的数据晚到时文本子节点不会重新 patch）。 --><span data-v-af1345cc="" class="layout-p__value"></span>
                     <!--v-if-->
                   </p>
-                  <!--v-if-->
                 </td>
                 <td data-v-af1345cc="" class="layout-table__cell" style="justify-content: center;" data-layout-id="wt-con-tpl">
-                  <!--v-if-->
                   <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--underline" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" contenteditable="true" data-field="工作内容_3" data-node-id="wt-con">
                     <!--v-if-->
                     <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
@@ -204,12 +168,10 @@ exports[`前五行渲染基线（P4.5 快照） > DOM 结构快照与基线一�
          包裹，否则 contenteditable <p> 的数据晚到时文本子节点不会重新 patch）。 --><span data-v-af1345cc="" class="layout-p__value"></span>
                     <!--v-if-->
                   </p>
-                  <!--v-if-->
                 </td>
               </tr>
               <tr data-v-af1345cc="" class="layout-table__row" style="grid-template-columns: 1fr 1fr; min-height: 8mm;">
                 <td data-v-af1345cc="" class="layout-table__cell" style="justify-content: center;" data-layout-id="wt-loc-tpl">
-                  <!--v-if-->
                   <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--underline" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" contenteditable="true" data-field="工作地点_4" data-node-id="wt-loc">
                     <!--v-if-->
                     <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
@@ -218,10 +180,8 @@ exports[`前五行渲染基线（P4.5 快照） > DOM 结构快照与基线一�
          包裹，否则 contenteditable <p> 的数据晚到时文本子节点不会重新 patch）。 --><span data-v-af1345cc="" class="layout-p__value"></span>
                     <!--v-if-->
                   </p>
-                  <!--v-if-->
                 </td>
                 <td data-v-af1345cc="" class="layout-table__cell" style="justify-content: center;" data-layout-id="wt-con-tpl">
-                  <!--v-if-->
                   <p data-v-af1345cc="" class="layout-p layout-p--field layout-p--underline" style="justify-content: flex-start; align-items: center; white-space: pre-wrap;" contenteditable="true" data-field="工作内容_4" data-node-id="wt-con">
                     <!--v-if-->
                     <!-- 复合字段（有前/后标签）：可输入区统一为 .layout-p__input，
@@ -230,12 +190,10 @@ exports[`前五行渲染基线（P4.5 快照） > DOM 结构快照与基线一�
          包裹，否则 contenteditable <p> 的数据晚到时文本子节点不会重新 patch）。 --><span data-v-af1345cc="" class="layout-p__value"></span>
                     <!--v-if-->
                   </p>
-                  <!--v-if-->
                 </td>
               </tr>
             </tbody>
           </table>
-          <!--v-if-->
         </div>
       </div>
     </div>

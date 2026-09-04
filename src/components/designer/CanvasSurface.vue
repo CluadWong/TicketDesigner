@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import type { CSSProperties } from "vue";
 import GridFormRenderer from "../renderer-v2/GridFormRenderer.vue";
 import {
   NODE_ID_ATTR,
@@ -18,7 +19,8 @@ import type { FormSchemaV2, FormDataV2, FormNodeV2 } from "@/types";
  * - 拖拽（A6）：落点（dragover / drop / dragend）与**源**（dragstart）均在本层以事件委托处理。
  *   原生 dragstart 冒泡到表面层根后，由本层确定被拖节点、套用拦截规则（表格内部节点 /
  *   设计态字段 p 需 Alt）、写入 NODE_MOVE_MIME，再计算合法投放格与插入下标；
- *   内核只按本层下传的 `dragOverCellId` / `dragOverIndex` 渲染插入指示线（不感知交互）。
+ *   内核不再感知拖拽：落点（dragover / drop / dragend）与**源**（dragstart）均在本层以事件委托处理，
+ *   插入指示线也由本层用 overlay 绝对定位绘制（见 `indicatorStyle`），内核模板零拖拽 DOM 分支（D3）。
  * - 透传 `node-drag-start` / `field-change` 给上层 DesignerApp；
  *   落点结果以语义事件 `drop-node` / `drop-palette` / `drag-end` 上抛，由 DesignerApp 提交 schema。
  *
@@ -121,9 +123,57 @@ const hostClass = computed(() => ({
 }));
 
 // ── 拖拽落点（A6） ──
-/** 当前悬停投放格与插入下标（内核据此渲染 `.v2-insertion-line`）。 */
+/** 当前悬停投放格与插入下标（D3 后仅供本层 overlay 绘制 `.v2-insertion-line`，不再下传内核）。 */
 const dragOverCellId = ref<string | null>(null);
 const dragOverIndex = ref<number>(-1);
+
+/**
+ * 插入指示线在表面层 overlay 上的绝对定位（D3）：命中目标格 `[data-layout-id]`，
+ * 再取其内部带 `data-node-id` 的子节点，按 `dragOverIndex` 计算线条位置——
+ * 等于子节点数时落在最后一个子节点底边（无子节点则落格内容区顶边），否则落在该子节点顶边。
+ * 坐标以表面层根为 offset parent（root 设 `position: relative`），用各自 `getBoundingClientRect`
+ * 之差换算为相对根的坐标，故祖先滚动不影响（root 自身随内容位移）。
+ * 仅在 design 拖拽态有效；其余时刻 `dragOverCellId` / `dragOverIndex` 为初始空值 → 返回 null。
+ */
+const indicatorStyle = computed<CSSProperties | null>(() => {
+  const cellId = dragOverCellId.value;
+  const idx = dragOverIndex.value;
+  const rootEl = root.value;
+  if (!cellId || idx < 0 || !rootEl) return null;
+  const cell = rootEl.querySelector<HTMLElement>(`[${LAYOUT_ID_ATTR}="${cellId}"]`);
+  if (!cell) return null;
+  const rootRect = rootEl.getBoundingClientRect();
+  const childEls = Array.from(cell.children).filter(
+    (el): el is HTMLElement =>
+      el instanceof HTMLElement && el.hasAttribute(NODE_ID_ATTR),
+  );
+  if (idx < childEls.length) {
+    const r = childEls[idx].getBoundingClientRect();
+    return {
+      position: "absolute",
+      top: `${r.top - rootRect.top}px`,
+      left: `${r.left - rootRect.left}px`,
+      width: `${r.width}px`,
+    };
+  }
+  const last = childEls[childEls.length - 1];
+  if (last) {
+    const r = last.getBoundingClientRect();
+    return {
+      position: "absolute",
+      top: `${r.bottom - rootRect.top}px`,
+      left: `${r.left - rootRect.left}px`,
+      width: `${r.width}px`,
+    };
+  }
+  const r = cell.getBoundingClientRect();
+  return {
+    position: "absolute",
+    top: `${r.top - rootRect.top}px`,
+    left: `${r.left - rootRect.left}px`,
+    width: `${r.width}px`,
+  };
+});
 /** 合法投放格集合：拖拽起点（node-drag-start）时按被拖拽节点计算，排除其自身及后代容器。 */
 const legalDropCellIds = ref<Set<string>>(new Set());
 let dragTargetEl: HTMLElement | null = null;
@@ -345,18 +395,20 @@ function onDragEnd(): void {
       :mode="mode"
       :data="data"
       :readonly="readonly"
-      :drag-over-cell-id="dragOverCellId"
-      :drag-over-index="dragOverIndex"
       :bare="bare"
       :paginate="paginate"
       @field-change="(field: string, value: string) => emit('field-change', field, value)"
     />
+    <!-- D3：插入指示线由表面层 overlay 绘制，内核不输出任何拖拽 DOM 分支 -->
+    <div v-if="indicatorStyle" class="v2-insertion-line" :style="indicatorStyle"></div>
   </div>
 </template>
 
 <style scoped>
 .v2-canvas-surface {
-  /* 表面层容器：仅承载选中高亮 / 拖拽落点高亮的 DOM 钩子，不引入任何版式样式 */
+  /* 表面层容器：仅承载选中高亮 / 拖拽落点高亮的 DOM 钩子，不引入任何版式样式；
+     同时作为插入指示线 overlay 的 offset parent（D3） */
+  position: relative;
   width: 100%;
   height: 100%;
 }
@@ -382,6 +434,17 @@ function onDragEnd(): void {
   background: #eff6ff;
 }
 
+/* 插入指示线（D3）：由表面层 overlay 绝对定位绘制，内核不输出该 DOM。
+   仅 design 拖拽悬停时出现（indicatorStyle 非空），不进版式、打印无关。 */
+.v2-insertion-line {
+  height: 2px;
+  background: #2563eb;
+  box-shadow: 0 0 0 1px rgb(37 99 235 / 40%);
+  border-radius: 1px;
+  pointer-events: none;
+  z-index: 5;
+}
+
 @media print {
   .v2-canvas-surface :deep(.is-design-selected) {
     background-color: transparent !important;
@@ -390,6 +453,10 @@ function onDragEnd(): void {
   .v2-canvas-surface :deep(.v2-drop-target) {
     outline: none !important;
     background: transparent !important;
+  }
+  /* 插入指示线只存在于设计态拖拽交互，打印时本不应出现；防御性隐藏（D3） */
+  .v2-canvas-surface .v2-insertion-line {
+    display: none !important;
   }
 }
 </style>

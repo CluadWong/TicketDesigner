@@ -57,9 +57,6 @@ const props = defineProps<{
     bottom?: boolean;
     left?: boolean;
   };
-  /** 拖拽重排（P9）：当前悬停的合法投放格 id 与插入下标，用于渲染插入指示线。 */
-  dragOverCellId?: string | null;
-  dragOverIndex?: number | null;
 }>();
 
 /** 该节点是否为绘制外框（all/outer）的 Grid。 */
@@ -429,10 +426,6 @@ function onImgError(): void {
           v-for="(child, childIndex) in cell.children"
           :key="child.id"
         >
-          <div
-            v-if="dragOverCellId === cell.id && dragOverIndex === childIndex"
-            class="v2-insertion-line"
-          ></div>
           <GridSchemaNode
             :node="child"
             :base-row-height="baseRowHeight"
@@ -442,15 +435,9 @@ function onImgError(): void {
             :suppress-borders="
               cellSiblingSuppressBorders(cell.children, childIndex)
             "
-            :drag-over-cell-id="dragOverCellId"
-            :drag-over-index="dragOverIndex"
                         @field-change="(field: string, value: string) => emit('field-change', field, value)"
           />
         </template>
-        <div
-          v-if="dragOverCellId === cell.id && dragOverIndex === cell.children.length"
-          class="v2-insertion-line"
-        ></div>
       </div>
     </div>
   </div>
@@ -568,32 +555,15 @@ function onImgError(): void {
             v-for="child in tableTemplate(node, column.key)?.children ?? []"
             :key="`${child.id}-${rowIndex}`"
           >
-            <div
-              v-if="
-                dragOverCellId === tableTemplate(node, column.key)?.id &&
-                dragOverIndex === 0
-              "
-              class="v2-insertion-line"
-            ></div>
             <GridSchemaNode
               :node="bindRowCell(child, column.key, rowIndex)"
               :base-row-height="baseRowHeight"
               :mode="resolvedMode"
               :data="data"
               :readonly="props.readonly"
-              :drag-over-cell-id="dragOverCellId"
-              :drag-over-index="dragOverIndex"
                             @field-change="(field: string, value: string) => emit('field-change', field, value)"
             />
           </template>
-          <div
-            v-if="
-              dragOverCellId === tableTemplate(node, column.key)?.id &&
-              dragOverIndex ===
-                (tableTemplate(node, column.key)?.children.length ?? 0)
-            "
-            class="v2-insertion-line"
-          ></div>
         </td>
       </tr>
     </tbody>
@@ -899,14 +869,8 @@ function onImgError(): void {
   object-position: center;
 }
 
-.v2-insertion-line {
-  flex: 0 0 auto;
-  width: 100%;
-  height: 2px;
-  margin: 1px 0;
-  background: #2563eb;
-  box-shadow: 0 0 0 1px rgb(37 99 235 / 40%);
-  border-radius: 1px;
-  pointer-events: none;
-}
+/* D3：插入指示线（`.v2-insertion-line`）与拖拽悬停态（`dragOverCellId` / `dragOverIndex`）
+   已整体移出内核——它们是设计态交互，由设计表面层 `designer/CanvasSurface.vue` 用
+   overlay 绝对定位绘制（内核不认识拖拽/落点，也不再为设计态输出任何 DOM 分支）。
+   内核对外 props 只剩 schema 数据与版式相关的 `suppressBorders`。 */
 </style>

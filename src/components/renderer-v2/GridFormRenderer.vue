@@ -41,9 +41,6 @@ const props = withDefaults(
      * `mode="preview"` 且不传 `readonly` 时字段仍可输入（设计器预览态显式传 `:readonly="false"`）。
      */
     readonly?: boolean;
-    /** 拖拽重排（P9）：当前悬停投放格与插入下标，透传给渲染树绘制插入指示线。 */
-    dragOverCellId?: string | null;
-    dragOverIndex?: number | null;
     /**
      * 无外壳模式（G8/G10）：去掉灰底纸张画布外壳（padding / 背景 / 阴影），
      * 仅渲染纸张 `<main>`，便于消费页把表单嵌入自身页面中部（而非模拟整张纸）。
@@ -223,8 +220,6 @@ function pageSiblingSuppressBorders(children: FormNodeV2[], index: number): { to
         :data="data"
         :readonly="props.readonly"
         :suppress-borders="suppressFor(pp, index, child.suppressBorders)"
-        :drag-over-cell-id="dragOverCellId"
-        :drag-over-index="dragOverIndex"
         @field-change="(field, value) => emit('field-change', field, value)"
       />
     </main>
