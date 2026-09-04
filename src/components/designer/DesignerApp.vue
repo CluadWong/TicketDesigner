@@ -4,6 +4,8 @@ import CanvasSurface from "./CanvasSurface.vue";
 import { NODE_ID_ATTR, LAYOUT_ID_ATTR, PALETTE_DRAG_MIME } from "@/engine-v2/node-address";
 import type { SampleEntry } from "@/samples/types";
 import { resolveCellBoxV2 } from "@/engine-v2/derivation";
+/** D2：打印触发收口到渲染内核，设计器不再裸调 `window.print()`。 */
+import { printForm } from "@/components/renderer-v2/print-form";
 import {
   buildEditorNodeIndexV2,
   appendNodeToCellV2,
@@ -292,8 +294,12 @@ function toggleViewMode(mode: "preview"): void {
   clearSelection();
 }
 
+/**
+ * 打印：触发走渲染内核统一入口（`printForm`），呈现（`@page` 纸张 + `@media print` 样式）
+ * 亦由渲染内核负责——两者同层，设计器不再各自 `window.print()`（D2）。
+ */
 function printDocument(): void {
-  window.print();
+  printForm();
 }
 
 let lastClickedLeafId: string | null = null;

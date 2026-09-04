@@ -32,15 +32,18 @@ const props = defineProps<{
   /**
    * 渲染模式（A1 / A5）：显式声明调用方意图，取代旧版靠 `data != null` 推断三态。
    * - design：设计态，字段 contenteditable 就地占位（不回写 schema），结构可拖拽/选中。
-   * - preview：只读回显，带数据但字段不可输入。
+   * - preview：带数据回显，**字段可输入**（消费模板、输入数据以配合流程流转；A3 与 fill 同口径）。
    * - fill：可填写，带数据且字段为真实可编辑控件。
    * 未传时向后兼容：有 `data` 且非 `readonly` → fill，有 `data` 且 `readonly` → preview，否则 design。
+   * ⚠️ `preview` 与 `fill` 在内核里**同一渲染路径、同一可输入口径**，差别只在调用方意图；
+   * 真正的「不可输入」由 `readonly` 闸门决定（见下），不由 `mode` 决定。
    */
   mode?: "design" | "preview" | "fill";
   data?: FormDataV2 | null;
   /**
-   * 只读预览（预览态）：带数据渲染，但字段一律不可输入。与 `mode` 同时传入时以 `mode` 为准，
-   * 此属性保留作向后兼容的兜底闸门。
+   * 只读闸门：为 `true` 时字段一律不可输入（真·只读回显/打印浏览）。
+   * 与 `mode` **正交**——`mode="preview"` + `readonly` 才是消费页的只读回显；
+   * `mode="preview"` + 不传 `readonly` 仍可输入（设计器预览态即显式传 `:readonly="false"`）。
    */
   readonly?: boolean;
   /**
@@ -197,8 +200,9 @@ function pStyle(node: PNodeV2): CSSProperties {
 }
 
 /** 复合字段（有前/后标签）可输入区域的宽度样式：仅复合字段且配置了 width 时生效，
- *  挂在内层 `.layout-p__input`（设计态）或 `.layout-p__control`（填充态）。
- *  flexGrow:0 确保显式宽度不被 flex 拉伸（.layout-p__input / .layout-p__control 默认 flex 可增长）。 */
+ *  挂在内层 `.layout-p__input`（A3 统一渲染路径后，设计/预览/填写态都是这个元素，
+ *  旧的填充态 `.layout-p__control` textarea 分支已于十续回退）。
+ *  flexGrow:0 确保显式宽度不被 flex 拉伸（`.layout-p__input` 默认 flex 可增长）。 */
 function fieldInputStyle(node: PNodeV2): CSSProperties {
   if (!isCompositeField(node) || !node.width) return {};
   return { width: node.width, flexGrow: 0 };
@@ -260,7 +264,19 @@ function isCompositeField(node: PNodeV2): boolean {
   return node.mode === "field" && Boolean(node.prefix || node.suffix);
 }
 
-/** 设计态可编辑（contenteditable 临时文本，不回写）；填充态交由真实控件处理。 */
+/**
+ * 设计态可编辑（contenteditable 临时文本，不回写，A2 已拍板保留）；填充态由同一 DOM 承载输入。
+ *
+ * 字段「能否输入」的口径只有一条：**`readonly` 是真的硬闸门，`preview` 与 `fill` 同口径
+ * （都可输入）**——预览态就是「消费模板、输入数据以配合流程流转」的地方（用户语义），
+ * 设计器预览态即显式传 `:readonly="false"`。故非复合字段为 `canFill || isDesign`，
+ * 复合字段的 `.layout-p__input` 写 `canFill ? 'true' : (readonly ? undefined : 'true')`
+ * （= 非 readonly 即可输入，design 亦在其中），二者等价。
+ *
+ * ⚠️ 勿把复合字段改成 `canFill || isDesign` 之外的口径，也勿让 `mode="preview"` 单独
+ * 关掉输入：那会让设计器预览态的复合字段（如「共 ___ 人」）不可输入、与非复合字段割裂。
+ * 内核 props 注释曾写「preview = 字段不可输入」（与实现相反），已按实现订正。
+ */
 function isEditable(node: PNodeV2): "true" | undefined {
   return isDesign.value && node.mode === "field" && !isCompositeField(node)
     ? "true"
@@ -342,7 +358,9 @@ function fieldLines(node: PNodeV2): string[] {
   return fieldValue(node).split("\n");
 }
 
-/** 填充态控件：字段统一为字符串类型，全部用 `<textarea>`（默认自动换行）。 */
+/** 字段控件已统一（A3 / 十续）：不再区分「填充态控件 / 静态文本」——
+ *  设计/预览/填写/打印共用同一个可编辑 `<p>`，值落在内层 `<span>` 文本里，
+ *  是否可输入只由 `contenteditable`（= `canFill` / 非 readonly）决定。 */
 
 const BROKEN_PLACEHOLDER =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='60'%3E%3Crect width='100%25' height='100%25' fill='%23f1f5f9' stroke='%23cbd5e1'/%3E%3Ctext x='50%25' y='50%25' font-size='10' fill='%2394a3b8' text-anchor='middle' dominant-baseline='middle'%3E图片%3C/text%3E%3C/svg%3E";

@@ -103,7 +103,7 @@ describe("P10 前五行闭环验收（实现侧 harness）", () => {
 
     it("渲染（填写态）：外部字段回写 demoData（P10 步骤 9「数据回写正确」）", () => {
       const wrapper = mount(GridFormRenderer, { props: { schema, data: demoData } });
-      // 填充态字段为真实控件（textarea/input），值存于 .value 而非 textContent
+      // A3 统一渲染路径后字段不再分叉为 textarea/input：值就落在 <p> 内层 <span> 的文本里
       const fieldVal = (f: string) => wrapper.find(`[data-field="${f}"]`).text();
       expect(fieldVal("单位")).toContain("121");
       expect(fieldVal("工作负责人（监护人）")).toContain("121");

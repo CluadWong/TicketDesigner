@@ -2,6 +2,7 @@
 import { computed, ref, watch } from "vue";
 import type { FormDataV2, FormSchemaV2 } from "@/types";
 import GridFormRenderer from "./GridFormRenderer.vue";
+import { printForm } from "./print-form";
 
 /** 渲染模式：preview=只读回显（消费页浏览详情）；fill=可填写（消费页录入）。 */
 export type FormRendererMode = "preview" | "fill";
@@ -62,6 +63,18 @@ function onFieldChange(field: string, value: string): void {
   emit("update:data", data.value);
   emit("field-change", field, value);
 }
+
+/**
+ * D2：向消费页暴露打印能力，使「触发」与「呈现」同归渲染层。
+ * 消费页 `ref.value.print()` 即可打印，无需自己 `window.print()`、也无需关心
+ * `@page` 纸张注入（由本组件持有内核渲染实例在挂载期完成）。
+ * @returns 是否真的触发了打印（宿主不支持时为 `false`）。
+ */
+function print(): boolean {
+  return printForm();
+}
+
+defineExpose({ print });
 </script>
 
 <template>

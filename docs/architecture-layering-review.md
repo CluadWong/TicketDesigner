@@ -60,8 +60,8 @@
 | 编号 | 不符合点 | 位置 | 现状 | 目标 | 优先级 |
 |---|---|---|---|---|---|
 | **A1** | 渲染组件 props 契约里内嵌「三态」概念，靠 `data != null` 推断模式 | `GridFormRenderer.vue` props 注释「data 为空时进入设计态（字段可编辑）」；`GridSchemaNode.vue` `fillMode = props.data != null`、`canFill = fillMode && props.readonly !== true`、`isEditable()` 用 `!fillMode` 判设计态 | 渲染组件自己把「有没有 data」解释成「是不是填充态」，把「设计态」写进对外契约 | 渲染组件只认识 `(schema, data, options)`；模式由调用方**显式传入**（如 `mode: "design" \| "preview" \| "fill"` 或 `editable` 开关），`data` 只用于取值与表格行数推导 | **P1** |
-| **A2** | 渲染组件内置设计态就地编辑（contenteditable） | `<p :contenteditable="canFill ? undefined : isEditable(node)">`；复合字段 `.layout-p__input :contenteditable="props.readonly ? undefined : 'true'"`；`readEditableText()` 同时处理 contenteditable 与控件；`.layout-p :deep(div)` 是为 contenteditable 运行时插入的 div 兜底 | 设计器的"编辑字段内容"能力长在渲染组件里，且**不回写 schema**（已知行为） | 设计态字段只渲染（`default` / 字段占位），改内容走 Inspector；contenteditable 相关逻辑与 CSS 随之下线 | **P2**（需拍板，见 §4） |
-| **A3** | 填充态与预览态是**两套 DOM 分支**，"填充"不是"渲染组件 + 数据" | `canFill` 决定渲染 `<textarea class="layout-p__control">` 还是静态文本 / 逐行 `<div class="layout-p__line">`（innerBorder 特例） | 同一组件内两条渲染路径，取值、换行、内部边框在两条路径各实现一遍 | 统一渲染路径：值渲染 + 可选控件；`editable` 决定控件是否可输入，只读态复用同一结构 | **P1** |
+| **A2** | 渲染组件内置设计态就地编辑（contenteditable） | `<p :contenteditable="canFill ? undefined : isEditable(node)">`；复合字段 `.layout-p__input :contenteditable="props.readonly ? undefined : 'true'"`；`readEditableText()` 同时处理 contenteditable 与控件；`.layout-p :deep(div)` 是为 contenteditable 运行时插入的 div 兜底 | 设计器的"编辑字段内容"能力长在渲染组件里，且**不回写 schema**（已知行为） | ✅ **2026-09-03 拍板：不整改（§4 选项①）**——设计态**必须允许**就地输入，这是查看「输入时的交互效果」（换行/撑开/光标/多行表现）最直观的手段，属设计态「关心模板设计效果」职责；输入的文本既非表单数据也非模板定义，故**不回写 schema 是正确行为**（要设默认值走 Inspector 改 `default`）。contenteditable 保留，A2 关闭、不再作为待整改项 | **P2（已拍板，不整改）** |
+| **A3** | 填充态与预览态是**两套 DOM 分支**，"填充"不是"渲染组件 + 数据" | ~~`canFill` 决定 `<textarea class="layout-p__control">` 还是静态文本~~ **该分叉已不存在**：十续回退 textarea 分支，现统一渲染 `<p>` + 内层 `<span>`（innerBorder 为逐行 `<div class="layout-p__line">`），仅 `contenteditable` 随可输入性变化 | 同一组件内两条渲染路径，取值、换行、内部边框在两条路径各实现一遍 | ✅ **2026-09-04 已落地（十续实质完成 + 本轮补齐口径与闸门）**：字段统一为可编辑 `<p>`（复合字段为 `.layout-p__input`），设计/预览/填写/打印共用一套 DOM；是否可输入只由 `readonly` 闸门决定，`preview` 与 `fill` **同口径**。**同构已固化为断言**：新增 `src/components/renderer-v2/__tests__/RenderPathIsomorphism.test.ts`（5 例：preview ≡ fill 逐字符一致、只读只差 `contenteditable`、无 textarea/input、分页页数一致），今后任何分化都会测试失败 | **P1（已落地，测试锁死）** |
 | **A4** | 数据回写走渲染组件内部 `inject("formFill")`，反向依赖设计器 | `const formFill = inject<(f,v)=>void>("formFill", ()=>{})`；`onFillInput` 内部判 `canFill` 后回写 | 渲染组件依赖一个**只有 DesignerApp 提供**的字符串 key；脱离设计器使用时静默失效（默认空函数） | 渲染组件 emit 字段变更（如 `field-change(field, value)` 或 `update:data`），由使用方决定写哪里 | **P1** |
 | **A5** | 渲染组件持有选中态并输出设计器高亮样式 | `GridSchemaNode` / `HtmlBlock` / `GridFormRenderer` 均接收 `selectedNodeId` 并输出 `.layout-node--selected`；`@media print` 里还要清除该高亮 | 「选中」是设计器交互，却进入渲染组件 props 与样式 | 渲染组件不认识 `selectedNodeId`；高亮由设计器通过 wrapper class / 插槽 / 外层样式注入 | **P2** |
 | **A6** | ⚠️ **进行中冲突**：今天正在实施的「拖拽重排已有节点」方案把拖拽能力放进渲染组件 | 当日规划（`.workbuddy/memory/2026-09-02.md`）P2 = `GridSchemaNode.vue` 加 `draggable` + `@dragstart` 并由 `GridFormRenderer` emit 透传到 `DesignerApp`；P4 = 渲染组件内渲染 `.v2-insertion-line` 插入指示 | 若按该方案落地，渲染组件将**主动承担拖拽源与插入指示**，与「渲染组件不做拖拽」直接冲突，且会让 A5 的 `selectedNodeId` 更难拆 | 拖拽只在设计器壳层：由 `DesignerApp` 在画布层用事件委托 + `data-node-id` 找源节点，插入指示由设计器 overlay 层绘制（或渲染组件仅提供**可选**的插槽/事件钩子，不内置交互） | **P1（先于拖拽实施定案）** |
@@ -88,7 +88,7 @@
 | 编号 | 不符合点 | 位置 | 说明 | 优先级 |
 |---|---|---|---|---|
 | **D1** | 渲染组件死代码 | `useTextarea(_node)` 恒 `true`、`inputElType(_node)` 恒 `"text"`，`component :is` 的 `input` 分支永不命中 | 字段统一为字符串类型后遗留（**已解决**：八续/九续 删除 `useTextarea`/`inputElType`，grep 确认 `src` 内无残留） | **P4** |
-| **D2** | 打印责任分散 | `window.print()` 在设计器工具栏，`@media print` 样式在渲染组件 | 触发与呈现分处两层 | **P4** |
+| **D2** | 打印责任分散 | `window.print()` 在设计器工具栏，`@media print` 样式在渲染组件 | ✅ 2026-09-03 已收口：**呈现**（`page-size-style.ts` 注入 `@page` + 渲染组件 `@media print`）与**触发**（新增 `renderer-v2/print-form.ts` 的 `printForm()`）同归渲染内核；`FormRenderer` 以 `defineExpose({ print })` 向消费页暴露打印能力；`DesignerApp.printDocument()` 与 preview 演示页均改调同一入口，宿主不再各自 `window.print()`。「何时打印」仍由宿主决定，内核不自动打印 | **P4（已收口）** |
 | **D3** | 渲染组件内为设计态服务的样式分支 | `@media print .layout-node--selected{...}`、`.layout-p--underline` 打印移除等 | 随 A5 一并清理（**暂缓**：A5 移除渲染组件 `selectedNodeId` 尚未获批，孤立清理会改变打印行为，待 A5 落地后处理） | **P4** |
 
 ---
@@ -97,7 +97,7 @@
 
 | 议题 | 现状 | 选项 |
 |---|---|---|
-| 设计态字段 P 是否保留就地输入 | 当前 `contenteditable` 可输入但**不回写 schema**（§0.3 记录为"已知行为，用户确认维持"） | ① 维持现状（保留 contenteditable，接受 A2 不整改）；② 设计态只读、改内容走 Inspector（与本文目标结构一致，推荐）；③ 就地输入即回写 schema（成本高，与"设计态编辑 schema 走 Inspector"的既有约定冲突） |
+| 设计态字段 P 是否保留就地输入 | 当前 `contenteditable` 可输入但**不回写 schema**（§0.3 记录为"已知行为，用户确认维持"） | ✅ **已拍板（用户 2026-09-03）= ① 维持现状**：设计态**允许且不可禁止**就地输入（用于查看输入时的交互效果）；不回写 schema 是正确行为（模板默认值走 Inspector 改 `default`）。A2 随之关闭；②「设计态只读」已被用户否决、勿再提；③ 就地输入即回写 schema（成本高，与"设计态编辑 schema 走 Inspector"的既有约定冲突） |
 
 ---
 
@@ -107,7 +107,7 @@
 
 0. **第零批（先定案，A6）**：**在做拖拽重排之前**先定「拖拽归属」——设计器壳层委托 vs 渲染组件内置 dragstart。这条不定，A1/A4/A5 的整改都会被后续拖拽代码再度污染。
 1. **第一批（契约与数据流，A1 + A4 + B1 测试侧）**：渲染组件新增显式 `mode`/`editable`，删除 `data != null` 推断；`inject("formFill")` 改为 emit；同步补渲染组件独立测试。
-2. **第二批（统一渲染路径，A3 + A2）**：填充/预览走同一渲染分支；A2 视 §4 拍板结果决定是否下线 contenteditable。
+2. ✅ **第二批（统一渲染路径，A3）——已完成（2026-09-04）**：填充/预览走同一渲染分支并由 `RenderPathIsomorphism.test.ts` 锁死；**A2 已拍板不整改**（§4 选项①），contenteditable 保留、不在本批下线。
 3. **第三批（解耦选中态，A5 + C2）**：移除渲染组件的 `selectedNodeId`，高亮改由设计器注入；把 `data-node-id` / `data-layout-id` 契约写进 `engine.md`。
 4. **第四批（外壳与数据，B1 + B2 + C1 + C3）**：独立预览/填充入口、数据导入导出、编辑动作统一闸门、非设计态不渲染配置面板。
 5. **第五批（清理，B3 + B4 + D1–D3）**：样例外置、`engine` 归位、删除死代码与打印分支整理。
@@ -140,7 +140,7 @@
 | 拖拽源、落点判定、插入指示线 | **表面层** | 事件委托 + `data-node-id` 命中 |
 | 节点命中与所属格反查 | **表面层** | 用内核输出的 `data-node-id` / `data-layout-id` + `buildEditorNodeIndexV2` |
 | 空容器占位提示、吸附辅助线 | **表面层** | overlay 绘制 |
-| 就地编辑（设计态改字段内容） | **表面层**（建议直接取消，见 A2） | 若保留，应由表面层在字段位置覆盖临时输入框，而不是让内核 DOM 带 `contenteditable` |
+| 就地编辑（设计态改字段内容） | **内核保留**（A2 已拍板不整改，见 §4） | 设计态需就地输入以查看交互效果（用户 2026-09-03 定）；若将来要收敛才考虑由表面层在字段位置覆盖临时输入框、而非内核 DOM 带 `contenteditable`——**当前不动** |
 
 内核唯一需要"让渡"的是**稳定的地址**：`data-node-id` / `data-layout-id` 这类定位属性。内核暴露地址、表面层负责交互——这是可接受的边界（对应 C2：把隐式契约升级为显式契约）。
 
@@ -170,6 +170,6 @@
 1. **内核瘦身（A1 + A4 + A5 + D1）**：显式 `mode`、`inject("formFill")` 改 emit、移除 `selectedNodeId` 与选中样式、清死代码。
 2. **新建设计表面层**：`designer/CanvasSurface.vue` 接管 `selectNode` / `dragover` / `drop` / 插入指示 / 选中 overlay（从 `DesignerApp.vue` **搬迁**而非重写）。
 3. **按新结构实施拖拽重排（A6）**：dragstart 走画布委托；移除旧的「上/下排序按钮 + 目标格下拉」（原规划 P3/P5）。
-4. **统一渲染路径（A3 + A2）**：填充/预览同构；contenteditable 按 §4 拍板结果处理。
+4. ✅ **统一渲染路径（A3）——已完成（2026-09-04）**：填充/预览同构且渲染结果逐字符一致，只读差异只落在 `contenteditable`，由 `RenderPathIsomorphism.test.ts` 锁死；contenteditable 按 §4 拍板结果（选项①）**保留不动**。
 5. **外壳与数据（B1 + B2 + C1 + C3）**：独立预览/填充入口、数据导入导出、编辑动作统一闸门、非设计态不渲染 Inspector。
 6. **清理（B3 + B4 + D2 + D3）**：样例外置、`engine` 归位、打印责任与样式分支整理。

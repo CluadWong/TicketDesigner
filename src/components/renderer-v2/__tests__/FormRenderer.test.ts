@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import FormRenderer from "@/components/renderer-v2/FormRenderer.vue";
 import { makeYunlvSecondTicketFirstFiveRowsSchema } from "@/dev/yunlv-second-ticket-first-five-rows";
@@ -8,7 +8,7 @@ import { parseTolerantFormSchemaV2 } from "@/types";
 /**
  * FormRenderer（G8 公共渲染入口）测试：
  * - preview 模式 = 只读回显（消费页浏览详情），字段不可输入；
- * - fill 模式 = 可填写，真实控件输入回写并 emit field-change / update:data；
+ * - fill 模式 = 可填写，字段值落在与 preview 同一套 DOM 的文本里，失焦回写并 emit field-change / update:data；
  * - 消费页典型流程：JSON 字符串 → parseTolerantFormSchemaV2().schema → FormRenderer。
  */
 const sampleSchema = makeYunlvSecondTicketFirstFiveRowsSchema();
@@ -31,7 +31,7 @@ describe("FormRenderer（G8 公共入口）", () => {
     expect(field.attributes("contenteditable")).toBeUndefined();
   });
 
-  it("fill 模式：渲染真实控件，字段初始值来自 data", () => {
+  it("fill 模式：字段可编辑，初始值来自 data（与 preview 同一 DOM）", () => {
     const wrapper = mount(FormRenderer, {
       props: {
         schema: sampleSchema,
@@ -98,5 +98,23 @@ describe("FormRenderer（G8 公共入口）", () => {
       },
     });
     expect(wrapper.find(".grid-form-canvas--bare").exists()).toBe(true);
+  });
+
+  it("D2：向消费页暴露 print()，触发宿主打印（消费页无需自己 window.print）", () => {
+    const original = window.print;
+    const spy = vi.fn();
+    window.print = spy;
+    try {
+      const wrapper = mount(FormRenderer, {
+        props: { schema: sampleSchema, mode: "preview" },
+      });
+      const exposed = wrapper.vm as unknown as { print: () => boolean };
+      expect(typeof exposed.print).toBe("function");
+      // 触发与呈现同归渲染层：消费页只调 print()，@page 由内核渲染实例注入
+      expect(exposed.print()).toBe(true);
+      expect(spy).toHaveBeenCalledTimes(1);
+    } finally {
+      window.print = original;
+    }
   });
 });

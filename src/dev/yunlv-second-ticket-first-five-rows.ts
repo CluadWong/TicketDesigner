@@ -1,3 +1,17 @@
+/**
+ * ⚠️ 本文件是「测试夹具」，不是交付样例——请勿以「样例已由 full 取代」为由删除。
+ *
+ * 被 11 个测试文件引用（`P10Acceptance` 11 例验收、`FirstFiveRowsSnapshot` 快照基线、
+ * designer/renderer 多套断言，合计 132 个测试）。它是**唯一**覆盖复杂结构（行内多列 /
+ * colspan / 合并格 / 表格动态行 / 嵌套 Grid）的 fixture——full 样例是扁平 13-grid、
+ * 节点 id 全变（`row-station` / `cell-o-l` / `owner-label` 等在此处才有），无法替代。
+ * 删除会直接导致上述测试集体失败。
+ *
+ * 交付样例是 `@/dev/yunlv-second-ticket-full`（设计器载入与 preview 页预览均用它）。
+ * 若觉得本文件"名字像样例、位置像样例"容易误判，下一步可把它移入 `src/dev/fixtures/`
+ * （位置本身即语义，需同步改 12 处 import）——但目前先以注释正名。
+ */
+
 import type {
   FieldPNodeV2,
   FormNodeV2,

@@ -1,74 +1,33 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
-import type { FormDataV2, FormSchemaV2 } from "@/types";
+import type { FormDataV2 } from "@/types";
 import FormRenderer from "@/components/renderer-v2/FormRenderer.vue";
-import { makeYunlvSecondTicketFirstFiveRowsSchema } from "@/dev/yunlv-second-ticket-first-five-rows";
+import { makeYunlvSecondTicketFullSchema } from "@/dev/yunlv-second-ticket-full";
 import demoData from "@/dev/demoData";
 
-// 消费页典型流程：服务器返回 JSON 字符串 → parseTolerantFormSchemaV2(json).schema →
-// 传给 <FormRenderer>；此处直接用内存中的样例 schema + demo data 演示（真实场景用容错解析）。
-type DemoKey = "yunlv";
-
-const demoOptions: { value: DemoKey; label: string }[] = [
-  { value: "yunlv", label: "云铝工作票（五行，单页）" },
-];
-const demoKey = ref<DemoKey>("yunlv");
-
-const schemaSource: Record<DemoKey, () => FormSchemaV2> = {
-  yunlv: makeYunlvSecondTicketFirstFiveRowsSchema,
-};
-const schema = computed<FormSchemaV2>(() => schemaSource[demoKey.value]());
-
-const data = ref<FormDataV2>({ ...(demoData as Record<string, unknown>) } as FormDataV2);
-const mode = ref<"preview" | "fill">("fill");
-const bare = ref(false);
-
-function onFieldChange(field: string, value: string): void {
-  // 真实消费页可在此把改动 POST 回服务器；此处仅打印。
-  console.log("[field-change]", field, value);
-}
+/**
+ * 消费页演示（G8 独立运行）：直接预览「云铝电气第二种工作票」完整样例。
+ *
+ * 刻意不提供工具栏——本页只回答一个问题：**渲染组件能否脱离设计器独立运行**。
+ * 形态与出页全部由渲染内核负责：
+ * - 纸张尺寸 `@page` 由渲染实例按 `schema.paper` 运行时注入（`page-size-style.ts`）；
+ * - 屏幕与打印的呈现样式（`@media print`）同样在渲染内核。
+ *
+ * 打印：直接用浏览器打印（Ctrl/Cmd + P）即可，无需页面按钮。
+ * 若要**以代码**触发，取组件引用调 `print()`——打印能力收口在渲染层（D2），
+ * 消费页无需自己写 `window.print()`。
+ */
+const schema = makeYunlvSecondTicketFullSchema();
+const data = { ...(demoData as Record<string, unknown>) } as FormDataV2;
 </script>
 
 <template>
   <div class="preview-page">
-    <header>
-      <h3>消费页演示：渲染器 + schema + data（G8 独立运行）</h3>
-      <label>
-        样例：
-        <select v-model="demoKey">
-          <option v-for="opt in demoOptions" :key="opt.value" :value="opt.value">
-            {{ opt.label }}
-          </option>
-        </select>
-      </label>
-      <label>
-        模式：
-        <select v-model="mode">
-          <option value="preview">预览（只读）</option>
-          <option value="fill">填写</option>
-        </select>
-      </label>
-      <label><input v-model="bare" type="checkbox" /> 无外壳（嵌入）</label>
-    </header>
-    <FormRenderer
-      :schema="schema"
-      v-model:data="data"
-      :mode="mode"
-      :options="{ bare }"
-      @field-change="onFieldChange"
-    />
+    <FormRenderer :schema="schema" :data="data" mode="preview" />
   </div>
 </template>
 
 <style>
 .preview-page {
   font-family: system-ui, sans-serif;
-  padding: 16px;
-}
-.preview-page header {
-  display: flex;
-  gap: 16px;
-  align-items: center;
-  margin-bottom: 12px;
 }
 </style>

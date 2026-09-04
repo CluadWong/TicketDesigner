@@ -25,16 +25,20 @@ const props = withDefaults(
     /**
      * 渲染模式（A1 / A5 分层重构）：显式声明调用方意图，取代旧版靠 `data != null` 推断三态。
      * - design：设计态，字段以 contenteditable 就地占位（不回写 schema），结构可编辑。
-     * - preview：只读回显，带数据但字段不可输入。
+     * - preview：带数据回显，**字段可输入**（消费模板、输入数据以配合流程流转；A3 与 fill 同口径）。
      * - fill：可填写，带数据且字段为真实可编辑控件。
      * 未传时向后兼容：有 `data` 且非 `readonly` → fill，有 `data` 且 `readonly` → preview，否则 design。
+     * ⚠️ `preview` 与 `fill` 在内核里**同一渲染路径、同一可输入口径**；真正的「不可输入」
+     * 由下面的 `readonly` 闸门决定，不由 `mode` 决定。
      */
     mode?: "design" | "preview" | "fill";
     /** 填充/预览态数据；用于字段取值与 Table 行数推导。设计态可为空（字段显示 default/占位）。 */
     data?: FormDataV2 | null;
     /**
-     * 只读预览：带数据渲染但字段不可输入（预览态）。与 `mode` 同时传入时以 `mode` 为准，
-     * 此属性保留作向后兼容的兜底闸门。
+     * 只读闸门：为 `true` 时字段一律不可输入（真·只读回显/打印浏览）。
+     * 与 `mode` **正交**——`mode="preview"` + `readonly` 才是消费页的只读回显
+     * （`FormRenderer` 即如此映射：非 fill 一律补 `readonly`）；
+     * `mode="preview"` 且不传 `readonly` 时字段仍可输入（设计器预览态显式传 `:readonly="false"`）。
      */
     readonly?: boolean;
     /** 拖拽重排（P9）：当前悬停投放格与插入下标，透传给渲染树绘制插入指示线。 */
