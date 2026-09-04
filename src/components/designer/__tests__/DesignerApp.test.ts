@@ -72,7 +72,7 @@ describe("DesignerApp V2 selection and deletion", () => {
 
     await grid.trigger("click");
 
-    const deleteButton = wrapper.find(".v2-inspector__delete");
+    const deleteButton = wrapper.find(".v2-tree__delete");
     expect(deleteButton.attributes("disabled")).toBeUndefined();
     await deleteButton.trigger("click");
 
@@ -91,14 +91,14 @@ describe("DesignerApp V2 selection and deletion", () => {
     await cell.trigger("click");
 
     // 选中单元格：删除禁用，检查器显示 grid-cell
-    const deleteButton = wrapper.find(".v2-inspector__delete");
+    const deleteButton = wrapper.find(".v2-tree__delete");
     expect(deleteButton.attributes("disabled")).toBeDefined();
     expect(wrapper.findAll(".v2-inspector-row")[0]?.text()).toContain("grid-cell");
 
     // 选中 Grid 本身仍可删除
     await grid.trigger("click");
-    expect(wrapper.find(".v2-inspector__delete").attributes("disabled")).toBeUndefined();
-    await wrapper.find(".v2-inspector__delete").trigger("click");
+    expect(wrapper.find(".v2-tree__delete").attributes("disabled")).toBeUndefined();
+    await wrapper.find(".v2-tree__delete").trigger("click");
 
     expect(wrapper.find('[data-node-id^="grid-"]').exists()).toBe(false);
     expect(wrapper.findAll(".v2-issue").some(issue => issue.text().includes("INVALID_GRID_ROWS"))).toBe(false);

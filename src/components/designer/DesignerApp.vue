@@ -1480,7 +1480,23 @@ function updateSelectedSafetyField(event: Event): void {
           表格 Table
         </button>
 
-        <div class="v2-sidebar__heading v2-sidebar__heading--tree">结构</div>
+        <div class="v2-sidebar__heading v2-sidebar__heading--tree v2-tree-head">
+          <span>结构</span>
+          <button
+            class="v2-tree__delete"
+            type="button"
+            :disabled="
+              !editable ||
+              !selectedNodeId ||
+              selectedNode?.type === 'page' ||
+              selectedNode?.type === 'grid-cell'
+            "
+            :title="editable ? '删除选中节点' : '预览态不可编辑结构'"
+            @click="removeSelectedNode"
+          >
+            删除
+          </button>
+        </div>
         <div class="v2-tree">
           <NodeTreeItem
             v-for="root in nodeTree"
@@ -1523,18 +1539,6 @@ function updateSelectedSafetyField(event: Event): void {
         <div class="v2-inspector-row v2-inspector-row--head">
           <span>当前节点</span>
           <code>{{ selectedNodeId ?? "未选择" }}</code>
-          <button
-            class="v2-inspector__delete"
-            type="button"
-            :disabled="
-              !selectedNodeId ||
-              selectedNode?.type === 'page' ||
-              selectedNode?.type === 'grid-cell'
-            "
-            @click="removeSelectedNode"
-          >
-            删除
-          </button>
         </div>
         <template v-if="selectedNode?.type === 'page'">
           <div class="v2-sidebar__subheading">页面设置</div>
@@ -2327,6 +2331,33 @@ function updateSelectedSafetyField(event: Event): void {
   margin-bottom: 8px;
   padding-top: 12px;
   border-top: 1px solid #e2e8f0;
+}
+
+/* 结构行：标题居左、删除按钮靠右（节点删除按钮从右侧 Inspector 移入此处） */
+.v2-tree-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.v2-tree__delete {
+  padding: 3px 8px;
+  border: 1px solid #fca5a5;
+  border-radius: 4px;
+  color: #b91c1c;
+  background: #fff7f7;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.v2-tree__delete:hover:not(:disabled) {
+  background: #fee2e2;
+}
+
+.v2-tree__delete:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .v2-tree {
