@@ -95,4 +95,42 @@ describe("PaperViewport（纸张视口 · 浏览缩放）", () => {
     expect(__getPz().resetStyle).toHaveBeenCalledTimes(1);
     expect(__getPz().destroy).toHaveBeenCalledTimes(1);
   });
+
+  it("设计态 draggable 节点切到预览（移除 draggable）后，过期 panzoom-exclude 被清除、可平移", async () => {
+    const wrapper = mount(PaperViewport, {
+      attachTo: document.body,
+      slots: { default: '<div class="node" draggable="true">design node</div>' },
+    });
+    const node = wrapper.find(".node").element as HTMLElement;
+    // 设计态：draggable 命中选择器 → 打上 panzoom-exclude（被排除，不平移）
+    expect(node.classList.contains("panzoom-exclude")).toBe(true);
+
+    // 切到预览态：CanvasSurface 移除 draggable
+    node.removeAttribute("draggable");
+    // 等 MutationObserver（attributeFilter: draggable）触发 reconcile
+    await new Promise((r) => setTimeout(r, 0));
+
+    // 过期标记被清除 → 节点不再被排除，可正常平移（拖拽非输入组件允许平移）
+    expect(node.classList.contains("panzoom-exclude")).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("字段（contenteditable）在 draggable 移除后仍保持排除，输入不被平移吞掉", async () => {
+    const wrapper = mount(PaperViewport, {
+      attachTo: document.body,
+      slots: {
+        default: '<p class="field" draggable="true" contenteditable="true">field</p>',
+      },
+    });
+    const field = wrapper.find(".field").element as HTMLElement;
+    expect(field.classList.contains("panzoom-exclude")).toBe(true);
+
+    // 切到预览态：draggable 移除，但 contenteditable（真实输入区）仍在
+    field.removeAttribute("draggable");
+    await new Promise((r) => setTimeout(r, 0));
+
+    // 仅 contenteditable 命中 → 仍被排除（字段可输入、不平移）
+    expect(field.classList.contains("panzoom-exclude")).toBe(true);
+    wrapper.unmount();
+  });
 });

@@ -54,9 +54,25 @@ const scaleText = computed(() => `${Math.round(scale.value * 100)}%`);
  * 同时把表单控件的 `user-select` 恢复为 `text`（抵消 panzoom 对整体的 `user-select:none`）。
  */
 const EXCLUDE_SELECTOR = "input, textarea, select, [contenteditable], [draggable='true']";
+/**
+ * 给表单控件与「可拖拽节点」打 `panzoom-exclude` 标记（isExcluded 会向上查祖先），
+ * 使这些元素上的指针手势不触发平移——字段可编辑/选中、设计态可拖拽节点，其余区域照常平移。
+ *
+ * ⚠️ 必须「先清后打」（reconcile），不能只 `add`：设计态 `CanvasSurface` 会给所有节点设
+ * `draggable="true"`（被本选择器命中 → 打标记）；切到预览态时 `draggable` 被移除，
+ * 若只 add 则过期标记残留，`panzoom-exclude` 类永不消失 —— 于是预览态「拖拽非输入组件」
+ * 仍被误判为排除区、无法平移（即 design→preview 切换后平移失效的回归）。
+ * 先清掉全部 `panzoom-exclude`，再按当前 EXCLUDE_SELECTOR 重新打标，保证 draggable 移除后
+ * 节点即时恢复可平移；字段（contenteditable）始终命中、持续排除，输入不被平移吞掉。
+ */
 function tagExclusions(): void {
   const root = scaler.value;
   if (!root) return;
+  // 先清除全部 panzoom-exclude（含 design→preview 切回后残留的过期标记）。
+  root
+    .querySelectorAll<HTMLElement>(".panzoom-exclude")
+    .forEach((el) => el.classList.remove("panzoom-exclude"));
+  // 再按当前选择器重新打标。
   root
     .querySelectorAll<HTMLElement>(EXCLUDE_SELECTOR)
     .forEach((el) => {
