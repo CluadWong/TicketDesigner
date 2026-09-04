@@ -32,8 +32,7 @@ const isNarrow = typeof window !== "undefined" && window.matchMedia("(max-width:
     <FormRenderer
       :schema="schema"
       :data="data"
-      mode="preview"
-      :options="{ zoom: true, fitOnMount: isNarrow }"
+      :options="{ zoom: true, fitOnMount: isNarrow, readonly: false }"
     />
   </div>
 </template>

@@ -6,7 +6,7 @@ import demoData from "@/dev/demoData";
 import type { FormDataV2 } from "@/types";
 
 /**
- * A3「统一渲染路径」验收闸门：**同一份 schema + data 在预览与填写下走同一条渲染路径**，
+ * A3「统一渲染路径」验收闸门：消费态（非 design）走同一条渲染路径，
  * 即「填充 = 渲染组件 + 数据」，而不是另起一套 DOM。
  *
  * 背景：G11 曾把填写态做成 `<textarea class="layout-p__control">` 分支，导致「浏览/打印看到的版式」
@@ -14,11 +14,11 @@ import type { FormDataV2 } from "@/types";
  * 字段统一为可编辑 `<p>`（复合字段为其中的 `.layout-p__input`）。本文件把这条不变式固化成断言，
  * 防止将来再次分化出两套渲染路径。
  *
- * 口径（2026-09-04 订正，与用户三态语义一致）：
- * - 内核 `preview` 与 `fill` **同口径、都可输入**——预览就是消费模板输入数据的地方；
+ * 口径（2026-09-04 内核收拢为 design | preview 两值，与消费态契约一致）：
+ * - 内核非设计态仅剩 `preview` 一个值，与旧 `fill` 完全等价（消费态）；
  * - 真正的「不可输入」由 `readonly` 闸门决定，与 `mode` 正交
- *   （`FormRenderer` 的 preview 会补 `readonly`；设计器预览态显式传 `:readonly="false"`）。
- * 故本文件锁两条：① preview ≡ fill；② 只读 vs 可输入只差 `contenteditable`。
+ *   （`FormRenderer` 默认 `readonly=true` 只读回显、显式 `readonly=false` 进入填写态；设计器预览态显式传 `:readonly="false"`）。
+ * 故本文件锁一条核心不变式：**非设计态渲染结果只受 `readonly` 闸门影响，且差异仅限 `contenteditable`**。
  *
  * 设计态（design）不在此不变式内：它无 data、字段显示 `default` 占位，且按 A2 拍板
  * 保留 contenteditable 就地输入以查看交互效果，与交付态本就不同源。
@@ -27,14 +27,13 @@ const schema = makeYunlvSecondTicketFirstFiveRowsSchema();
 const data = { ...(demoData as Record<string, unknown>) } as FormDataV2;
 
 type RenderCase = {
-  mode: "preview" | "fill";
   readonly?: boolean;
   paginate?: boolean;
 };
 
-function renderHtml({ mode, readonly = false, paginate = false }: RenderCase): string {
+function renderHtml({ readonly = false, paginate = false }: RenderCase): string {
   const wrapper = mount(GridFormRenderer, {
-    props: { schema, data, mode, readonly, paginate },
+    props: { schema, data, mode: "preview", readonly, paginate },
   });
   return wrapper.html();
 }
@@ -52,15 +51,10 @@ function countPages(html: string): number {
   return html.match(/class="grid-form-paper"/g)?.length ?? 0;
 }
 
-describe("A3 统一渲染路径：预览 / 填写同构", () => {
-  it("preview 与 fill 渲染结果完全相同（同一口径：都可输入）", () => {
-    // 最硬的同构形式：不是「结构相似」，而是逐字符一致
-    expect(renderHtml({ mode: "preview" })).toBe(renderHtml({ mode: "fill" }));
-  });
-
-  it("只读（readonly）与可填写只差 contenteditable，DOM 结构一致", () => {
-    const editable = renderHtml({ mode: "fill" });
-    const readonly = renderHtml({ mode: "fill", readonly: true });
+describe("A3 统一渲染路径：消费态（preview）同构", () => {
+  it("可填写（readonly=false）与只读（readonly=true）只差 contenteditable，DOM 结构一致", () => {
+    const editable = renderHtml({ readonly: false });
+    const readonly = renderHtml({ readonly: true });
 
     expect(stripEditable(editable)).toBe(stripEditable(readonly));
     // 且确实只差 contenteditable：可填写态每个字段都有，只读态一个都没有
@@ -68,11 +62,10 @@ describe("A3 统一渲染路径：预览 / 填写同构", () => {
     expect(countEditable(readonly)).toBe(0);
   });
 
-  it("预览/填写都不再出现 textarea / input 控件（十续回退 textarea 分支后的统一结构）", () => {
+  it("消费态不再出现 textarea / input 控件（十续回退 textarea 分支后的统一结构）", () => {
     for (const html of [
-      renderHtml({ mode: "preview" }),
-      renderHtml({ mode: "fill" }),
-      renderHtml({ mode: "fill", readonly: true }),
+      renderHtml({ readonly: false }),
+      renderHtml({ readonly: true }),
     ]) {
       expect(html).not.toContain("<textarea");
       expect(html).not.toContain("<input");
@@ -81,8 +74,8 @@ describe("A3 统一渲染路径：预览 / 填写同构", () => {
   });
 
   it("只读闸门对普通字段与复合字段同口径（无「一类可编辑、一类不可」的割裂）", () => {
-    const editable = renderHtml({ mode: "fill" });
-    const readonly = renderHtml({ mode: "fill", readonly: true });
+    const editable = renderHtml({ readonly: false });
+    const readonly = renderHtml({ readonly: true });
 
     // 样例含复合字段（如「共 ___ 人」）与普通字段，二者在只读下都应失去 contenteditable
     const inputs = (html: string): number =>
@@ -93,14 +86,12 @@ describe("A3 统一渲染路径：预览 / 填写同构", () => {
     expect(editable).toMatch(/class="layout-p__input[^"]*" contenteditable="true"/);
   });
 
-  it("分页开启时三态物理页数一致（分页结果不因 preview/fill/readonly 而分叉）", () => {
+  it("分页开启时，只读态 / 填写态的物理页数一致（分页结果不因 readonly 而分叉）", () => {
     const pages = [
-      renderHtml({ mode: "preview", paginate: true }),
-      renderHtml({ mode: "fill", paginate: true }),
-      renderHtml({ mode: "fill", readonly: true, paginate: true }),
+      renderHtml({ readonly: false, paginate: true }),
+      renderHtml({ readonly: true, paginate: true }),
     ].map(countPages);
     expect(pages[0]).toBeGreaterThan(0);
     expect(pages[1]).toBe(pages[0]);
-    expect(pages[2]).toBe(pages[0]);
   });
 });

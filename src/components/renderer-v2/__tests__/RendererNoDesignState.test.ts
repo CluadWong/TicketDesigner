@@ -18,7 +18,7 @@ import type { FormDataV2 } from "@/types";
 const schema = makeYunlvSecondTicketFirstFiveRowsSchema();
 const data = { ...(demoData as Record<string, unknown>) } as FormDataV2;
 
-function html(mode: "design" | "preview" | "fill"): string {
+function html(mode: "design" | "preview"): string {
   const wrapper = mount(GridFormRenderer, {
     props: { schema, data, mode, paginate: false },
   });
@@ -27,13 +27,13 @@ function html(mode: "design" | "preview" | "fill"): string {
 
 describe("D3 渲染内核不含设计态交互 DOM", () => {
   it("任意模式下都不渲染插入指示线 .v2-insertion-line", () => {
-    for (const mode of ["design", "preview", "fill"] as const) {
+    for (const mode of ["design", "preview"] as const) {
       expect(html(mode)).not.toContain("v2-insertion-line");
     }
   });
 
   it("渲染结果不含任何 drag-over-* 属性（拖拽悬停态已移出内核）", () => {
-    for (const mode of ["design", "preview", "fill"] as const) {
+    for (const mode of ["design", "preview"] as const) {
       const h = html(mode);
       expect(h).not.toContain("drag-over-cell-id");
       expect(h).not.toContain("drag-over-index");

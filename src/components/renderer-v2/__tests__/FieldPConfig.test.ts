@@ -39,25 +39,25 @@ describe("字段组件配置：宽度 / 默认内容 / 内部边框", () => {
   });
 
   it("宽度：复合字段（有前/后标签）下宽度只作用于可输入区域，不作用于整个组件", () => {
-    const make = (mode: "design" | "fill") =>
+    const make = (mode: "design" | "preview") =>
       mount(GridSchemaNode, {
         props: {
           node: fieldNode({ prefix: "共", suffix: "人", width: "30mm" }),
           baseRowHeight: 8,
-          // fill 模式传空 data 进入填充态控件；
-          data: mode === "fill" ? {} : undefined,
+          // preview 模式传空 data 进入填充态控件；
+          data: mode === "preview" ? {} : undefined,
         },
       });
 
     // 1. 整个 <p> 不应带 width（否则前缀/后缀会被算进宽度）
     const design = make("design");
     expect(design.attributes("style") ?? "").not.toContain("width:");
-    const fill = make("fill");
-    expect(fill.attributes("style") ?? "").not.toContain("width:");
+    const preview = make("preview");
+    expect(preview.attributes("style") ?? "").not.toContain("width:");
 
-    // 2. 可输入区域挂上 width：设计态与填充态均为 .layout-p__input（统一渲染路径，见十续）
+    // 2. 可输入区域挂上 width：设计态与预览态均为 .layout-p__input（统一渲染路径，见十续）
     expect(design.find(".layout-p__input").attributes("style")).toContain("width: 30mm");
-    expect(fill.find(".layout-p__input").attributes("style")).toContain("width: 30mm");
+    expect(preview.find(".layout-p__input").attributes("style")).toContain("width: 30mm");
   });
 
   it("默认内容：无 data 时渲染 default 预设文本", () => {

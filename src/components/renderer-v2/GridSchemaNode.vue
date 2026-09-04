@@ -32,13 +32,11 @@ const props = defineProps<{
   /**
    * 渲染模式（A1 / A5）：显式声明调用方意图，取代旧版靠 `data != null` 推断三态。
    * - design：设计态，字段 contenteditable 就地占位（不回写 schema），结构可拖拽/选中。
-   * - preview：带数据回显，**字段可输入**（消费模板、输入数据以配合流程流转；A3 与 fill 同口径）。
-   * - fill：可填写，带数据且字段为真实可编辑控件。
-   * 未传时向后兼容：有 `data` 且非 `readonly` → fill，有 `data` 且 `readonly` → preview，否则 design。
-   * ⚠️ `preview` 与 `fill` 在内核里**同一渲染路径、同一可输入口径**，差别只在调用方意图；
-   * 真正的「不可输入」由 `readonly` 闸门决定（见下），不由 `mode` 决定。
+   * - preview：带数据回显，**字段可输入**（消费模板、输入数据以配合流程流转）。
+   * 未传时向后兼容：有 `data` → preview，否则 design。
+   * ⚠️ `mode` 不决定可编辑性；真正的「不可输入」由 `readonly` 闸门决定（见下）。
    */
-  mode?: "design" | "preview" | "fill";
+  mode?: "design" | "preview";
   data?: FormDataV2 | null;
   /**
    * 只读闸门：为 `true` 时字段一律不可输入（真·只读回显/打印浏览）。
@@ -84,21 +82,21 @@ function cellSiblingSuppressBorders(
 
 /**
  * 显式渲染模式（A1 / A5）：调用方优先用 `mode` 直接声明意图；未传时向后兼容旧调用，
- * 由 `data` + `readonly` 推断（有 data 且非只读 → fill；有 data 且只读 → preview；否则 design）。
+ * 由 `data` 推断（有 data → preview；否则 design）。`readonly` 是独立的只读闸门，不在此推断。
  * 渲染内核只认这个显式模式，不再把「有没有 data」解释成「是不是填充态」。
  */
-type RenderMode = "design" | "preview" | "fill";
+type RenderMode = "design" | "preview";
 const resolvedMode = computed<RenderMode>(() => {
   if (props.mode) return props.mode;
-  if (props.data != null) return props.readonly ? "preview" : "fill";
+  if (props.data != null) return "preview";
   return "design";
 });
 /** 设计态：字段 contenteditable 就地占位、节点可拖拽。 */
 const isDesign = computed(() => resolvedMode.value === "design");
 /**
- * 字段是否可输入：预览态即「交互填充态」——复用同一 `<p>` 渲染路径，字段可编辑、
+ * 字段是否可输入：预览/消费态即「交互填充态」——复用同一 `<p>` 渲染路径，字段可编辑、
  * 值来自 data，用户输入经 DOM 遍历采集（不逐键回写响应式 data，见十续）。
- * 故 preview 与 fill 都视为可输入；仅 design 态字段是占位、不承载真实数据。
+ * 故所有非 design 模式（现仅 preview 一种）均视为可输入；仅 design 态字段是占位、不承载真实数据。
  * 但同时受 `readonly` 硬闸门约束：外部传入 readonly（如真·只读展示）时强制不可编辑。
  * 等价于旧逻辑 `data != null && !readonly`。
  */

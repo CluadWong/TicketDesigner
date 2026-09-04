@@ -27,13 +27,13 @@ import type { FormSchemaV2, FormDataV2, FormNodeV2 } from "@/types";
  * 关键拆分：内核不再持有 `selectedNodeId`、不处理拖拽 DOM 事件（A5/A6）；
  * 选中与拖拽交互均在本表面层完成，内核保持纯净（见 docs/architecture-layering-review.md §6.5）。
  */
-type CanvasSurfaceMode = "design" | "preview" | "fill";
+type CanvasSurfaceMode = "design" | "preview";
 type NodeKind = "text" | "field" | "table" | "html" | "image" | "grid";
 
 const props = withDefaults(
   defineProps<{
     schema: FormSchemaV2;
-    /** 渲染模式，透传给内核（design / preview / fill）。仅 design 态允许拖拽交互。 */
+    /** 渲染模式，透传给内核（design / preview）。仅 design 态允许拖拽交互。 */
     mode?: CanvasSurfaceMode;
     data?: FormDataV2 | null;
     readonly?: boolean;
@@ -119,7 +119,7 @@ onMounted(() => {
 onUnmounted(() => observer?.disconnect());
 
 const hostClass = computed(() => ({
-  "v2-canvas-surface--preview": props.mode === "preview" || props.mode === "fill",
+  "v2-canvas-surface--preview": props.mode !== "design",
 }));
 
 // ── 拖拽落点（A6） ──
@@ -179,7 +179,7 @@ const legalDropCellIds = ref<Set<string>>(new Set());
 let dragTargetEl: HTMLElement | null = null;
 
 const dragEnabled = computed(
-  () => props.mode !== "preview" && props.mode !== "fill",
+  () => props.mode === "design",
 );
 
 function setDropHighlight(cell: HTMLElement | null): void {

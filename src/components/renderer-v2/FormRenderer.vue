@@ -5,10 +5,17 @@ import GridFormRenderer from "./GridFormRenderer.vue";
 import PaperViewport from "./PaperViewport.vue";
 import { printForm } from "./print-form";
 
-/** 渲染模式：preview=消费模板预览（默认可输入数据，配合业务流程流转）；fill=可填写（消费页录入）。两者口径一致，是否只读由 `options.readonly` 决定。 */
-export type FormRendererMode = "preview" | "fill";
-
-/** 渲染形态选项（G10 部分落地：当前支持 `bare` / `zoom` / `readonly`）。 */
+/**
+ * 消费页渲染形态选项（G8 / G10）。
+ *
+ * 设计态与消费态由**两个正交轴**区分（同一套渲染内核 `GridFormRenderer`）：
+ * - `isDesign`（内核 `mode="design"`，仅设计器内）：可编辑组件（表面层负责）+ 字段可就地输入看交互效果（不回写 schema）；
+ * - `readonly`（消费态闸门）：消费页不编辑组件，字段是否可输入由 `readonly` 全局控制，**默认 true（只读回显）**，
+ *   显式传 `false` 即进入「填写」——这正是 `FormRenderer` 这里唯一的输入控制。
+ *
+ * 因此 `FormRenderer` 不需要 `preview` / `fill` 这类模式区分：它永远是消费态（非 design），
+ * 对内统一传固定的非设计 `mode` 给内核，对外只暴露 `readonly` 与 `getFormData`。
+ */
 export interface FormRendererOptions {
   /** 无外壳：去掉灰底纸张画布，便于嵌入消费页中部（G8 / G10）。 */
   bare?: boolean;
@@ -24,9 +31,9 @@ export interface FormRendererOptions {
    */
   fitOnMount?: boolean;
   /**
-   * 只读闸门（与 `mode` **正交**）：默认 false —— preview / fill 两种模式都允许字段输入
-   * （契合「预览即消费模板、输入数据以配合业务流程流转」的语义，三态口径一致）。
-   * 设为 true 时强制只读回显（字段不可编辑），用于「仅浏览详情、不录入」的消费场景。
+   * 只读闸门（与内核 `mode` **正交**）：默认 **true** —— 消费页默认只读回显（仅浏览详情）。
+   * 设为 false 即进入「填写」态，字段可输入（契合「预览即消费模板、输入数据以配合业务流程流转」）。
+   * 设计态的「不回写 schema 的就地输入」是另一回事（内核 `mode="design"`，由设计器控制），与此无关。
    */
   readonly?: boolean;
 }
@@ -34,25 +41,24 @@ export interface FormRendererOptions {
 /**
  * 公共渲染入口（G8）：消费页引用渲染器的唯一公开组件。
  *
- * 设计器（DesignerApp）仍直接引用内核 `GridFormRenderer`；本组件是在内核之上收敛出的
- * 「消费页友好」包装——props 收敛为 `schema / data / mode / options`，不暴露任何设计器私有状态
- * （`selectedNodeId` / 拖拽态 / `node-drag-start`），从而可被独立引用与库化。
+ * 设计器（DesignerApp）仍直接引用内核 `GridFormRenderer`（并包 `CanvasSurface` 负责组件编辑）；
+ * 本组件是在内核之上收敛出的「消费页友好」包装——props 收敛为 `schema / data / options`，
+ * 不暴露任何设计器私有状态（`selectedNodeId` / 拖拽态 / `node-drag-start`），从而可被独立引用与库化。
  *
  * 消费页典型流程：拿到 JSON 字符串 → `parseTolerantFormSchemaV2(json).schema` →
- * `<FormRenderer :schema="schema" v-model:data="data" mode="fill" />`。
+ * `<FormRenderer :schema="schema" v-model:data="data" />`（只读回显）；
+ * 需要录入时 `<FormRenderer :schema="schema" :options="{ readonly: false }" v-model:data="data" />`。
  */
 const props = withDefaults(
   defineProps<{
     /** 设计器导出的 Schema（消费页由 json + 容错解析得到）。 */
     schema: FormSchemaV2;
-    /** 字段数据；缺省为空（预览/设计态显示静态内容或 default）。 */
+    /** 字段数据；缺省为空（显示静态内容或 default）。 */
     data?: FormDataV2 | null;
-    /** 渲染模式：preview=只读回显，fill=可填写。默认 preview。 */
-    mode?: FormRendererMode;
-    /** 渲染形态选项（G10 部分落地：当前支持 bare）。 */
+    /** 渲染形态选项（G8 / G10：bare / zoom / fitOnMount / readonly）。 */
     options?: FormRendererOptions;
   }>(),
-  { mode: "preview", options: () => ({}) },
+  { options: () => ({}) },
 );
 
 const emit = defineEmits<{
@@ -60,7 +66,7 @@ const emit = defineEmits<{
   (e: "update:data", data: FormDataV2): void;
 }>();
 
-// 内部持有 data，使填充态输入可回写并被消费页 v-model:data 接管。
+// 内部持有 data，使填写态输入可回写并被消费页 v-model:data 接管。
 const data = ref<FormDataV2>({ ...(props.data ?? {}) });
 watch(
   () => props.data,
@@ -69,9 +75,10 @@ watch(
   },
 );
 
-// 只读闸门与 mode 正交：默认 false → preview / fill 都可输入（消费态口径一致）。
-// 需要「仅浏览详情」时由消费页显式传 options.readonly=true。
-const readonly = computed(() => props.options?.readonly ?? false);
+// 消费态只读闸门：默认 true（只读回显），显式 readonly:false → 可填写。与内核 mode 正交。
+const readonly = computed(() => props.options?.readonly ?? true);
+// FormRenderer 永远是消费态（非 design），内核只需知道不是 design。
+const renderMode = "preview" as const;
 
 /**
  * G15（A4）契约化：内核（GridFormRenderer → GridSchemaNode）在填写态 emit `field-change`，
@@ -94,14 +101,23 @@ function print(): boolean {
   return printForm();
 }
 
-defineExpose({ print });
+/**
+ * 获取整个表单当前输入数据（消费页「提交 / 导出填写结果」入口）。
+ * 返回内部响应式 data 的快照——初始来自 `props.data`，每次字段 `field-change` 即时并入，
+ * 与 `update:data` 发射的口径一致。只读态返回的是回显数据，填写态返回的是已录入值。
+ */
+function getFormData(): FormDataV2 {
+  return { ...data.value };
+}
+
+defineExpose({ print, getFormData });
 </script>
 
 <template>
   <PaperViewport v-if="options?.zoom" :fit-on-mount="options?.fitOnMount ?? false">
     <GridFormRenderer
       :schema="schema"
-      :mode="props.mode"
+      :mode="renderMode"
       :data="data"
       :readonly="readonly"
       :bare="true"
@@ -111,7 +127,7 @@ defineExpose({ print });
   <GridFormRenderer
     v-else
     :schema="schema"
-    :mode="props.mode"
+    :mode="renderMode"
     :data="data"
     :readonly="readonly"
     :bare="options?.bare"
