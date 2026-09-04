@@ -2,7 +2,11 @@
 import { computed, ref, watch, onMounted, onUnmounted, reactive } from "vue";
 import CanvasSurface from "./CanvasSurface.vue";
 import PaperViewport from "@/components/renderer-v2/PaperViewport.vue";
-import { NODE_ID_ATTR, LAYOUT_ID_ATTR, PALETTE_DRAG_MIME } from "@/engine-v2/node-address";
+import {
+  NODE_ID_ATTR,
+  LAYOUT_ID_ATTR,
+  PALETTE_DRAG_MIME,
+} from "@/engine-v2/node-address";
 import type { SampleEntry } from "@/samples/types";
 import { resolveCellBoxV2 } from "@/engine-v2/derivation";
 /** D2：打印触发收口到渲染内核，设计器不再裸调 `window.print()`。 */
@@ -127,11 +131,6 @@ const selectedNode = computed<EditorNodeV2 | null>(() => {
   return id && isStyleEditableNodeId(id)
     ? (nodeIndex.value.get(id)?.node ?? null)
     : null;
-});
-const selectedPath = computed<EditorNodeV2[]>(() => {
-  return selectionPathIds.value
-    .map((id) => nodeIndex.value.get(id)?.node)
-    .filter((n): n is EditorNodeV2 => n != null && isStyleEditableNodeId(n.id));
 });
 const selectedNodeType = computed(() => selectedNode.value?.type ?? "未选择");
 const selectedOwnerCell = computed(() =>
@@ -464,7 +463,9 @@ function importFillDataFile(event: Event): void {
       viewMode.value = "preview";
       clearSelection();
     } catch (error) {
-      alert(`导入数据失败：${error instanceof Error ? error.message : String(error)}`);
+      alert(
+        `导入数据失败：${error instanceof Error ? error.message : String(error)}`,
+      );
     } finally {
       input.value = "";
     }
@@ -486,7 +487,9 @@ function exportFillDataFile(): void {
   if (!root || !previewMode.value) return;
   try {
     const values = collectFieldValues(root);
-    const blob = new Blob([JSON.stringify(values, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify(values, null, 2)], {
+      type: "application/json",
+    });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
@@ -494,7 +497,9 @@ function exportFillDataFile(): void {
     anchor.click();
     URL.revokeObjectURL(url);
   } catch (error) {
-    alert(`导出数据失败：${error instanceof Error ? error.message : String(error)}`);
+    alert(
+      `导出数据失败：${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }
 
@@ -506,7 +511,9 @@ function saveFillDataToLocal(): void {
     const values = collectFieldValues(root);
     localStorage.setItem(DATA_STORAGE_KEY, JSON.stringify(values));
   } catch (error) {
-    alert(`保存数据失败：${error instanceof Error ? error.message : String(error)}`);
+    alert(
+      `保存数据失败：${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }
 
@@ -523,7 +530,9 @@ function loadFillDataFromLocal(): void {
     viewMode.value = "preview";
     clearSelection();
   } catch (error) {
-    alert(`读取数据失败：${error instanceof Error ? error.message : String(error)}`);
+    alert(
+      `读取数据失败：${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }
 
@@ -551,6 +560,10 @@ function beforeUnload(event: BeforeUnloadEvent): void {
 }
 
 onMounted(() => {
+  // 默认选中首个页面节点，使右侧「页面设置」（纸张/边距/行高/分页）开箱即可见
+  if (schema.value.pages.length > 0) {
+    selectNodeById(schema.value.pages[0].id);
+  }
   window.addEventListener("keydown", onKeydown);
   window.addEventListener("beforeunload", beforeUnload);
 });
@@ -690,7 +703,12 @@ function onDropNode(detail: {
   cellId: string;
   index: number;
 }): void {
-  const next = moveNodeToIndexV2(schema.value, detail.moveId, detail.cellId, detail.index);
+  const next = moveNodeToIndexV2(
+    schema.value,
+    detail.moveId,
+    detail.cellId,
+    detail.index,
+  );
   if (next === schema.value) return; // 原位 / 非法：不产生新结构
   commit(next, "move:" + detail.moveId);
   selectedNodeId.value = detail.moveId;
@@ -715,7 +733,8 @@ function selectNode(event: MouseEvent): void {
   if (!editable.value) return;
   const target = event.target as HTMLElement;
   selectedInsertionSlotId.value =
-    target.closest<HTMLElement>(`[${LAYOUT_ID_ATTR}]`)?.dataset.layoutId ?? null;
+    target.closest<HTMLElement>(`[${LAYOUT_ID_ATTR}]`)?.dataset.layoutId ??
+    null;
   const ids: string[] = [];
   let cursor = target.closest<HTMLElement>(`[${NODE_ID_ATTR}]`);
   while (cursor) {
@@ -749,14 +768,6 @@ function selectNode(event: MouseEvent): void {
   }
   selectionPathIndex.value = selectionDepth;
   selectedNodeId.value = selectableIds[selectionDepth] ?? leafId;
-}
-
-function selectFromPath(id: string): void {
-  const index = selectionPathIds.value.indexOf(id);
-  if (index < 0) return;
-  selectionPathIndex.value = index;
-  selectedNodeId.value = id;
-  selectionDepth = index;
 }
 
 function selectIssue(issue: SchemaIssueV2): void {
@@ -1276,38 +1287,6 @@ function updateSelectedSafetyField(event: Event): void {
 <template>
   <div class="v2-designer">
     <header class="v2-toolbar">
-      <div class="v2-toolbar__title">固定版式表单设计器 V2</div>
-      <div class="v2-toolbar__meta">
-        <label class="v2-toolbar__control">
-          <span>纸张</span>
-          <select :value="schema.paper.size" @change="updatePaperSize">
-            <option value="A4">A4（纵向）</option>
-            <option value="A3">A3（横向）</option>
-          </select>
-        </label>
-        <label class="v2-toolbar__control">
-          <span>纸张边距(mm)</span>
-          <input
-            type="number"
-            min="0"
-            max="99"
-            step="1"
-            :value="paperMargin"
-            @change="updatePaperMargin"
-          />
-        </label>
-        <label class="v2-toolbar__control">
-          <span>行高(mm)</span>
-          <input
-            type="number"
-            min="1"
-            max="99"
-            step="1"
-            :value="schema.baseRowHeight"
-            @change="updateBaseRowHeight"
-          />
-        </label>
-      </div>
       <span
         class="v2-toolbar__dirty"
         :class="{ 'v2-toolbar__dirty--on': dirty }"
@@ -1410,10 +1389,6 @@ function updateSelectedSafetyField(event: Event): void {
         <button class="v2-toolbar__button" type="button" @click="printDocument">
           打印
         </button>
-        <label class="v2-toolbar__control v2-toolbar__control--toggle">
-          <input v-model="paginate" type="checkbox" data-paginate="true" />
-          <span>分页</span>
-        </label>
       </div>
       <input
         ref="fileInput"
@@ -1456,7 +1431,7 @@ function updateSelectedSafetyField(event: Event): void {
           @dragstart="startPaletteDrag('field', $event)"
           @click="addNodeToSelectedCell('field')"
         >
-          字段 Field
+          输入框
         </button>
         <button
           class="v2-palette-item v2-palette-item--button"
@@ -1491,7 +1466,7 @@ function updateSelectedSafetyField(event: Event): void {
           @dragstart="startPaletteDrag('grid', $event)"
           @click="addGrid"
         >
-          添加 Grid
+          格子 Grid
         </button>
         <button
           class="v2-palette-item v2-palette-item--button"
@@ -1502,14 +1477,8 @@ function updateSelectedSafetyField(event: Event): void {
           @dragstart="startPaletteDrag('table', $event)"
           @click="addNodeToSelectedCell('table')"
         >
-          明细 Table
+          表格 Table
         </button>
-
-        <p class="v2-sidebar__hint">
-          1.点击插入到选中格，或拖动模板到任意格子；<br />
-          2.选中组件后可在右侧面板配置并删除。<br />
-          3.预览/填充态为只读展示，不可添加或改动结构。
-        </p>
 
         <div class="v2-sidebar__heading v2-sidebar__heading--tree">结构</div>
         <div class="v2-tree">
@@ -1547,7 +1516,10 @@ function updateSelectedSafetyField(event: Event): void {
       </main>
 
       <aside v-if="editable" class="v2-sidebar v2-sidebar--right">
-        <div class="v2-sidebar__heading">节点检查</div>
+        <div class="v2-inspector-row">
+          <span>节点类型</span>
+          <strong>{{ selectedNodeType }}</strong>
+        </div>
         <div class="v2-inspector-row v2-inspector-row--head">
           <span>当前节点</span>
           <code>{{ selectedNodeId ?? "未选择" }}</code>
@@ -1564,44 +1536,41 @@ function updateSelectedSafetyField(event: Event): void {
             删除
           </button>
         </div>
-        <div class="v2-inspector-row">
-          <span>节点类型</span>
-          <strong>{{ selectedNodeType }}</strong>
-        </div>
-        <nav
-          v-if="selectedPath.length"
-          class="v2-breadcrumb"
-          aria-label="节点路径"
-        >
-          <button
-            v-for="node in selectedPath"
-            :key="node.id"
-            type="button"
-            class="v2-breadcrumb__item"
-            :class="{
-              'v2-breadcrumb__item--active': node.id === selectedNodeId,
-            }"
-            @click.stop="selectFromPath(node.id)"
-          >
-            {{ node.type }}
-          </button>
-        </nav>
-        <div class="v2-inspector-row">
-          <span>Schema 版本</span>
-          <strong>{{ schema.version }}</strong>
-        </div>
-        <template
-          v-if="
-            selectedNode &&
-            selectedNode.type !== 'page' &&
-            selectedNode.type !== 'grid-cell'
-          "
-        >
-          <div class="v2-sidebar__subheading">位置（拖拽重排）</div>
-          <div class="v2-inspector-row v2-inspector-row--hint">
-            在设计画布中拖拽节点即可重排：同格内拖动调整顺序；拖到其它格 / 嵌套
-            Grid 即跨格移动。整段可编辑字段请按住 Alt 再拖拽。
-          </div>
+        <template v-if="selectedNode?.type === 'page'">
+          <div class="v2-sidebar__subheading">页面设置</div>
+          <label class="v2-control v2-control--inline">
+            <span>纸张类型</span>
+            <select :value="schema.paper.size" @change="updatePaperSize">
+              <option value="A4">A4（纵向）</option>
+              <option value="A3">A3（横向）</option>
+            </select>
+          </label>
+          <label class="v2-control v2-control--inline">
+            <span>纸张边距(mm)</span>
+            <input
+              type="number"
+              min="0"
+              max="99"
+              step="1"
+              :value="paperMargin"
+              @change="updatePaperMargin"
+            />
+          </label>
+          <label class="v2-control v2-control--inline">
+            <span>行高(mm)</span>
+            <input
+              type="number"
+              min="1"
+              max="99"
+              step="1"
+              :value="schema.baseRowHeight"
+              @change="updateBaseRowHeight"
+            />
+          </label>
+          <label class="v2-control v2-control--toggle">
+            <input v-model="paginate" type="checkbox" data-paginate="true" />
+            <span>分页（仅设计态生效）</span>
+          </label>
         </template>
         <template v-if="selectedNode?.type === 'grid'">
           <div class="v2-grid-dimensions">
@@ -2224,11 +2193,12 @@ function updateSelectedSafetyField(event: Event): void {
   padding: 0 18px;
   color: #f8fafc;
   background: #172033;
+  /* 可视区域宽度不足时允许横向滚动，避免挤压缩排 */
+  overflow-x: auto;
 }
 
-.v2-toolbar__title {
-  font-size: 14px;
-  font-weight: 700;
+.v2-toolbar > * {
+  flex-shrink: 0;
 }
 
 .v2-toolbar__meta {
@@ -2305,10 +2275,6 @@ function updateSelectedSafetyField(event: Event): void {
   color: #9fb3c8;
 }
 
-.v2-toolbar__group:first-of-type {
-  margin-left: auto;
-}
-
 .v2-toolbar__button {
   height: 28px;
   padding: 0 12px;
@@ -2318,6 +2284,7 @@ function updateSelectedSafetyField(event: Event): void {
   background: #263957;
   cursor: pointer;
   font-size: 12px;
+  white-space: nowrap;
 }
 
 .v2-toolbar__button:disabled {
@@ -2601,29 +2568,6 @@ function updateSelectedSafetyField(event: Event): void {
   white-space: nowrap;
 }
 
-.v2-breadcrumb {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin: 8px 0 14px;
-}
-
-.v2-breadcrumb__item {
-  padding: 3px 6px;
-  border: 1px solid #cbd5e1;
-  border-radius: 3px;
-  color: #475569;
-  background: #f8fafc;
-  cursor: pointer;
-  font-size: 10px;
-}
-
-.v2-breadcrumb__item--active {
-  border-color: #2563eb;
-  color: #1d4ed8;
-  background: #eff6ff;
-}
-
 .v2-control {
   display: flex;
   flex-direction: column;
@@ -2711,6 +2655,19 @@ function updateSelectedSafetyField(event: Event): void {
   box-sizing: border-box;
   color: #1e293b;
   background: #fff;
+  font-size: 12px;
+}
+
+/* 复选框类控件：标签与勾选框同一行（如页面设置里的「分页」开关） */
+.v2-control--toggle {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  margin: 14px 0 0;
+}
+
+.v2-control--toggle span {
+  color: #475569;
   font-size: 12px;
 }
 

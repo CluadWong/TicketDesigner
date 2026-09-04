@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { nextTick } from "vue";
 import { mount } from "@vue/test-utils";
 import DesignerApp from "@/components/designer/DesignerApp.vue";
 import type { FormSchemaV2 } from "@/types";
@@ -77,6 +78,11 @@ describe("DesignerApp 分页渲染", () => {
   it("关闭分页开关后回到单张纸的整页连续渲染，行数不丢", async () => {
     const wrapper = mountWithTallSchema();
     expect(wrapper.findAll(".grid-form-paper").length).toBeGreaterThan(1);
+
+    // 分页开关已移入「页面」配置项，需先选中页面节点方能操作
+    const pageRow = wrapper.findAll(".v2-tree-row").find(r => r.text().includes("页面"));
+    await pageRow?.trigger("click");
+    await nextTick();
 
     await wrapper.find('[data-paginate="true"]').setValue(false);
 

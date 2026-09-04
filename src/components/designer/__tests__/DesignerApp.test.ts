@@ -51,24 +51,19 @@ describe("DesignerApp V2 selection and deletion", () => {
     const field = wrapper.find('[data-node-id="unit-field"]');
 
     await field.trigger("click");
-    expect(wrapper.findAll(".v2-inspector-row")[1]?.text()).toContain("p");
+    expect(wrapper.findAll(".v2-inspector-row")[0]?.text()).toContain("p");
 
     await field.trigger("click");
-    expect(wrapper.findAll(".v2-inspector-row")[1]?.text()).toContain("grid-cell");
+    expect(wrapper.findAll(".v2-inspector-row")[0]?.text()).toContain("grid-cell");
 
     await field.trigger("click");
-    expect(wrapper.findAll(".v2-inspector-row")[1]?.text()).toContain("grid");
+    expect(wrapper.findAll(".v2-inspector-row")[0]?.text()).toContain("grid");
 
     await field.trigger("click");
-    expect(wrapper.findAll(".v2-inspector-row")[1]?.text()).toContain("page");
+    expect(wrapper.findAll(".v2-inspector-row")[0]?.text()).toContain("page");
 
     await field.trigger("click");
-    expect(wrapper.findAll(".v2-inspector-row")[1]?.text()).toContain("p");
-    expect(wrapper.findAll(".v2-breadcrumb__item")).toHaveLength(4);
-
-    await wrapper.findAll(".v2-breadcrumb__item")[2]?.trigger("click");
-    expect(wrapper.findAll(".v2-inspector-row")[1]?.text()).toContain("grid");
-    expect(wrapper.findAll(".v2-breadcrumb__item")).toHaveLength(4);
+    expect(wrapper.findAll(".v2-inspector-row")[0]?.text()).toContain("p");
   });
 
   it("removes a selected root grid from the rendered page", async () => {
@@ -98,7 +93,7 @@ describe("DesignerApp V2 selection and deletion", () => {
     // 选中单元格：删除禁用，检查器显示 grid-cell
     const deleteButton = wrapper.find(".v2-inspector__delete");
     expect(deleteButton.attributes("disabled")).toBeDefined();
-    expect(wrapper.findAll(".v2-inspector-row")[1]?.text()).toContain("grid-cell");
+    expect(wrapper.findAll(".v2-inspector-row")[0]?.text()).toContain("grid-cell");
 
     // 选中 Grid 本身仍可删除
     await grid.trigger("click");
@@ -163,8 +158,8 @@ describe("DesignerApp V2 selection and deletion", () => {
     expect(issueEntry).toBeDefined();
     await issueEntry!.trigger("click");
 
-    expect(wrapper.findAll(".v2-inspector-row")[0]?.text()).toContain("unit-label");
-    expect(wrapper.findAll(".v2-inspector-row")[1]?.text()).toContain("text");
+    expect(wrapper.findAll(".v2-inspector-row")[1]?.text()).toContain("unit-label");
+    expect(wrapper.findAll(".v2-inspector-row")[0]?.text()).toContain("text");
   });
 
   it("falls back to the nearest selectable Grid for a row-level issue", async () => {
@@ -177,9 +172,8 @@ describe("DesignerApp V2 selection and deletion", () => {
     expect(issueEntry).toBeDefined();
     await issueEntry!.trigger("click");
 
-    expect(wrapper.findAll(".v2-inspector-row")[0]?.text()).toContain("ticket-layout");
-    expect(wrapper.findAll(".v2-inspector-row")[1]?.text()).toContain("grid");
-    expect(wrapper.findAll(".v2-breadcrumb__item")).toHaveLength(2);
+    expect(wrapper.findAll(".v2-inspector-row")[1]?.text()).toContain("ticket-layout");
+    expect(wrapper.findAll(".v2-inspector-row")[0]?.text()).toContain("grid");
   });
 
   it("falls back to the first Page for a schema-level issue without nodeId", async () => {
@@ -192,8 +186,8 @@ describe("DesignerApp V2 selection and deletion", () => {
     expect(issueEntry).toBeDefined();
     await issueEntry!.trigger("click");
 
-    expect(wrapper.findAll(".v2-inspector-row")[0]?.text()).toContain("ticket-page-1");
-    expect(wrapper.findAll(".v2-inspector-row")[1]?.text()).toContain("page");
+    expect(wrapper.findAll(".v2-inspector-row")[1]?.text()).toContain("ticket-page-1");
+    expect(wrapper.findAll(".v2-inspector-row")[0]?.text()).toContain("page");
   });
 
   it("renders a structure tree and selects a node by clicking it", async () => {
