@@ -236,6 +236,25 @@ function tableCellStyle(column: TableColumnV2): CSSProperties {
   };
 }
 
+/**
+ * 表头单元格样式：合并「表头级样式 headerStyle」与「列级 align」。
+ * headerStyle.align 优先于 column.align（表头作为整体可统一对齐）；
+ * 字号/粗细仅由 headerStyle 提供（未设则交回 CSS 默认，避免改动既有外观）。
+ * headerStyle 为 undefined 时完全回退到 `tableCellStyle(column)` 的既有行为。
+ */
+function tableHeaderCellStyle(
+  column: TableColumnV2,
+  headerStyle?: TextStyleV2,
+): CSSProperties {
+  const align = headerStyle?.align ?? column.align;
+  return {
+    justifyContent:
+      align === "center" ? "center" : align === "right" ? "flex-end" : "flex-start",
+    fontSize: headerStyle?.fontSize ? `${headerStyle.fontSize}px` : undefined,
+    fontWeight: headerStyle?.fontWeight ?? undefined,
+  };
+}
+
 function tableTemplate(node: TableNodeV2, columnKey: string) {
   return node.rowTemplate.find((template) => template.columnKey === columnKey);
 }
@@ -550,7 +569,7 @@ function onImgError(): void {
           v-for="column in node.columns"
           :key="column.key"
           class="layout-table__cell"
-          :style="tableCellStyle(column)"
+          :style="tableHeaderCellStyle(column, node.headerStyle)"
         >
           {{ column.title }}
         </th>

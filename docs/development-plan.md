@@ -18,7 +18,7 @@
   - **P11-1 已完成**：full 样例对齐为**扁平 13 个独立段 grid**（与设计器导出 `ticket-schema-v2-1788315240965.json` 对齐；border 分布 all×3 / outer×9 / none×4，带 `columns`），消除段间 2px 双边框；前五行样例（P10 验收）字段键已同步到同一 JSON 键集（工作负责人（监护人）/ 电站设备 / 工作地点_* / 工作内容_*）。
   - **P11-3 已完成**：A4 整票打印真机核验通过；打印方向改为由纸张尺寸派生（A4 纵向 / A3 横向）；Table 新增边框配置（all/outer/inner/none，与 Grid 对齐）。（**2026-09-02 十三续补正**：打印纸张尺寸 `@page` 曾硬编码 `A4`，选 A3 时渲染正常但打印仍按 A4 出页致内容被裁；现由渲染内核按 `schema.paper` 运行时注入，设计器与消费页均生效。）
   - **下一步**：P11-2（完整票快照基线，可选）、P11-4（并入推迟项：P9.1c 专用控件、P9.2、P12 清理）。（P7.2e 完整编辑 UI 经用户澄清=「设计器人工编排符合参考图结构的整票模板」，已由导出 JSON `ticket-schema-v2-1788315240965.json` + 同步 `yunlv-second-ticket-full.ts` 完成；P7.2d/P7.2f/P9.1d 已于 2026-09-01 完成。）
-- 当前测试基线 **vitest 274/274（33 文件）**，`vue-tsc --noEmit` 干净；每轮详细过程见 **[execution-log.md](./execution-log.md)**。（第39续：列宽设置失效修复——`parseColumnWidth` 认 `mm` 后缀 + `resizeGridV2` 同步 `columns`，+3 例）
+- 当前测试基线 **vitest 281/281（34 文件）**，`vue-tsc --noEmit` 干净；每轮详细过程见 **[execution-log.md](./execution-log.md)**。（第39续：列宽设置失效修复 +3 例；第40续：Table 表头样式配置 +4 例）
 
 ### 0.2 任务节点状态（2026-08-31 十续执行后）
 

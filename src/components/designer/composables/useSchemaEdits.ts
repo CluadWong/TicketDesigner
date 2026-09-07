@@ -453,6 +453,39 @@ export function useSchemaEdits(ctx: SchemaEditsContext) {
     );
   }
 
+  /** 表头样式（字号/粗细/对齐）合并写入 `node.headerStyle`，空/非法值走 undefined 移除覆盖（不静默兜底）。 */
+  function updateTableHeaderStyle(patch: Partial<TextStyleV2>): void {
+    if (selectedNode.value?.type !== "table") return;
+    updateSelectedNode(
+      (node) =>
+        node.type === "table"
+          ? { ...node, headerStyle: { ...node.headerStyle, ...patch } }
+          : node,
+      selectedNodeId.value ? `tablehdr:${selectedNodeId.value}` : undefined,
+    );
+  }
+
+  function updateTableHeaderFontSize(event: Event): void {
+    const raw = (event.target as HTMLInputElement).value;
+    const value = Number(raw);
+    // 金标准：非法/空 → undefined（移除覆盖），不静默成 1（对齐项目既定范式）
+    updateTableHeaderStyle({ fontSize: Number.isFinite(value) && value > 0 ? value : undefined });
+  }
+
+  function updateTableHeaderFontWeight(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value;
+    updateTableHeaderStyle({
+      fontWeight: (value || undefined) as "normal" | "bold" | undefined,
+    });
+  }
+
+  function updateTableHeaderAlign(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value;
+    updateTableHeaderStyle({
+      align: (value || undefined) as "left" | "center" | "right" | undefined,
+    });
+  }
+
   /**
    * 解析列宽输入：合法值（number / `Nfr` / `auto`）原样返回；空串视为「回到默认 1fr」；
    * 非法串（非数字、0、负、`.fr` 等）返回 `"INVALID"`，由调用方**忽略**——
@@ -730,6 +763,9 @@ export function useSchemaEdits(ctx: SchemaEditsContext) {
     removeTableColumn,
     renameTableColumnKey,
     updateTableColumn,
+    updateTableHeaderFontSize,
+    updateTableHeaderFontWeight,
+    updateTableHeaderAlign,
     updateGridColumnWidth,
     updateGridCellDefault,
     updateGridGap,

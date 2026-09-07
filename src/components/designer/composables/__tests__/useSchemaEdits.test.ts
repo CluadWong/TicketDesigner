@@ -9,7 +9,7 @@ import { ref, type Ref } from "vue";
 import { useSchemaDocument, type SchemaDocument } from "../useSchemaDocument";
 import { useNodeSelection } from "../useNodeSelection";
 import { useSchemaEdits } from "../useSchemaEdits";
-import type { FormSchemaV2, GridCellV2, GridNodeV2 } from "@/types";
+import type { FormSchemaV2, GridCellV2, GridNodeV2, TableNodeV2 } from "@/types";
 
 function setup(editable = true) {
   const editableRef = ref(editable);
@@ -249,5 +249,57 @@ describe("列宽解析：不得静默兜底为 24（三十七续回归）", () =
     const grid = gridOf(doc);
     expect(grid.columns).toHaveLength(2);
     expect(grid.columns?.[1]).toBe(40);
+  });
+});
+
+describe("Table 表头样式配置（表头字号/粗细/对齐）", () => {
+  function selectTable() {
+    const ctx = setup(true);
+    const { doc, selection, edits } = ctx;
+    const grid = doc.schema.value.pages[0].children[0] as GridNodeV2;
+    const cellId = grid.rows[0].cells[0].id;
+    selection.selectNodeById(cellId);
+    edits.addNodeToSelectedCell("table");
+    const cell = findCell(doc, cellId);
+    const table = cell.children.find((c) => c.type === "table") as TableNodeV2;
+    selection.selectNodeById(table.id);
+    return { ...ctx, tableId: table.id };
+  }
+
+  function tableOf(doc: SchemaDocument): TableNodeV2 {
+    const grid = doc.schema.value.pages[0].children[0] as GridNodeV2;
+    const cell = findCell(doc, grid.rows[0].cells[0].id);
+    return cell.children.find((c) => c.type === "table") as TableNodeV2;
+  }
+
+  it("设置表头字号：写入 headerStyle.fontSize", () => {
+    const { doc, edits } = selectTable();
+    edits.updateTableHeaderFontSize({ target: { value: "14" } } as unknown as Event);
+    expect(tableOf(doc).headerStyle?.fontSize).toBe(14);
+  });
+
+  it("表头字号非法/空：不静默兜底，移除覆盖（undefined，不写 1）", () => {
+    const { doc, edits } = selectTable();
+    edits.updateTableHeaderFontSize({ target: { value: "14" } } as unknown as Event);
+    expect(tableOf(doc).headerStyle?.fontSize).toBe(14);
+    edits.updateTableHeaderFontSize({ target: { value: "abc" } } as unknown as Event);
+    expect(tableOf(doc).headerStyle?.fontSize).toBeUndefined();
+  });
+
+  it("设置表头粗细 / 对齐：写入 headerStyle", () => {
+    const { doc, edits } = selectTable();
+    edits.updateTableHeaderFontWeight({ target: { value: "bold" } } as unknown as Event);
+    edits.updateTableHeaderAlign({ target: { value: "center" } } as unknown as Event);
+    const h = tableOf(doc).headerStyle;
+    expect(h?.fontWeight).toBe("bold");
+    expect(h?.align).toBe("center");
+  });
+
+  it("非 table 节点：表头样式不生效", () => {
+    const { doc, selection, edits } = selectTable();
+    const grid = doc.schema.value.pages[0].children[0];
+    selection.selectNodeById(grid.id);
+    edits.updateTableHeaderFontSize({ target: { value: "20" } } as unknown as Event);
+    expect(tableOf(doc).headerStyle).toBeUndefined();
   });
 });

@@ -159,6 +159,8 @@ export interface TableNodeV2 extends SchemaNodeBaseV2 {
   columns: TableColumnV2[];
   minRows: number;
   rowTemplate: TableCellTemplateV2[];
+  /** 表头样式（标题行）：字号(px) / 粗细 / 对齐。可选；未设时回退到列 align 与默认外观。 */
+  headerStyle?: TextStyleV2;
   /** 边框模式（与 Grid 一致）：all=外框+内部线（默认）、inner=仅内部线、outer=仅外框、none=无。 */
   border?: BorderModeV2;
   /**

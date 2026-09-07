@@ -28,6 +28,42 @@ defineProps<{ node: TableNodeV2; api: SchemaEdits }>();
       </select>
     </label>
   </div>
+  <div class="v2-sidebar__subheading">表头样式</div>
+  <div class="v2-style-grid">
+    <label class="v2-control v2-control--inline">
+      <span>字号(px)</span>
+      <input
+        type="number"
+        min="1"
+        step="1"
+        :value="node.headerStyle?.fontSize ?? ''"
+        @change="api.updateTableHeaderFontSize"
+      />
+    </label>
+    <label class="v2-control v2-control--inline">
+      <span>粗细</span>
+      <select
+        :value="node.headerStyle?.fontWeight ?? 'normal'"
+        @change="api.updateTableHeaderFontWeight"
+      >
+        <option value="normal">常规</option>
+        <option value="bold">加粗</option>
+      </select>
+    </label>
+  </div>
+  <div class="v2-grid-dimensions">
+    <label class="v2-control">
+      <span>水平对齐</span>
+      <select
+        :value="node.headerStyle?.align ?? 'left'"
+        @change="api.updateTableHeaderAlign"
+      >
+        <option value="left">左</option>
+        <option value="center">居中</option>
+        <option value="right">右</option>
+      </select>
+    </label>
+  </div>
   <div class="v2-sidebar__subheading">列配置</div>
   <div class="v2-col-table">
     <div class="v2-col-table__row v2-col-table__head">
