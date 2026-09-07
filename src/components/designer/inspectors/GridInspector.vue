@@ -106,3 +106,6 @@ defineProps<{ node: GridNodeV2; api: SchemaEdits }>();
     </label>
   </div>
 </template>
+
+<style scoped>
+</style>

@@ -128,6 +128,15 @@ export interface GridCellV2 extends SchemaNodeBaseV2 {
   padding?: number;
   align?: "left" | "center" | "right";
   verticalAlign?: "top" | "middle" | "bottom";
+  /**
+   * 弹性布局（单元格级）：为 true 时该单元格自身作为水平流式 flex 容器，
+   * 其直接子节点沿水平方向排布、到达边界自动换行、水平左对齐、垂直居中、间隔 0
+   * （等价于 CSS `display:flex; flex-direction:row; flex-wrap:wrap;
+   *  justify-content:flex-start; align-items:center`）。
+   * 适用于「一格内横排多个字段/文本」的弹性分组场景；缺省为 false（普通格子，
+   * 子节点按默认对齐居中放置）。flex 是单元格属性，不是独立组件。
+   */
+  flex?: boolean;
   children: FormNodeV2[];
 }
 

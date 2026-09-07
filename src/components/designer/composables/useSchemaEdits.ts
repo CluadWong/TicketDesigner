@@ -437,28 +437,24 @@ export function useSchemaEdits(ctx: SchemaEditsContext) {
     );
   }
 
+  /** 切换单元格弹性布局（cell.flex）：自身作为水平流式 flex 容器排布子节点。 */
+  function updateSelectedCellFlex(event: Event): void {
+    const checked = (event.target as HTMLInputElement).checked;
+    updateSelectedNode(
+      (node) =>
+        node.type === "grid-cell"
+          ? { ...node, flex: checked || undefined }
+          : node,
+      selectedNodeId.value ? `cellflex:${selectedNodeId.value}` : undefined,
+    );
+  }
+
   function updateSelectedCellRowHeight(event: Event): void {
     const raw = (event.target as HTMLInputElement).value;
     const value = raw === "" ? undefined : Math.max(0, Math.floor(Number(raw)));
     updateSelectedNode(
       (node) => (node.type === "grid-cell" ? { ...node, rowHeight: value } : node),
       selectedNodeId.value ? `cellrowh:${selectedNodeId.value}` : undefined,
-    );
-  }
-
-  function clearCellOverride(): void {
-    updateSelectedNode(
-      (node) =>
-        node.type === "grid-cell"
-          ? {
-              ...node,
-              padding: undefined,
-              align: undefined,
-              verticalAlign: undefined,
-              rowHeight: undefined,
-            }
-          : node,
-      selectedNodeId.value ? `cellclear:${selectedNodeId.value}` : undefined,
     );
   }
 
@@ -630,8 +626,8 @@ export function useSchemaEdits(ctx: SchemaEditsContext) {
     updateSelectedCellPadding,
     updateSelectedCellAlign,
     updateSelectedCellVerticalAlign,
+    updateSelectedCellFlex,
     updateSelectedCellRowHeight,
-    clearCellOverride,
     updateSelectedTextStyle,
     updateSelectedFontSize,
     updateSelectedLineHeight,

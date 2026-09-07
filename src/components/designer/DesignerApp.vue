@@ -132,7 +132,6 @@ const {
   updateSelectedCellAlign,
   updateSelectedCellVerticalAlign,
   updateSelectedCellRowHeight,
-  clearCellOverride,
   updateSelectedFontSize,
   updateSelectedLineHeight,
   updateSelectedFontWeight,

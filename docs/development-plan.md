@@ -18,7 +18,7 @@
   - **P11-1 已完成**：full 样例对齐为**扁平 13 个独立段 grid**（与设计器导出 `ticket-schema-v2-1788315240965.json` 对齐；border 分布 all×3 / outer×9 / none×4，带 `columns`），消除段间 2px 双边框；前五行样例（P10 验收）字段键已同步到同一 JSON 键集（工作负责人（监护人）/ 电站设备 / 工作地点_* / 工作内容_*）。
   - **P11-3 已完成**：A4 整票打印真机核验通过；打印方向改为由纸张尺寸派生（A4 纵向 / A3 横向）；Table 新增边框配置（all/outer/inner/none，与 Grid 对齐）。（**2026-09-02 十三续补正**：打印纸张尺寸 `@page` 曾硬编码 `A4`，选 A3 时渲染正常但打印仍按 A4 出页致内容被裁；现由渲染内核按 `schema.paper` 运行时注入，设计器与消费页均生效。）
   - **下一步**：P11-2（完整票快照基线，可选）、P11-4（并入推迟项：P9.1c 专用控件、P9.2、P12 清理）。（P7.2e 完整编辑 UI 经用户澄清=「设计器人工编排符合参考图结构的整票模板」，已由导出 JSON `ticket-schema-v2-1788315240965.json` + 同步 `yunlv-second-ticket-full.ts` 完成；P7.2d/P7.2f/P9.1d 已于 2026-09-01 完成。）
-- 当前测试基线 **vitest 257/257（32 文件）**，`vue-tsc --noEmit` 干净；每轮详细过程见 **[execution-log.md](./execution-log.md)**。
+- 当前测试基线 **vitest 260/260（33 文件）**，`vue-tsc --noEmit` 干净；每轮详细过程见 **[execution-log.md](./execution-log.md)**。
 
 ### 0.2 任务节点状态（2026-08-31 十续执行后）
 
@@ -242,6 +242,7 @@
 - [x] 清理所有旧实现残留（D1 死代码 `useTextarea`/`inputElType` 已于 八续/九续 删除；D2 打印责任分散、D3 设计态打印样式属设计层/随 A5，见架构分层审查；详见 execution-log 廿四续）
 - [x] 清理 `src/dev` 旧渲染器副本：已删除 `src/dev/GridSchemaNode.vue`、`src/dev/GridSchemaRenderer.vue`（dev 测试 `GridSchemaNode.test.ts` / `GridSchemaHeight.test.ts` 已改指向 `src/components/renderer-v2`）；`demoData.ts` 仍被 DesignerApp 使用，保留；`yunlv-second-ticket-*.ts` 样例 schema 暂留 dev 目录。
 - [x] **清理废弃 `orientation` 键（三十四续）**：方向自 P11-3 起由纸张尺寸派生（A4→纵、A3→横），渲染/打印均忽略 `orientation`。`PaperConfigV2.orientation` 置可选废弃键；`updatePaperSize` / `createEmptyFormSchemaV2` / `normalizeFormSchemaV2` 不再写/回补（存量模板载入归一化时直接丢弃，不向前携带）；从全部 dev 样例（`yunlv-second-ticket-first-five-rows.ts`、`yunlv-second-ticket-full.ts`、`gridPaginationDemo.ts`、3 个 `ticket-schema-v2-*.json`/`grid-50-rows.json`）与测试 fixture（`makeSchema`、pagination、GridGap、schema-v2-table-rows、DesignerApp.pagination）移除；`schema-v2.test.ts` 保留「存量模板载入丢弃 orientation」回归断言。`vue-tsc` 干净、`vitest 257/257（32 文件）` 零回归。
+- [x] **单元格弹性布局 `cell.flex`（三十五续，按用户澄清改为 cell 级）**：Flex **不是独立组件**，而是 `GridCellV2.flex?: boolean` 单元格属性（默认 false，存量/新建均不受影响）。`GridNodeV2` 不引入 `display` 字段、无工厂、无调色板按钮、不改 `NodeKind`。渲染内核 `GridSchemaNode.vue` 在普通 cell 上按 `cell.flex` 分支：基础 `.layout-grid__cell` 已是 `display:flex`（row），flex 单元格补 `flex-wrap:wrap; justify-content:flex-start; align-items:center`（`cellStyle` 内联样式），并通过 `.layout-grid__cell--flex > .layout-p, > .layout-text { flex:0 1 auto; width:auto }` 覆盖 `.layout-p`/`.layout-text` 的 `width:100%`，使直接子节点沿水平方向连续排布、到达边界换行；cell 仍承载 children 递归渲染。`useSchemaEdits` 新增 `updateSelectedCellFlex()`（写 `cell.flex`，勾选 `flex:true`、取消 `undefined`），`clearCellOverride` 一并清除 `flex`；`CellInspector` 顶部新增「弹性布局」勾选（`data-flex`），`GridInspector` 无「布局」切换（行数始终渲染）。序列化 `normalizeNode` 透传未知字段、校验仅查 rows≥1，管线零改动。测试 `GridSchemaNode.flex.test.ts` 改写为 cell 级（3 例：flex cell 内联样式 + 子节点递归渲染、非 flex cell 无 `--flex` 类、序列化往返保留 `cell.flex`）；`schema-v2-operations.test.ts` 删除 `createFlexGridNodeV2` 工厂测试。`vue-tsc` 干净、`vitest 260/260（33 文件）` 零回归。**已知边界**：flex 是单元格自身容器行为，与 Grid 行列结构正交——不影响 `.layout-grid__row` 渲染与边框单边规则（cell 仍是 row 内一格）；适合「一格内横排多个字段/文本」的弹性分组。
 - [ ] 更新组件开发文档和示例
 - [ ] 补充性能和大模板测试
 

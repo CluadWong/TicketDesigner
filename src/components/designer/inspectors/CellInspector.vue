@@ -17,9 +17,15 @@ defineProps<{
 </script>
 
 <template>
-  <p class="v2-sidebar__hint">
-    单元格仅可设置内边距与对齐；删除已禁用，请删除所在 Grid 或先清空内容。
-  </p>
+  <label class="v2-control v2-control--inline">
+    <span>弹性布局</span>
+    <input
+      type="checkbox"
+      data-flex="true"
+      :checked="!!node.flex"
+      @change="api.updateSelectedCellFlex"
+    />
+  </label>
   <div class="v2-sidebar__subheading">合并 / 拆分</div>
   <div class="v2-toolbar v2-toolbar--row">
     <button
@@ -38,7 +44,7 @@ defineProps<{
       :disabled="!cellContext?.canSplit"
       @click="api.splitSelectedCell"
     >
-      拆分此格（colspan {{ node.colspan ?? 1 }}）
+      拆分此格
     </button>
   </div>
   <div class="v2-grid-dimensions">
@@ -64,9 +70,7 @@ defineProps<{
       />
     </label>
     <label class="v2-control">
-      <span
-        >水平对齐{{ cellBox ? `（生效：${cellBox.align}）` : "" }}</span
-      >
+      <span>水平对齐</span>
       <select :value="node.align ?? ''" @change="api.updateSelectedCellAlign">
         <option value="">默认（居中）</option>
         <option value="left">左</option>
@@ -75,9 +79,7 @@ defineProps<{
       </select>
     </label>
     <label class="v2-control">
-      <span
-        >垂直对齐{{ cellBox ? `（生效：${cellBox.verticalAlign}）` : "" }}</span
-      >
+      <span>垂直对齐</span>
       <select
         :value="node.verticalAlign ?? ''"
         @change="api.updateSelectedCellVerticalAlign"
@@ -89,14 +91,4 @@ defineProps<{
       </select>
     </label>
   </div>
-  <button
-    class="v2-toolbar__button"
-    type="button"
-    :disabled="
-      !node.padding && !node.align && !node.verticalAlign && !node.rowHeight
-    "
-    @click="api.clearCellOverride"
-  >
-    清除覆盖（恢复 Grid 默认）
-  </button>
 </template>

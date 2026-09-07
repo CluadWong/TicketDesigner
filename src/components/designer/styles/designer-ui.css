@@ -47,6 +47,10 @@
   opacity: 0.4;
 }
 
+.v2-toolbar--row{
+  background: #263957;
+}
+
 .v2-sidebar {
   min-width: 0;
   padding: 16px;

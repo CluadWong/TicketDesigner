@@ -137,26 +137,36 @@ function gridRowStyle(node: GridNodeV2, rowIndex: number): CSSProperties {
 
 function cellStyle(cell: GridCellV2, grid: GridNodeV2): CSSProperties {
   const box = resolveCellBoxV2(cell, grid);
-  return {
+  // 水平对齐（main 轴，row 方向）→ justify-content；垂直对齐（cross 轴）→ align-items。
+  const alignItems =
+    box.verticalAlign === "top"
+      ? "flex-start"
+      : box.verticalAlign === "bottom"
+        ? "flex-end"
+        : "center";
+  const justifyContent =
+    box.align === "center"
+      ? "center"
+      : box.align === "right"
+        ? "flex-end"
+        : "flex-start";
+  const base: CSSProperties = {
     gridColumn: cell.colspan ? `span ${cell.colspan}` : undefined,
     // 单元格行高倍数：设置时覆盖所在 Grid 行高（行容器按最高单元格撑开）。
     minHeight: cell.rowHeight
       ? `${cell.rowHeight * props.baseRowHeight}mm`
       : undefined,
     padding: `${box.padding}mm`,
-    alignItems:
-      box.verticalAlign === "top"
-        ? "flex-start"
-        : box.verticalAlign === "bottom"
-          ? "flex-end"
-          : "center",
-    justifyContent:
-      box.align === "center"
-        ? "center"
-        : box.align === "right"
-          ? "flex-end"
-          : "flex-start",
+    alignItems,
+    justifyContent,
   };
+  // 弹性单元格（cell.flex）：基础 `.layout-grid__cell` 已是 `display:flex`（默认 row），
+  // 故只需额外开启 `flex-wrap:wrap` 即得到「水平流式 + 自动换行」；水平/垂直对齐
+  // 与普通单元格完全一致，复用 cell 自身的 align / verticalAlign 配置。
+  if (cell.flex) {
+    return { ...base, flexWrap: "wrap" };
+  }
+  return base;
 }
 
 function textCss(style?: TextStyleV2): CSSProperties {
@@ -424,7 +434,7 @@ function onImgError(): void {
         v-for="cell in row.cells"
         :key="cell.id"
         class="layout-grid__cell"
-        :class="{}"
+        :class="cell.flex ? 'layout-grid__cell--flex' : {}"
         :style="cellStyle(cell, node)"
         :data-layout-id="cell.id"
         :data-node-id="cell.id"
@@ -612,6 +622,14 @@ function onImgError(): void {
   box-sizing: border-box;
 }
 
+/* 弹性单元格（cell.flex）：基础 `.layout-grid__cell` 已是 `display:flex`（默认 row），
+   此处仅额外开启换行；水平/垂直对齐由 cellStyle 的内联样式（cell.align / cell.verticalAlign）
+   驱动，与普通单元格一致。子节点作为 flex item 自适应内容宽度（不强制 100%），
+   从而沿水平方向连续排布、到达边界换行。 */
+.layout-grid__cell--flex {
+  flex-wrap: wrap;
+}
+
 .layout-grid__row {
   display: grid;
   flex: 0 0 auto;
@@ -627,6 +645,16 @@ function onImgError(): void {
   min-height: 0;
   box-sizing: border-box;
   overflow: hidden;
+}
+
+/* 弹性单元格（cell.flex）的子节点：作为 flex item 自适应内容宽度，
+   不被自身 `width:100%` 顶满整行。否则普通 `.layout-p`/`.layout-text` 的
+   `width:100%` 会让每个子节点独占一行、失去横向流式效果。 */
+.layout-grid__cell--flex > .layout-p,
+.layout-grid__cell--flex > .layout-text {
+  flex: 0 1 auto;
+  width: auto;
+  min-width: 0;
 }
 
 /* 单边归属规则（P4.3 / 十四续 gap 修正）：外框仅由 Grid 容器绘制；
