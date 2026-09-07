@@ -437,33 +437,49 @@ export function useSchemaEdits(ctx: SchemaEditsContext) {
   ): void {
     if (selectedNode.value?.type !== "table") return;
     const target = event.target as HTMLInputElement | HTMLSelectElement;
-    const patch: Partial<TableColumnV2> =
-      field === "width"
-        ? { width: parseColumnWidth(target.value) }
-        : ({ [field]: target.value || undefined } as Partial<TableColumnV2>);
+    if (field === "width") {
+      const parsed = parseColumnWidth(target.value);
+      if (parsed === "INVALID") return; // 非法输入不提交，避免误写 24
+      commit(
+        updateTableColumnV2(schema.value, selectedNode.value.id, columnKey, { width: parsed }),
+        `tblcol:${columnKey}:width`,
+      );
+      return;
+    }
+    const patch = { [field]: target.value || undefined } as Partial<TableColumnV2>;
     commit(
       updateTableColumnV2(schema.value, selectedNode.value.id, columnKey, patch),
       `tblcol:${columnKey}:${field}`,
     );
   }
 
-  function parseColumnWidth(raw: string): GridTrackV2 {
+  /**
+   * 解析列宽输入：合法值（number / `Nfr` / `auto`）原样返回；空串视为「回到默认 1fr」；
+   * 非法串（非数字、0、负、`.fr` 等）返回 `"INVALID"`，由调用方**忽略**——
+   * 绝不静默兜底成 24 把错误值写进 schema（旧实现会这样，导致列宽神秘变成 24 且锁死）。
+   */
+  function parseColumnWidth(raw: string): GridTrackV2 | "INVALID" {
     const value = raw.trim().toLowerCase();
+    if (value === "") return "1fr"; // 空 = 回到默认，而非 24
     if (value === "auto") return "auto";
     if (/^\d+(\.\d+)?fr$/.test(value)) return value as `${number}fr`;
+    // 标签声明单位为 mm：允许带 `mm`/`MM` 后缀（含可选空格），剥离后按毫米数值处理，
+    // 否则用户照标签输入「30mm」会被误判 INVALID 而静默丢弃（见列宽设置失效回归）。
+    const mmMatch = value.match(/^(\d+(?:\.\d+)?)\s*mm$/);
+    if (mmMatch) {
+      const number = Number(mmMatch[1]);
+      return Number.isFinite(number) && number > 0 ? number : "INVALID";
+    }
     const number = Number(value);
-    return Number.isFinite(number) && number > 0 ? number : 24;
+    return Number.isFinite(number) && number > 0 ? number : "INVALID";
   }
 
   function updateGridColumnWidth(columnIndex: number, event: Event): void {
     if (selectedNode.value?.type !== "grid") return;
+    const parsed = parseColumnWidth((event.target as HTMLInputElement).value);
+    if (parsed === "INVALID") return; // 非法输入不提交，避免误写 24
     commit(
-      setGridColumnWidthV2(
-        schema.value,
-        selectedNode.value.id,
-        columnIndex,
-        parseColumnWidth((event.target as HTMLInputElement).value),
-      ),
+      setGridColumnWidthV2(schema.value, selectedNode.value.id, columnIndex, parsed),
       `col:${selectedNode.value.id}:${columnIndex}`,
     );
   }

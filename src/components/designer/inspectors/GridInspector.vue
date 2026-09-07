@@ -40,7 +40,7 @@ defineProps<{ node: GridNodeV2; api: SchemaEdits }>();
     >
       <span>第 {{ columnIndex + 1 }} 列</span>
       <input
-        :value="node.columns?.[columnIndex] ?? cell.width ?? 24"
+        :value="node.columns?.[columnIndex] ?? cell.width ?? '1fr'"
         @change="api.updateGridColumnWidth(columnIndex, $event)"
       />
     </label>

@@ -192,3 +192,62 @@ describe("useSchemaEdits 复制/剪切/粘贴/原地复制", () => {
     expect(doc.canUndo.value).toBe(false);
   });
 });
+
+describe("列宽解析：不得静默兜底为 24（三十七续回归）", () => {
+  function selectGrid() {
+    const ctx = setup(true);
+    const { doc, selection, edits } = ctx;
+    const gridId = (doc.schema.value.pages[0].children[0] as GridNodeV2).id;
+    selection.selectNodeById(gridId);
+    return { ...ctx, gridId };
+  }
+
+  function gridOf(doc: SchemaDocument): GridNodeV2 {
+    const node = doc.schema.value.pages[0].children[0];
+    if (node.type !== "grid") throw new Error("not a grid");
+    return node;
+  }
+
+  it("空列宽输入：回到默认 1fr，绝不写入 24", () => {
+    const { doc, edits } = selectGrid();
+    edits.updateGridColumnWidth(0, { target: { value: "" } } as unknown as Event);
+    const grid = gridOf(doc);
+    expect(grid.columns?.[0]).toBe("1fr");
+    expect(grid.columns?.[0]).not.toBe(24);
+  });
+
+  it("非法列宽输入（如 abc）：不提交 schema，不误写 24", () => {
+    const { doc, edits } = selectGrid();
+    const before = doc.schema.value;
+    edits.updateGridColumnWidth(0, { target: { value: "abc" } } as unknown as Event);
+    expect(doc.schema.value).toBe(before);
+    expect(doc.canUndo.value).toBe(false);
+  });
+
+  it("合法列宽（1fr / 数字）：正常提交且不变成 24", () => {
+    const { doc, edits } = selectGrid();
+    edits.updateGridColumnWidth(0, { target: { value: "1fr" } } as unknown as Event);
+    expect(gridOf(doc).columns?.[0]).toBe("1fr");
+    edits.updateGridColumnWidth(0, { target: { value: "30" } } as unknown as Event);
+    expect(gridOf(doc).columns?.[0]).toBe(30);
+  });
+
+  it("列宽带 mm 单位（照标签输入 30mm）：剥离后按毫米数提交", () => {
+    const { doc, edits } = selectGrid();
+    edits.updateGridColumnWidth(0, { target: { value: "30mm" } } as unknown as Event);
+    expect(gridOf(doc).columns?.[0]).toBe(30);
+    edits.updateGridColumnWidth(0, { target: { value: "20 MM" } } as unknown as Event);
+    expect(gridOf(doc).columns?.[0]).toBe(20);
+  });
+
+  it("改列数后设第二列宽度：渲染真源 columns 同步（resize 不再留 stale 长度）", () => {
+    const { doc, selection, edits } = selectGrid();
+    edits.updateGridDimensions({
+      target: { value: "2", dataset: { dimension: "columns" } },
+    } as unknown as Event);
+    edits.updateGridColumnWidth(1, { target: { value: "40" } } as unknown as Event);
+    const grid = gridOf(doc);
+    expect(grid.columns).toHaveLength(2);
+    expect(grid.columns?.[1]).toBe(40);
+  });
+});

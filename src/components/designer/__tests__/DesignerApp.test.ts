@@ -311,11 +311,7 @@ describe("DesignerApp V2 selection and deletion", () => {
       "is-design-selected",
     );
 
-    // 表格面板显示「列key_行号」派生字段提示，且不含单独字段名控件
-    const hint = wrapper.find(".v2-hint");
-    expect(hint.exists()).toBe(true);
-    expect(hint.text()).toContain("列key_行号");
-
+    // 表格面板不含单独「字段名」控件（字段由列配置自动派生；说明文字已按用户要求移除）
     const fieldNameControl = wrapper
       .findAll(".v2-control")
       .find((c) => c.text().includes("字段名"));

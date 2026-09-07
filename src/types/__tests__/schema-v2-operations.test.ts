@@ -507,6 +507,22 @@ describe("P6.2c/P6.2d 共享列轨 + 合并/拆分", () => {
     expect(g.rows.every(row => row.cells[1].width === 50)).toBe(true);
   });
 
+  it("resizeGridV2 同步 columns：长度对齐首行格数并保留既有宽度", () => {
+    const { schema, grid } = buildThreeColGrid(); // columns=[30,30,30]
+    // 缩到 2 列：保留前 2 个宽度
+    const shrunk = resizeGridV2(schema, grid.id, 1, 2);
+    const s = shrunk.pages[0].children[0];
+    if (s.type !== "grid") throw new Error("grid missing");
+    expect(s.columns).toEqual([30, 30]);
+    expect(s.rows[0].cells).toHaveLength(2);
+    // 扩到 4 列：保留原有 + 新列默认 1fr
+    const grown = resizeGridV2(schema, grid.id, 1, 4);
+    const g2 = grown.pages[0].children[0];
+    if (g2.type !== "grid") throw new Error("grid missing");
+    expect(g2.columns).toEqual([30, 30, 30, "1fr"]);
+    expect(g2.rows[0].cells).toHaveLength(4);
+  });
+
   it("mergeGridCellsV2 sums colspan and concatenates children", () => {
     const { schema, grid } = buildThreeColGrid();
     const first = grid.rows[0].cells[0].id;

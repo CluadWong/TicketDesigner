@@ -1004,7 +1004,11 @@ export function resizeGridV2(
         children: [...lastCell.children, ...overflow],
       };
     }
-    return { ...node, rows };
+    // 同步「渲染真源」grid.columns：长度对齐首行格数，保留既有格宽，新列默认 1fr。
+    // 否则改列数后 columns 长度错位/缺失，渲染层优先用 columns 会读不到或错位
+    // （典型表现：改 2 列后设第 2 列宽度不生效）。
+    const columns = (rows[0]?.cells ?? []).map(cell => cell.width ?? "1fr");
+    return { ...node, rows, columns };
   });
 }
 

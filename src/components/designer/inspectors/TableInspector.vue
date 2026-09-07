@@ -35,7 +35,11 @@ defineProps<{ node: TableNodeV2; api: SchemaEdits }>();
       <span class="v2-col-table__th">字段</span>
       <span class="v2-col-table__th v2-col-table__th--action"></span>
     </div>
-    <div v-for="column in node.columns" :key="column.key" class="v2-col-table__row">
+    <div
+      v-for="column in node.columns"
+      :key="column.key"
+      class="v2-col-table__row"
+    >
       <input
         class="v2-col-table__input"
         :value="column.title"
@@ -59,12 +63,11 @@ defineProps<{ node: TableNodeV2; api: SchemaEdits }>();
       </button>
     </div>
   </div>
-  <p class="v2-hint">
-    表格内字段由列配置自动生成，格式为「列key_行号」（1-based）：列
-    <code>工作地点</code> 第 2 行绑定为 <code>工作地点_2</code>。表格内
-    字段不可单独选中或配置，增删列即增删对应字段。
-  </p>
-  <button class="v2-toolbar__button v2-add-col" type="button" @click="api.addTableColumn">
+  <button
+    class="v2-toolbar__button v2-add-col"
+    type="button"
+    @click="api.addTableColumn"
+  >
     + 添加列
   </button>
 </template>
