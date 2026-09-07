@@ -28,7 +28,7 @@ import type {
 const BASE_ROW_HEIGHT = 8;
 const ROW_COUNT = 50;
 const MARGIN: EdgeInsetsV2 = { top: 10, right: 10, bottom: 10, left: 10 };
-const PAPER: PaperConfigV2 = { size: "A4", orientation: "portrait" };
+const PAPER: PaperConfigV2 = { size: "A4" };
 
 function fieldP(id: string, field: string, label?: string): FieldPNodeV2 {
   return {

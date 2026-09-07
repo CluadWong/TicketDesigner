@@ -241,6 +241,7 @@
 - [x] 移除旧流式 Renderer 和硬编码旧 Schema（旧 `src/engine` 及 `src/dev` 旧渲染器副本已于 十八续/前期删除，`vue-tsc`/`vitest` 全量纳入）
 - [x] 清理所有旧实现残留（D1 死代码 `useTextarea`/`inputElType` 已于 八续/九续 删除；D2 打印责任分散、D3 设计态打印样式属设计层/随 A5，见架构分层审查；详见 execution-log 廿四续）
 - [x] 清理 `src/dev` 旧渲染器副本：已删除 `src/dev/GridSchemaNode.vue`、`src/dev/GridSchemaRenderer.vue`（dev 测试 `GridSchemaNode.test.ts` / `GridSchemaHeight.test.ts` 已改指向 `src/components/renderer-v2`）；`demoData.ts` 仍被 DesignerApp 使用，保留；`yunlv-second-ticket-*.ts` 样例 schema 暂留 dev 目录。
+- [x] **清理废弃 `orientation` 键（三十四续）**：方向自 P11-3 起由纸张尺寸派生（A4→纵、A3→横），渲染/打印均忽略 `orientation`。`PaperConfigV2.orientation` 置可选废弃键；`updatePaperSize` / `createEmptyFormSchemaV2` / `normalizeFormSchemaV2` 不再写/回补（存量模板载入归一化时直接丢弃，不向前携带）；从全部 dev 样例（`yunlv-second-ticket-first-five-rows.ts`、`yunlv-second-ticket-full.ts`、`gridPaginationDemo.ts`、3 个 `ticket-schema-v2-*.json`/`grid-50-rows.json`）与测试 fixture（`makeSchema`、pagination、GridGap、schema-v2-table-rows、DesignerApp.pagination）移除；`schema-v2.test.ts` 保留「存量模板载入丢弃 orientation」回归断言。`vue-tsc` 干净、`vitest 257/257（32 文件）` 零回归。
 - [ ] 更新组件开发文档和示例
 - [ ] 补充性能和大模板测试
 

@@ -20,7 +20,7 @@ function rootGrid(schema: FormSchemaV2) {
 function makeSchema(overrides: Partial<FormSchemaV2> = {}): FormSchemaV2 {
   return {
     version: 2,
-    paper: { size: "A4", orientation: "portrait" },
+    paper: { size: "A4" },
     baseRowHeight: 8,
     pages: [
       {
@@ -296,14 +296,15 @@ describe("Schema V2 serialization", () => {
     expect(g.gap).toBeUndefined();
   });
 
-  it("fills compatible optional defaults while loading", () => {
+  it("drops deprecated orientation key while loading (存量模板兼容)", () => {
     const schema = makeSchema();
     const input = JSON.parse(JSON.stringify(schema)) as Record<string, unknown>;
     delete input.baseRowHeight;
-    delete (input.paper as Record<string, unknown>).orientation;
+    (input.paper as Record<string, unknown>).orientation = "portrait"; // 存量模板残留的废弃键
     const restored = parseFormSchemaV2(input);
     expect(restored.baseRowHeight).toBe(8);
-    expect(restored.paper.orientation).toBe("portrait");
+    // `orientation` 为废弃键（方向自 P11-3 起由纸张尺寸派生，渲染/打印均忽略）：归一化时直接丢弃。
+    expect(restored.paper.orientation).toBeUndefined();
     expect(restored.pages[0].children[0]).toMatchObject({ type: "grid", border: "all" });
   });
 

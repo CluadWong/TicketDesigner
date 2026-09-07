@@ -142,7 +142,7 @@ describe("collectFieldKeys", () => {
 function makeSchema(children: FormNodeV2[]): FormSchemaV2 {
   return {
     version: 2,
-    paper: { size: "A4", orientation: "portrait" },
+    paper: { size: "A4" },
     baseRowHeight: 8,
     pages: [
       {

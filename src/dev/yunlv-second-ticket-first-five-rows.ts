@@ -152,7 +152,7 @@ export function makeYunlvSecondTicketFirstFiveRowsSchema(): FormSchemaV2 {
 
   let schema: FormSchemaV2 = {
     version: 2,
-    paper: { size: "A4", orientation: "portrait" },
+    paper: { size: "A4" },
     baseRowHeight: 8,
     pages: [
       {

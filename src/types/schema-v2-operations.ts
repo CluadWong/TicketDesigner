@@ -411,7 +411,7 @@ export function updateBaseRowHeightV2(
   return { ...schema, baseRowHeight: Math.max(1, Math.min(99, Math.floor(baseRowHeight))) };
 }
 
-/** Updates the paper size / orientation. */
+/** Updates the paper size (方向自 P11-3 起由纸张尺寸派生，不再单独维护 orientation). */
 export function updatePaperConfigV2(
   schema: FormSchemaV2,
   paper: FormSchemaV2["paper"],
@@ -422,7 +422,7 @@ export function updatePaperConfigV2(
 export function createEmptyFormSchemaV2(): FormSchemaV2 {
   return {
     version: 2,
-    paper: { size: "A4", orientation: "portrait" },
+    paper: { size: "A4" },
     baseRowHeight: 8,
     pages: [
       {

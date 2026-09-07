@@ -1,8 +1,7 @@
 {
   "version": 2,
   "paper": {
-    "size": "A4",
-    "orientation": "portrait"
+    "size": "A4"
   },
   "baseRowHeight": 8,
   "pages": [

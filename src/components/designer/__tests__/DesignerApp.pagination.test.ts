@@ -10,7 +10,7 @@ import { makeFiftyRowGridSchema } from "@/dev/gridPaginationDemo";
 function makeOversizedRowSchema(): FormSchemaV2 {
   return {
     version: 2,
-    paper: { size: "A4", orientation: "portrait" },
+    paper: { size: "A4" },
     baseRowHeight: 8,
     pages: [
       {

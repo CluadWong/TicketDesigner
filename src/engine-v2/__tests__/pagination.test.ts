@@ -104,7 +104,7 @@ describe("分页引擎 pagination", () => {
         },
       ],
     };
-    const schema: FormSchemaV2 = { version: 2, paper: { size: "A4", orientation: "portrait" }, baseRowHeight: 8, pages: [page] };
+    const schema: FormSchemaV2 = { version: 2, paper: { size: "A4" }, baseRowHeight: 8, pages: [page] };
     const result = paginatePage(page, {
       baseRowHeight: 8,
       bodyHeightMm: 277,
@@ -164,7 +164,7 @@ describe("分页引擎 pagination", () => {
     });
     const schema: FormSchemaV2 = {
       version: 2,
-      paper: { size: "A4", orientation: "portrait" },
+      paper: { size: "A4" },
       baseRowHeight: 8,
       pages: [makePage("lp1"), makePage("lp2")],
     };
@@ -211,7 +211,7 @@ describe("分页引擎 pagination", () => {
     // 构造与用户 grid-50-rows.json 一致的结构：Grid(1行) → Cell → Table(minRows:50)
     const schema: FormSchemaV2 = {
       version: 2,
-      paper: { size: "A4", orientation: "portrait" },
+      paper: { size: "A4" },
       baseRowHeight: 8,
       pages: [
         {

@@ -576,9 +576,9 @@ export function useSchemaEdits(ctx: SchemaEditsContext) {
 
   function updatePaperSize(event: Event): void {
     const size = (event.target as HTMLSelectElement).value as FormSchemaV2["paper"]["size"];
-    // 方向由纸张尺寸派生：A4 → 纵向，A3 → 横向。
-    const orientation = size === "A3" ? "landscape" : "portrait";
-    commit(updatePaperConfigV2(schema.value, { size, orientation }));
+    // 方向自 P11-3 起由纸张尺寸派生（A4→纵向、A3→横向），渲染与打印均忽略 `orientation`
+    // 字段（已置为可选废弃键）。仅更新 size，旧 orientation 在内存中置 undefined，序列化导出自然丢弃。
+    commit(updatePaperConfigV2(schema.value, { size }));
   }
 
   /** 纸张边距（mm）：统一作用于四边，展示为单一数值（取首页 top）。 */

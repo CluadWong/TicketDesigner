@@ -115,7 +115,8 @@ export function normalizeFormSchemaV2(input: unknown): FormSchemaV2 {
     version: 2,
     paper: {
       size: (paper.size ?? "A4") as FormSchemaV2["paper"]["size"],
-      orientation: (paper.orientation ?? "portrait") as FormSchemaV2["paper"]["orientation"],
+      // `orientation` 为废弃键（方向自 P11-3 起由纸张尺寸派生，渲染/打印均忽略）：
+      // 归一化时直接丢弃，不向前携带；旧模板中残留的 orientation 仅在解析时被忽略，不会回写导出。
     },
     baseRowHeight: (source.baseRowHeight ?? 8) as number,
     pages: source.pages.map(value => {

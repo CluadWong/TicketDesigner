@@ -13,7 +13,9 @@ export type BorderModeV2 = "all" | "outer" | "inner" | "none";
 
 export interface PaperConfigV2 {
   size: PaperSizeV2;
-  orientation: OrientationV2;
+  /** 废弃键：方向自 P11-3 起由纸张尺寸派生（A4→纵向、A3→横向），渲染与打印均忽略本字段。
+   *  保留为可选仅为存量模板向后兼容；新模板不再写入，序列化导出自然丢弃。 */
+  orientation?: OrientationV2;
 }
 
 export interface EdgeInsetsV2 {

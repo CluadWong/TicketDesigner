@@ -1,8 +1,7 @@
 {
   "version": 2,
   "paper": {
-    "size": "A3",
-    "orientation": "landscape"
+    "size": "A3"
   },
   "baseRowHeight": 8,
   "pages": [
