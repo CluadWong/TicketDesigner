@@ -622,7 +622,7 @@ function onImgError(): void {
 
 .layout-grid__cell {
   display: flex;
-  flex-direction: column;
+  /* flex-direction: column; */
   min-width: 0;
   min-height: 0;
   box-sizing: border-box;

@@ -1,0 +1,212 @@
+/**
+ * 设计器共用控件样式（**非 scoped**）。
+ *
+ * 背景：Inspector 组件化（2026-09-07 批次 2）后，这些类被多个 inspector 子组件共用，
+ * 放在任一组件的 `<style scoped>` 里都无法命中其他组件的元素（scoped 加属性选择器）。
+ * 因此提取为全局样式表，由 `InspectorPanel.vue` 引入一次即可。
+ */
+/* 工具条：工具栏（DesignerApp）与检查器内的按钮行（CellInspector 合并/拆分）共用，
+   放全局以免跨组件 scoped 失配。 */
+.v2-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 0 18px;
+  color: #f8fafc;
+  background: #172033;
+  overflow-x: auto;
+}
+
+.v2-toolbar > * {
+  flex-shrink: 0;
+}
+
+.v2-toolbar__group {
+  display: flex;
+  gap: 6px;
+}
+
+.v2-toolbar__group:last-of-type {
+  margin-left: auto;
+}
+
+.v2-toolbar__button {
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid #4c6484;
+  border-radius: 4px;
+  color: #f8fafc;
+  background: #263957;
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.v2-toolbar__button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.v2-sidebar {
+  min-width: 0;
+  padding: 16px;
+  overflow: auto;
+  background: #fff;
+  border-right: 1px solid #d8dee8;
+}
+
+.v2-sidebar__subheading {
+  margin: 16px 0 8px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.v2-sidebar__hint {
+  margin: 18px 2px 0;
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.v2-control {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 14px 0;
+  color: #475569;
+  font-size: 12px;
+}
+
+.v2-control input,
+.v2-control select {
+  width: 100%;
+  min-height: 30px;
+  padding: 0 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  box-sizing: border-box;
+  color: #1e293b;
+  background: #fff;
+  font-size: 12px;
+}
+
+/* 复选框不套用文本框的全宽边框样式：保持上下结构（标签在上、勾选框在下）并左对齐 */
+.v2-control input[type="checkbox"] {
+  width: 16px;
+  min-height: 16px;
+  height: 16px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  align-self: flex-start;
+  accent-color: #2563eb;
+  cursor: pointer;
+}
+
+/* 统一为上下结构：标签在上、输入在下（与 .v2-control 一致） */
+.v2-control--inline {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  margin: 0;
+}
+
+.v2-control--inline input {
+  width: 100%;
+  min-height: 30px;
+  padding: 0 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  box-sizing: border-box;
+  color: #1e293b;
+  background: #fff;
+  font-size: 12px;
+}
+
+/* 复选框类控件：标签与勾选框同一行（如页面设置里的「分页」开关） */
+.v2-control--toggle {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  margin: 14px 0 0;
+}
+
+.v2-control--toggle span {
+  color: #475569;
+  font-size: 12px;
+}
+
+/* 长文本控件独占一整行（在 2 列网格中横跨两列） */
+.v2-control--full {
+  grid-column: 1 / -1;
+}
+
+.v2-grid-dimensions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+/* 网格容器内的控件去掉上下外边距，由网格 gap 控制间距 */
+.v2-grid-dimensions .v2-control {
+  margin: 0;
+}
+
+.v2-style-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+  margin-bottom: 4px;
+}
+
+.v2-style-grid .v2-control {
+  margin-bottom: 0;
+}
+
+.v2-style-grid .v2-control--inline input[type="color"] {
+  width: 100%;
+  height: 26px;
+  padding: 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 3px;
+  background: #fff;
+}
+
+.v2-textarea {
+  width: 100%;
+  min-height: 30px;
+  padding: 6px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  box-sizing: border-box;
+  color: #1e293b;
+  background: #fff;
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  resize: vertical;
+}
+
+.v2-hint {
+  margin: -6px 0 12px;
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.v2-hint code {
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: #f1f5f9;
+  font-size: 11px;
+}
+
+/* 打印：工具条与两侧面板跨组件（DesignerApp 工具栏 / InspectorPanel 侧栏）统一隐藏，
+   故放全局而非任一组件的 scoped 样式。 */
+@media print {
+  .v2-toolbar,
+  .v2-sidebar {
+    display: none !important;
+  }
+}
