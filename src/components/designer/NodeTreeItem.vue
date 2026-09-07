@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, watch, inject } from "vue";
+import { TreeControlKey, type TreeControl } from "./composables/treeControl";
 
 export interface TreeNode {
   id: string;
@@ -18,7 +19,20 @@ const props = defineProps<{
 
 const emit = defineEmits<{ (event: "select", id: string): void }>();
 
-const expanded = ref(true);
+/** 全局折叠/展开信号（由 DesignerApp 经 provide 下发）。 */
+const control = inject<TreeControl | null>(TreeControlKey, null);
+/**
+ * 局部展开态：默认展开。若处于全局信号管控下，新节点以当前 `target` 作为
+ * 初始态（「折叠全部」后再挂载的节点也应为折叠态）；挂载后受 `token` 驱动
+ * 重设，同时仍允许单独点击 `onToggle` 脱离全局信号。
+ */
+const expanded = ref(control ? control.target.value : true);
+
+if (control) {
+  watch(control.token, () => {
+    expanded.value = control.target.value;
+  });
+}
 
 function onRowClick(): void {
   emit("select", props.node.id);

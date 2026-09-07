@@ -651,3 +651,53 @@ describe("DesignerApp 字段组件配置：宽度 / 默认内容 / 内部边框"
     ).not.toContain("layout-p--inner-border");
   });
 });
+
+describe("结构树 折叠全部 / 展开全部", () => {
+  it("初始展开，折叠全部后所有子树收起，展开全部后恢复", async () => {
+    const wrapper = mountDesigner();
+
+    // 默认展开：结构树存在子树容器
+    expect(wrapper.findAll(".v2-tree-children").length).toBeGreaterThan(0);
+
+    const collapseBtn = wrapper
+      .findAll(".v2-tree__btn")
+      .find((b) => b.text() === "折叠全部");
+    expect(collapseBtn).toBeDefined();
+    await collapseBtn!.trigger("click");
+    await nextTick();
+
+    // 折叠全部：所有节点收起，子树容器消失
+    expect(wrapper.findAll(".v2-tree-children").length).toBe(0);
+
+    const expandBtn = wrapper
+      .findAll(".v2-tree__btn")
+      .find((b) => b.text() === "展开全部");
+    expect(expandBtn).toBeDefined();
+    await expandBtn!.trigger("click");
+    await nextTick();
+
+    // 展开全部：恢复展开
+    expect(wrapper.findAll(".v2-tree-children").length).toBeGreaterThan(0);
+  });
+
+  it("折叠全部后仍可单独点击某节点展开（全局信号不锁死局部切换）", async () => {
+    const wrapper = mountDesigner();
+    await wrapper
+      .findAll(".v2-tree__btn")
+      .find((b) => b.text() === "折叠全部")!
+      .trigger("click");
+    await nextTick();
+    expect(wrapper.findAll(".v2-tree-children").length).toBe(0);
+
+    // 单独点击某个有子节点的行展开
+    const row = wrapper
+      .findAll(".v2-tree-row")
+      .find((r) => r.find(".v2-tree-toggle").exists());
+    expect(row).toBeDefined();
+    await row!.find(".v2-tree-toggle").trigger("click");
+    await nextTick();
+
+    // 至少该节点重新展开（出现一个子树容器）
+    expect(wrapper.findAll(".v2-tree-children").length).toBeGreaterThan(0);
+  });
+});

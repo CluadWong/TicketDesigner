@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted } from "vue";
+import { computed, ref, provide, onMounted, onUnmounted } from "vue";
 import CanvasSurface from "./CanvasSurface.vue";
 import PaperViewport from "@/components/renderer-v2/PaperViewport.vue";
 import { PALETTE_DRAG_MIME } from "@/engine-v2/node-address";
@@ -16,6 +16,7 @@ import { buildBlankSchema, useSchemaDocument } from "./composables/useSchemaDocu
 import { useNodeSelection } from "./composables/useNodeSelection";
 import { useSchemaEdits, type NodeKind } from "./composables/useSchemaEdits";
 import { useFillData } from "./composables/useFillData";
+import { TreeControlKey, type TreeControl } from "./composables/treeControl";
 
 const props = defineProps<{
   initialSchema?: FormSchemaV2;
@@ -90,6 +91,20 @@ const {
   selectIssue,
 } = selection;
 onDocumentReset = clearSelection;
+
+// ── 结构树全局折叠 / 展开（provide 下发信号，NodeTreeItem 经 inject 接收）──
+const treeControl: TreeControl = { token: ref(0), target: ref(true) };
+provide(TreeControlKey, treeControl);
+/** 折叠全部：置 target=false 并自增 token，驱动所有节点收起。 */
+function collapseAll(): void {
+  treeControl.target.value = false;
+  treeControl.token.value++;
+}
+/** 展开全部：置 target=true 并自增 token，驱动所有节点展开。 */
+function expandAll(): void {
+  treeControl.target.value = true;
+  treeControl.token.value++;
+}
 
 // ── 结构编辑动作 ───────────────────────────────────────────
 const edits = useSchemaEdits({
@@ -531,6 +546,22 @@ onUnmounted(() => {
             @select="selectNodeById"
           />
         </div>
+        <div class="v2-tree__buttons">
+          <button
+            type="button"
+            class="v2-tree__btn"
+            @click="collapseAll"
+          >
+            折叠全部
+          </button>
+          <button
+            type="button"
+            class="v2-tree__btn"
+            @click="expandAll"
+          >
+            展开全部
+          </button>
+        </div>
       </aside>
 
       <main
@@ -707,6 +738,28 @@ onUnmounted(() => {
 .v2-tree__delete:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+/* 结构树底部：折叠全部 / 展开全部 */
+.v2-tree__buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.v2-tree__btn {
+  flex: 1 1 0;
+  padding: 5px 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  color: #334155;
+  background: #f8fafc;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.v2-tree__btn:hover {
+  background: #eef2f7;
 }
 
 .v2-tree {

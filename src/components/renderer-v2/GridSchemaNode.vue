@@ -921,6 +921,9 @@ function onImgError(): void {
   align-items: center;
   font-weight: 600;
   text-align: center;
+  /* 表头字号默认 16px（未显式设置 headerStyle.fontSize 时回退到此，
+     与 TableInspector 输入框占位值 16 对齐；不以内联样式写入，保留回退语义）。 */
+  font-size: 16px;
 }
 
 .layout-image {

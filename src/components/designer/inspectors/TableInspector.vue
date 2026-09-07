@@ -36,7 +36,7 @@ defineProps<{ node: TableNodeV2; api: SchemaEdits }>();
         type="number"
         min="1"
         step="1"
-        :value="node.headerStyle?.fontSize ?? ''"
+        :value="node.headerStyle?.fontSize ?? 16"
         @change="api.updateTableHeaderFontSize"
       />
     </label>
