@@ -27,7 +27,7 @@ export interface ResolvedCellBoxV2 {
 }
 
 const DEFAULT_CELL_PADDING = 0;
-const DEFAULT_CELL_ALIGN: "left" | "center" | "right" = "left";
+const DEFAULT_CELL_ALIGN: "left" | "center" | "right" = "center";
 const DEFAULT_CELL_VERTICAL_ALIGN: "top" | "middle" | "bottom" = "middle";
 
 /** 解析单元格的内边距 / 对齐：cell 覆盖优先，否则继承 Grid 默认，再否则取引擎常量。 */

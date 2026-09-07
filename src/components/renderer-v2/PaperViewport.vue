@@ -83,6 +83,48 @@ function tagExclusions(): void {
     });
 }
 
+// ── 空格长按平移 ──
+// 设计态下纸张中间区域的拖拽被「节点拖拽」占用，按住空格临时禁用画布内一切节点交互
+// （指针事件穿透到缩放层 scaler），由 panzoom 统一接管整片平移；松开空格恢复原交互。
+// 实现上【不触碰 panzoom 的排除标记】，仅靠 pointer-events 把事件路由到 scaler，
+// 避免了此前「中途解除字段 panzoom-exclude」方案在真实环境失效的问题（更稳健），
+// 且与模式正交：设计态可越过节点拖拽平移，预览态可越过 contenteditable 字段平移。
+const panMode = ref(false);
+
+function isTypingTarget(t: EventTarget | null): boolean {
+  const el = t as HTMLElement | null;
+  return Boolean(
+    el &&
+      typeof el.closest === "function" &&
+      el.closest("input, textarea, select, [contenteditable]"),
+  );
+}
+
+function activatePan(): void {
+  if (panMode.value) return;
+  panMode.value = true;
+  viewport.value?.classList.add("is-space-pan");
+}
+
+function deactivatePan(): void {
+  if (!panMode.value) return;
+  panMode.value = false;
+  viewport.value?.classList.remove("is-space-pan");
+}
+
+function onSpaceKeyDown(e: KeyboardEvent): void {
+  if (e.code !== "Space" && e.key !== " ") return;
+  // 正在输入字段（contenteditable / input 等）：让空格正常输入，不进入平移态
+  if (isTypingTarget(e.target)) return;
+  e.preventDefault(); // 阻止空格滚动页面
+  activatePan();
+}
+
+function onSpaceKeyUp(e: KeyboardEvent): void {
+  if (e.code !== "Space" && e.key !== " ") return;
+  deactivatePan();
+}
+
 function onPanChange(e: Event): void {
   const detail = (e as CustomEvent<{ scale: number }>).detail;
   if (typeof detail?.scale === "number" && detail.scale !== scale.value) {
@@ -163,6 +205,9 @@ onMounted(() => {
   });
   el.addEventListener("panzoomchange", onPanChange);
   vp.addEventListener("wheel", onWheel, { passive: false });
+  // 空格长按平移：全局监听 keydown/keyup；按住空格临时接管整片平移，松开恢复。
+  window.addEventListener("keydown", onSpaceKeyDown);
+  window.addEventListener("keyup", onSpaceKeyUp);
   if (props.fitOnMount) fitWidth();
 });
 
@@ -173,6 +218,8 @@ onBeforeUnmount(() => {
   const vp = viewport.value;
   el?.removeEventListener("panzoomchange", onPanChange);
   vp?.removeEventListener("wheel", onWheel);
+  window.removeEventListener("keydown", onSpaceKeyDown);
+  window.removeEventListener("keyup", onSpaceKeyUp);
   // 复位 panzoom 写入的 parent/elem 内联样式，并移除指针监听。
   pz?.resetStyle();
   pz?.destroy();
@@ -181,7 +228,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="viewport" class="paper-viewport">
+  <div ref="viewport" class="paper-viewport" :class="{ 'is-space-pan': panMode }">
     <div ref="scaler" class="paper-viewport__scaler">
       <slot />
     </div>
@@ -221,6 +268,22 @@ onBeforeUnmount(() => {
 .paper-viewport__scaler {
   transform-origin: 50% 50%;
   will-change: transform;
+}
+
+/* 空格长按平移：临时让纸张内容「指针穿透」，整片平移交给 panzoom（scaler）接管。
+   内容（字段 / 可拖拽节点）不再拦截指针，指针按下直达 scaler，panzoom 不再因
+   panzoom-exclude 标记而忽略 —— 设计/预览态都可直接拖拽空白或节点区域平移。 */
+.paper-viewport.is-space-pan .paper-viewport__scaler > * {
+  pointer-events: none;
+}
+
+.paper-viewport.is-space-pan,
+.paper-viewport.is-space-pan .paper-viewport__scaler > * {
+  cursor: grab;
+}
+
+.paper-viewport.is-space-pan:active {
+  cursor: grabbing;
 }
 
 .paper-viewport__bar {

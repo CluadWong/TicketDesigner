@@ -378,10 +378,10 @@ describe("P6.2b cell padding/align cascade", () => {
       align: "right",
       verticalAlign: "bottom",
     });
-    // 无 Grid 默认时回退常量（padding 0 / 左 / 居中）
+    // 无 Grid 默认时回退常量（padding 0 / 居中 / 居中）
     expect(resolveCellBoxV2(makeCell(), makeGrid())).toEqual({
       padding: 0,
-      align: "left",
+      align: "center",
       verticalAlign: "middle",
     });
   });

@@ -107,7 +107,7 @@ const pagination = computed(() =>
   paginateSchema(schema.value, { data: previewData.value }),
 );
 const nodeIndex = computed(() => buildEditorNodeIndexV2(schema.value));
-// 单元格（grid-cell）作为「仅样式可编辑」实体可被选中，但不可删除、不进入节点树。
+// 单元格（grid-cell）作为「仅样式可编辑」实体可被选中（含结构树内点击），但不可删除。
 /** 节点是否位于某个 Table 的行模板内（含嵌套 Grid）。表格内节点不可单独选中/配置，
  *  其字段 P 由列配置派生，故选中时归到所属 Table。 */
 function isInsideTable(id: string): boolean {
@@ -194,24 +194,57 @@ const selectedCellContext = computed<{
 const insertionSlot = computed(() => {
   const slotId = selectedInsertionSlotId.value;
   const slot = slotId ? nodeIndex.value.get(slotId)?.node : undefined;
-  return slot?.type === "grid-cell" || slot?.type === "table-cell-template"
-    ? slot
-    : selectedOwnerCell.value;
+  if (slot?.type === "grid-cell" || slot?.type === "table-cell-template") return slot;
+  // 选中单元格本身（尤其在结构树里直接点 cell）也应作为插入槽：
+  // 使「添加 Grid / 组件」嵌进该格，从而实现「cell 内并列多个 Grid」。
+  const sel = selectedNodeId.value
+    ? nodeIndex.value.get(selectedNodeId.value)?.node
+    : undefined;
+  if (sel?.type === "grid-cell" || sel?.type === "table-cell-template") return sel;
+  return selectedOwnerCell.value;
 });
 
-// 结构树：仅展示可选节点（Page / Grid / 实际组件），跳过 Row/Cell 布局记录。
-function selectableChildrenOf(node: EditorNodeV2): EditorNodeV2[] {
-  if (node.type === "page") return node.children;
-  if (node.type === "grid") {
-    const out: EditorNodeV2[] = [];
-    for (const row of node.rows)
-      for (const cell of row.cells) out.push(...cell.children);
-    return out;
-  }
-  if (node.type === "table")
-    // 表格内字段 P 由列配置派生、不可作为独立组件选中/配置，故结构树不展开其子节点。
-    return [];
-  return [];
+// 结构树：展示 Page / Grid / Cell / 实际组件 的层级。
+// 行（grid-row）仅为布局容器、无独立配置、不可选中 —— 不显示、不进入树；
+// 单元格（grid-cell）直接挂在所属 Grid 下、可点击选中以配置其样式（padding / 行高 / 合并拆分）。
+// 单元格内的组件经 cell.children 递归展开，故「Grid 内嵌套多层并列 Grid」可自然呈现于树中。
+// Table 内部字段 P 由列配置派生、不可作为独立组件选中/配置，故表格节点不展开子节点。
+function buildGridTree(grid: GridNodeV2): TreeNode {
+  const cellNodes: TreeNode[] = [];
+  grid.rows.forEach((row, ri) => {
+    row.cells.forEach((cell, ci) => {
+      cellNodes.push(
+        buildCellTree(cell, ri, ci, row.cells.length, grid.rows.length),
+      );
+    });
+  });
+  return {
+    id: grid.id,
+    type: "grid",
+    label: nodeLabel(grid),
+    children: cellNodes,
+  };
+}
+
+function buildCellTree(
+  cell: GridCellV2,
+  ri: number,
+  ci: number,
+  colCount: number,
+  rowCount: number,
+): TreeNode {
+  const label =
+    rowCount > 1
+      ? `单元格 ${ri + 1}-${ci + 1}`
+      : colCount > 1
+        ? `单元格 ${ci + 1}`
+        : "单元格";
+  return {
+    id: cell.id,
+    type: "grid-cell",
+    label,
+    children: cell.children.map(buildTreeNode), // 递归：单元格内组件（可含嵌套 grid）
+  };
 }
 
 function nodeLabel(node: EditorNodeV2): string {
@@ -236,12 +269,16 @@ function nodeLabel(node: EditorNodeV2): string {
 }
 
 function buildTreeNode(node: EditorNodeV2): TreeNode {
-  return {
-    id: node.id,
-    type: node.type,
-    label: nodeLabel(node),
-    children: selectableChildrenOf(node).map(buildTreeNode),
-  };
+  if (node.type === "grid") return buildGridTree(node);
+  if (node.type === "page")
+    return {
+      id: node.id,
+      type: node.type,
+      label: nodeLabel(node),
+      children: node.children.map(buildTreeNode),
+    };
+  // 其余组件节点（text / p / table / image / html）：无独立子节点
+  return { id: node.id, type: node.type, label: nodeLabel(node), children: [] };
 }
 
 const nodeTree = computed(() =>
@@ -797,7 +834,12 @@ function selectIssue(issue: SchemaIssueV2): void {
 function selectNodeById(id: string): void {
   if (!editable.value) return;
   const ref = nodeIndex.value.get(id);
-  if (!ref || !isSelectableSchemaNodeV2(ref.node)) return;
+  // 允许选中单元格（grid-cell）；其余须为可独立配置组件
+  if (
+    !ref ||
+    (!isSelectableSchemaNodeV2(ref.node) && ref.node.type !== "grid-cell")
+  )
+    return;
   selectedNodeId.value = id;
   selectedInsertionSlotId.value = null;
   const ancestors: string[] = [];
@@ -1531,7 +1573,7 @@ function updateSelectedSafetyField(event: Event): void {
         </PaperViewport>
       </main>
 
-      <aside v-if="editable" class="v2-sidebar v2-sidebar--right">
+      <aside class="v2-sidebar v2-sidebar--right">
         <div class="v2-inspector-row">
           <span>节点类型</span>
           <strong>{{ selectedNodeType }}</strong>
@@ -1655,7 +1697,7 @@ function updateSelectedSafetyField(event: Event): void {
                 :value="selectedNode.cellAlign ?? ''"
                 @change="updateGridCellDefault('cellAlign', $event)"
               >
-                <option value="">左（默认）</option>
+                <option value="">居中（默认）</option>
                 <option value="left">左</option>
                 <option value="center">居中</option>
                 <option value="right">右</option>
@@ -1965,7 +2007,7 @@ function updateSelectedSafetyField(event: Event): void {
                 :value="selectedNode.align ?? ''"
                 @change="updateSelectedCellAlign"
               >
-                <option value="">默认（继承 Grid）</option>
+                <option value="">默认（居中）</option>
                 <option value="left">左</option>
                 <option value="center">居中</option>
                 <option value="right">右</option>
@@ -2272,6 +2314,10 @@ function updateSelectedSafetyField(event: Event): void {
   gap: 6px;
 }
 
+.v2-toolbar__group:last-of-type {
+  margin-left: auto;
+}
+
 .v2-toolbar__label {
   align-self: center;
   margin-right: 2px;
@@ -2302,7 +2348,7 @@ function updateSelectedSafetyField(event: Event): void {
 
 .v2-designer__body {
   display: grid;
-  grid-template-columns: 224px minmax(0, 1fr) 400px;
+  grid-template-columns: 360px minmax(0, 1fr) 360px;
   min-height: 0;
 }
 

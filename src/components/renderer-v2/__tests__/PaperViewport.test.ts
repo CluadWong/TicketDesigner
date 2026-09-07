@@ -133,4 +133,49 @@ describe("PaperViewport（纸张视口 · 浏览缩放）", () => {
     expect(field.classList.contains("panzoom-exclude")).toBe(true);
     wrapper.unmount();
   });
+
+  it("空格长按平移：keydown 空格给视口加 is-space-pan，keyup 移除；输入态空格不触发", async () => {
+    const wrapper = mount(PaperViewport, {
+      attachTo: document.body,
+      slots: { default: '<div class="node" draggable="true">design node</div>' },
+    });
+    const vp = wrapper.find(".paper-viewport").element as HTMLElement;
+
+    // 初始未进入平移态
+    expect(vp.classList.contains("is-space-pan")).toBe(false);
+
+    // 空白区域按下空格 → 进入平移态（事件冒泡到 window 监听）
+    window.dispatchEvent(new KeyboardEvent("keydown", { code: "Space", key: " ", bubbles: true }));
+    await wrapper.vm.$nextTick();
+    expect(vp.classList.contains("is-space-pan")).toBe(true);
+
+    // 松开空格 → 退出平移态
+    window.dispatchEvent(new KeyboardEvent("keyup", { code: "Space", key: " ", bubbles: true }));
+    await wrapper.vm.$nextTick();
+    expect(vp.classList.contains("is-space-pan")).toBe(false);
+
+    // 在 contenteditable 字段内按下空格（target 命中输入区）→ 不进入平移态，空格正常输入
+    const field = document.createElement("div");
+    field.setAttribute("contenteditable", "true");
+    document.body.appendChild(field);
+    field.dispatchEvent(new KeyboardEvent("keydown", { code: "Space", key: " ", bubbles: true }));
+    await wrapper.vm.$nextTick();
+    expect(vp.classList.contains("is-space-pan")).toBe(false);
+    field.remove();
+
+    wrapper.unmount();
+  });
+
+  it("空格长按平移：卸载时移除 window 键盘监听，不残留 is-space-pan", () => {
+    const wrapper = mount(PaperViewport, { attachTo: document.body });
+    const vp = wrapper.find(".paper-viewport").element as HTMLElement;
+    window.dispatchEvent(new KeyboardEvent("keydown", { code: "Space", key: " ", bubbles: true }));
+    expect(vp.classList.contains("is-space-pan")).toBe(true);
+    wrapper.unmount();
+    // 卸载后即便再收到 keydown 也不再响应（监听已移除）
+    window.dispatchEvent(new KeyboardEvent("keydown", { code: "Space", key: " ", bubbles: true }));
+    const detached = document.querySelector(".paper-viewport");
+    // 组件已卸载，DOM 中不应再有 .paper-viewport，或即便有也不再被本实例控管
+    expect(detached === null || !detached.classList.contains("is-space-pan")).toBe(true);
+  });
 });

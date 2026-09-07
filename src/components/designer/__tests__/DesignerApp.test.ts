@@ -204,6 +204,25 @@ describe("DesignerApp V2 selection and deletion", () => {
     expect(wrapper.find('[data-node-id="title-text"]').exists()).toBe(true);
   });
 
+  it("结构树：不显示行(grid-row)，单元格(grid-cell)可直接点击选中并打开其样式面板", async () => {
+    const wrapper = mountDesigner();
+    // 行不再进入树
+    const typeBadges = wrapper.findAll(".v2-tree-type").map((el) => el.text());
+    expect(typeBadges).not.toContain("grid-row");
+    // 单元格在树中且可点击选中
+    const cellRow = wrapper
+      .findAll(".v2-tree-row")
+      .find((r) => r.text().includes("单元格"));
+    expect(cellRow).toBeDefined();
+    await cellRow!.trigger("click");
+    const selected = (wrapper.vm as unknown as { selectedNodeId: string | null })
+      .selectedNodeId;
+    expect(selected).toBeTruthy();
+    // 选中单元格后检查器首行显示 grid-cell（样式面板），且删除按钮禁用
+    expect(wrapper.findAll(".v2-inspector-row")[0]?.text()).toContain("grid-cell");
+    expect(wrapper.find(".v2-tree__delete").attributes("disabled")).toBeDefined();
+  });
+
   it("edits a cell's padding via the inspector and writes it to the schema", async () => {
     const wrapper = mountDesigner();
     const field = wrapper.find('[data-node-id="unit-field"]');
@@ -333,6 +352,48 @@ describe("DesignerApp 把 Grid 放进 / 拖进 cell（Grid 嵌套，九续）", 
 
     // 3. 结构校验不再报错（嵌套 Grid 已纳入索引与校验）
     expect(wrapper.findAll(".v2-issue").some(i => i.text().includes("INVALID_GRID_ROWS"))).toBe(false);
+  });
+
+  it("选中已含 Grid 的 cell 本身再添加 Grid：新 Grid 追加到同一 cell（并列），而非 page", async () => {
+    const wrapper = mountDesigner();
+    // 1. 先选中某格内字段，添加第一个 Grid 进该 cell
+    await wrapper.find('[data-node-id="unit-field"]').trigger("click");
+    await nextTick();
+    const cellId = findOwnerCellOfField(schemaOf(wrapper), "unit-field")!.cell.id;
+    const gridButton = wrapper
+      .findAll(".v2-palette-item--button")
+      .find(b => b.text().includes("Grid"))!;
+    await gridButton.trigger("click");
+    await nextTick();
+
+    // 该 cell 内现已有一个嵌套 Grid
+    const nestedGridId = findOwnerCellOfField(schemaOf(wrapper), "unit-field")!
+      .cell.children.find(c => c.type === "grid")!.id;
+
+    // 2. 在结构树里选中「该 cell 本身」（即用户点单元格节点，而非内部 grid）
+    const gridTreeRow = wrapper
+      .findAll(".v2-tree-row")
+      .find(r => r.text().includes(nestedGridId))!;
+    const cellRowEl = gridTreeRow.element.closest(".v2-tree-children")
+      ?.previousElementSibling as HTMLElement | null;
+    expect(cellRowEl).toBeTruthy();
+    cellRowEl!.click();
+    await nextTick();
+    expect(
+      (wrapper.vm as unknown as { selectedNodeId: string | null }).selectedNodeId,
+    ).toBe(cellId);
+
+    const pageChildrenBefore = schemaOf(wrapper).pages[0].children.length;
+
+    // 3. 再点添加 Grid
+    await gridButton.trigger("click");
+    await nextTick();
+
+    // 期望：同一 cell 内 grid 数变为 2（并列），page 层级 grid 数不变
+    const cell = findOwnerCellOfField(schemaOf(wrapper), "unit-field")!.cell;
+    const gridCount = cell.children.filter(c => c.type === "grid").length;
+    expect(gridCount).toBe(2);
+    expect(schemaOf(wrapper).pages[0].children.length).toBe(pageChildrenBefore);
   });
 
   it("预览态：点击「添加 Grid」被禁用且不改动结构", async () => {

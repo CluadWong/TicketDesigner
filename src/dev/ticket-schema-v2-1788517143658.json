@@ -1,0 +1,209 @@
+{
+  "version": 2,
+  "paper": {
+    "size": "A3",
+    "orientation": "landscape"
+  },
+  "baseRowHeight": 8,
+  "pages": [
+    {
+      "id": "page-mtmo4tuv-tppir",
+      "type": "page",
+      "mode": "fixed",
+      "margin": {
+        "top": 10,
+        "right": 10,
+        "bottom": 10,
+        "left": 10
+      },
+      "children": [
+        {
+          "id": "grid-mtmo4tuv-et0a8",
+          "type": "grid",
+          "border": "none",
+          "rows": [
+            {
+              "id": "row-mtmo4tuv-r0fsf",
+              "type": "grid-row",
+              "height": 1,
+              "cells": [
+                {
+                  "id": "cell-1-mtmo4tuv-0ju20",
+                  "type": "grid-cell",
+                  "width": "1fr",
+                  "children": [
+                    {
+                      "id": "text-mtmo53g3-tcm6m",
+                      "type": "text",
+                      "text": "云南铝业股份有限公司电气第一种工作票",
+                      "style": {
+                        "align": "center",
+                        "fontSize": 24,
+                        "fontWeight": "bold"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "grid-mtmo6frl-7hi2x",
+          "type": "grid",
+          "border": "inner",
+          "rows": [
+            {
+              "id": "row-mtmo6frl-btngz",
+              "type": "grid-row",
+              "height": 1,
+              "cells": [
+                {
+                  "id": "cell-1-mtmo6frl-ick96",
+                  "type": "grid-cell",
+                  "width": "1fr",
+                  "children": [
+                    {
+                      "id": "grid-mtmo8srm-usm7c",
+                      "type": "grid",
+                      "border": "all",
+                      "rows": [
+                        {
+                          "id": "row-mtmo8srm-yybnu",
+                          "type": "grid-row",
+                          "height": 1,
+                          "cells": [
+                            {
+                              "id": "cell-1-mtmo8srm-4fun7",
+                              "type": "grid-cell",
+                              "width": 20,
+                              "children": [
+                                {
+                                  "id": "text-mtmqghms-0iowh",
+                                  "type": "text",
+                                  "text": "单位",
+                                  "style": {
+                                    "align": "center"
+                                  }
+                                }
+                              ]
+                            },
+                            {
+                              "id": "cell-mtmqfynv-qlfac",
+                              "type": "grid-cell",
+                              "width": "1fr",
+                              "children": [
+                                {
+                                  "id": "p-field-mtmqhpy1-x846m",
+                                  "type": "p",
+                                  "mode": "field",
+                                  "field": "单位",
+                                  "underline": true
+                                }
+                              ]
+                            },
+                            {
+                              "id": "cell-mtmqfyt7-0ik1t",
+                              "type": "grid-cell",
+                              "width": 20,
+                              "children": [
+                                {
+                                  "id": "text-mtmqgs8e-zffmk",
+                                  "type": "text",
+                                  "text": "编号",
+                                  "style": {
+                                    "align": "center"
+                                  }
+                                }
+                              ]
+                            },
+                            {
+                              "id": "cell-mtmqfz3m-u2jb9",
+                              "type": "grid-cell",
+                              "width": "1fr",
+                              "children": [
+                                {
+                                  "id": "p-field-mtmqi41b-0eb9c",
+                                  "type": "p",
+                                  "mode": "field",
+                                  "field": "编号",
+                                  "underline": true
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ],
+                      "columns": [
+                        20,
+                        "1fr",
+                        20,
+                        "1fr"
+                      ]
+                    },
+                    {
+                      "id": "grid-mtmsv88i-r682n",
+                      "type": "grid",
+                      "border": "all",
+                      "rows": [
+                        {
+                          "id": "row-mtmsv88i-hixlo",
+                          "type": "grid-row",
+                          "height": 1,
+                          "cells": [
+                            {
+                              "id": "cell-1-mtmsv88i-fxcub",
+                              "type": "grid-cell",
+                              "width": "1fr",
+                              "children": []
+                            },
+                            {
+                              "id": "cell-mtmsx23c-k875i",
+                              "type": "grid-cell",
+                              "width": "1fr",
+                              "children": []
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "id": "cell-mtmo6nfd-belzd",
+                  "type": "grid-cell",
+                  "width": "1fr",
+                  "children": [
+                    {
+                      "id": "grid-mtmoggl4-aj904",
+                      "type": "grid",
+                      "border": "all",
+                      "rows": [
+                        {
+                          "id": "row-mtmoggl4-o6s4t",
+                          "type": "grid-row",
+                          "height": 1,
+                          "cells": [
+                            {
+                              "id": "cell-1-mtmoggl4-71frk",
+                              "type": "grid-cell",
+                              "width": "1fr",
+                              "children": [],
+                              "align": "center"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "gap": 10,
+          "cellAlign": "left"
+        }
+      ]
+    }
+  ]
+}

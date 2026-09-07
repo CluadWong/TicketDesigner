@@ -100,7 +100,9 @@ const isDesign = computed(() => resolvedMode.value === "design");
  * 但同时受 `readonly` 硬闸门约束：外部传入 readonly（如真·只读展示）时强制不可编辑。
  * 等价于旧逻辑 `data != null && !readonly`。
  */
-const canFill = computed(() => resolvedMode.value !== "design" && !props.readonly);
+const canFill = computed(
+  () => resolvedMode.value !== "design" && !props.readonly,
+);
 
 const track = (value: number | `${number}fr` | "auto" | undefined): string => {
   if (value === undefined || value === "auto") return "auto";
@@ -234,7 +236,10 @@ function tableTemplate(node: TableNodeV2, columnKey: string) {
  * `_paginateMaxRows` 字段，限制该片段只渲染前 N 行数据（避免每页都渲染全部 50 行）。
  * 未设置时返回完整行数（= 不限制，与未分页时一致）。
  */
-function tablePaginatedRowCount(node: TableNodeV2, data: FormDataV2 | null | undefined): number {
+function tablePaginatedRowCount(
+  node: TableNodeV2,
+  data: FormDataV2 | null | undefined,
+): number {
   const full = resolveTableRowCount(node, data);
   if (typeof node._paginateMaxRows === "number" && node._paginateMaxRows > 0) {
     return Math.min(full, node._paginateMaxRows);
@@ -251,7 +256,11 @@ function tablePaginatedRowCount(node: TableNodeV2, data: FormDataV2 | null | und
  * P10「数据回写正确 —— 键与逐行数据一致无错位」。行模板内手写 field 会被覆盖，
  * 故无需（也不应在）schema 中写死字段名。
  */
-function bindRowCell(node: FormNodeV2, columnKey: string, rowIndex: number): FormNodeV2 {
+function bindRowCell(
+  node: FormNodeV2,
+  columnKey: string,
+  rowIndex: number,
+): FormNodeV2 {
   return bindTableRowCell(node, columnKey, rowIndex);
 }
 
@@ -396,14 +405,14 @@ function onImgError(): void {
     :class="[
       `layout-grid--${node.border}`,
       {
-                'layout-grid--no-top': suppressBorders?.top,
+        'layout-grid--no-top': suppressBorders?.top,
         'layout-grid--no-right': suppressBorders?.right,
         'layout-grid--no-bottom': suppressBorders?.bottom,
         'layout-grid--no-left': suppressBorders?.left,
       },
     ]"
     :data-node-id="node.id"
-          >
+  >
     <div
       v-for="(row, rowIndex) in node.rows"
       :key="row.id"
@@ -420,10 +429,7 @@ function onImgError(): void {
         :data-layout-id="cell.id"
         :data-node-id="cell.id"
       >
-        <template
-          v-for="(child, childIndex) in cell.children"
-          :key="child.id"
-        >
+        <template v-for="(child, childIndex) in cell.children" :key="child.id">
           <GridSchemaNode
             :node="child"
             :base-row-height="baseRowHeight"
@@ -433,7 +439,10 @@ function onImgError(): void {
             :suppress-borders="
               cellSiblingSuppressBorders(cell.children, childIndex)
             "
-                        @field-change="(field: string, value: string) => emit('field-change', field, value)"
+            @field-change="
+              (field: string, value: string) =>
+                emit('field-change', field, value)
+            "
           />
         </template>
       </div>
@@ -446,7 +455,7 @@ function onImgError(): void {
     :class="{}"
     :style="textStyle(node)"
     :data-node-id="node.id"
-          >
+  >
     {{ node.text }}
   </div>
 
@@ -458,12 +467,14 @@ function onImgError(): void {
       'layout-p--composite': isCompositeField(node),
       'layout-p--underline': node.underline && !isCompositeField(node),
       'layout-p--inner-border': node.innerBorder,
-          }"
+    }"
     :style="pStyle(node)"
-    :contenteditable="isCompositeField(node) ? undefined : (canFill ? 'true' : isEditable(node))"
+    :contenteditable="
+      isCompositeField(node) ? undefined : canFill ? 'true' : isEditable(node)
+    "
     :data-field="node.field"
     :data-node-id="node.id"
-            @blur="onFillBlur(node.field, $event)"
+    @blur="onFillBlur(node.field, $event)"
   >
     <span v-if="node.prefix" class="layout-p__label">{{ node.prefix }}</span>
 
@@ -474,7 +485,7 @@ function onImgError(): void {
       class="layout-p__input"
       :class="{ 'layout-p--underline': node.underline }"
       :style="fieldInputStyle(node)"
-      :contenteditable="canFill ? 'true' : (props.readonly ? undefined : 'true')"
+      :contenteditable="canFill ? 'true' : props.readonly ? undefined : 'true'"
       :data-field="node.field"
       @blur="onFillBlur(node.field, $event)"
       ><template v-if="node.innerBorder"
@@ -482,7 +493,9 @@ function onImgError(): void {
           v-for="(line, li) in fieldLines(node)"
           :key="li"
           class="layout-p__line"
-        >{{ line }}</div></template
+        >
+          {{ line }}
+        </div></template
       ><template v-else>{{ fieldValue(node) }}</template></span
     >
 
@@ -492,11 +505,14 @@ function onImgError(): void {
       ref="innerLinesEl"
       class="layout-p__lines"
       v-once
-    ><div
+      ><div
         v-for="(line, li) in fieldLines(node)"
         :key="li"
         class="layout-p__line"
-      >{{ line }}</div></span>
+      >
+        {{ line }}
+      </div></span
+    >
 
     <!-- 非复合字段：普通展示值。直接作为 <p> 的 v-else 子项（不经 <template v-else>
          包裹，否则 contenteditable <p> 的数据晚到时文本子节点不会重新 patch）。 -->
@@ -508,12 +524,10 @@ function onImgError(): void {
   <table
     v-else-if="node.type === 'table'"
     class="layout-table"
-    :class="[
-      `layout-table--${node.border ?? 'all'}`,
-    ]"
+    :class="[`layout-table--${node.border ?? 'all'}`]"
     :data-node-id="node.id"
     :data-field="node.field"
-          >
+  >
     <thead>
       <tr
         class="layout-table__row layout-table__header"
@@ -559,7 +573,10 @@ function onImgError(): void {
               :mode="resolvedMode"
               :data="data"
               :readonly="props.readonly"
-                            @field-change="(field: string, value: string) => emit('field-change', field, value)"
+              @field-change="
+                (field: string, value: string) =>
+                  emit('field-change', field, value)
+              "
             />
           </template>
         </td>
@@ -567,11 +584,7 @@ function onImgError(): void {
     </tbody>
   </table>
 
-    <HtmlBlock
-      v-else-if="node.type === 'html'"
-      :node="node"
-      :data="data"
-                />
+  <HtmlBlock v-else-if="node.type === 'html'" :node="node" :data="data" />
 
   <img
     v-else
@@ -587,7 +600,7 @@ function onImgError(): void {
       objectFit: node.objectFit,
     }"
     @error="onImgError"
-          />
+  />
 </template>
 
 <style scoped>
@@ -609,6 +622,7 @@ function onImgError(): void {
 
 .layout-grid__cell {
   display: flex;
+  flex-direction: column;
   min-width: 0;
   min-height: 0;
   box-sizing: border-box;
