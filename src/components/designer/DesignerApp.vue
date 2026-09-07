@@ -103,6 +103,10 @@ const {
   addGrid,
   addNodeToSelectedCell,
   removeSelectedNode,
+  copySelected,
+  cutSelected,
+  pasteClipboard,
+  duplicateSelected,
   mergeSelectedCellRight,
   splitSelectedCell,
   onCanvasNodeDragStart,
@@ -238,19 +242,48 @@ const warningCount = computed(() => issues.value.length);
 const pagination = computed(() => paginateSchema(schema.value, { data: previewData.value }));
 
 // ── 快捷键与离开确认 ───────────────────────────────────────
+/** 焦点在表单控件 / 可编辑区内时，快捷键让位给浏览器原生（文本复制、撤销、退格等）。 */
+function isTypingTarget(event: KeyboardEvent): boolean {
+  const t = event.target as HTMLElement | null;
+  if (!t) return false;
+  const tag = t.tagName;
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || t.isContentEditable;
+}
+
 function onKeydown(event: KeyboardEvent): void {
+  // 输入框 / contenteditable 内：全部让位原生（含 Ctrl+Z/S/C/V）
+  if (isTypingTarget(event)) return;
   const mod = event.ctrlKey || event.metaKey;
-  if (!mod) return;
   const key = event.key.toLowerCase();
-  if (key === "z" && !event.shiftKey) {
+  if (mod) {
+    if (key === "z" && !event.shiftKey) {
+      event.preventDefault();
+      undo();
+    } else if ((key === "z" && event.shiftKey) || key === "y") {
+      event.preventDefault();
+      redo();
+    } else if (key === "s") {
+      event.preventDefault();
+      saveToLocal();
+    } else if (key === "c") {
+      event.preventDefault();
+      copySelected();
+    } else if (key === "x") {
+      event.preventDefault();
+      cutSelected();
+    } else if (key === "v") {
+      event.preventDefault();
+      pasteClipboard();
+    } else if (key === "d") {
+      event.preventDefault();
+      duplicateSelected();
+    }
+    return;
+  }
+  // 无修饰键：Delete / Backspace 删除选中（仅设计态）
+  if ((key === "delete" || key === "backspace") && editable.value) {
     event.preventDefault();
-    undo();
-  } else if ((key === "z" && event.shiftKey) || key === "y") {
-    event.preventDefault();
-    redo();
-  } else if (key === "s") {
-    event.preventDefault();
-    saveToLocal();
+    removeSelectedNode();
   }
 }
 

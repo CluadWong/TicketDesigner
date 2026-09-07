@@ -10,6 +10,7 @@ import { computed, type ComputedRef } from "vue";
 import {
   addTableColumnV2,
   appendNodeToCellV2,
+  cloneNodeWithFreshIdsV2,
   createFieldPNodeV2,
   createGridNodeV2,
   createHtmlNodeV2,
@@ -73,6 +74,7 @@ export function useSchemaEdits(ctx: SchemaEditsContext) {
     selectionPathIndex,
     nodeIndex,
     selectedCellContext,
+    selectedOwnerCell,
     insertionSlot,
   } = ctx.selection;
 
@@ -127,6 +129,94 @@ export function useSchemaEdits(ctx: SchemaEditsContext) {
       return;
     commit(removeNodeV2(schema.value, selectedNodeId.value));
     ctx.clearSelection();
+  }
+
+  // ── 复制 / 剪切 / 粘贴 / 原地复制（设计器内部内存缓冲） ──
+  // 缓冲只存节点深拷贝（已刷新 ID）；粘贴时再次刷新 ID → 可重复粘贴、不与原件/历史撞 ID。
+  let clipboard: FormNodeV2 | null = null;
+  // 复制/剪切时的源格 id：cut 后选中被清空，作为粘贴的最终兜底落点。
+  let clipboardSourceCellId: string | null = null;
+
+  /** 选中节点是否可复制/剪切/原地复制：排除 page 与 grid-cell（无独立复制语义）。 */
+  function selectedCopiableNode(): FormNodeV2 | null {
+    const node = selectedNode.value;
+    return node && node.type !== "page" && node.type !== "grid-cell"
+      ? (node as FormNodeV2)
+      : null;
+  }
+
+  /**
+   * 将克隆节点落到合适位置（提交 schema 并选中新节点）：
+   * - 选中单元格 → 进该格末尾；
+   * - 选中普通组件且其父是格 → 插到它后面（同格、下标+1）；
+   * - 否则落到「插入槽」（与新增组件同一落点）；
+   * 无合法落点则丢弃克隆、不提交。
+   */
+  function insertCloneAfterSelectedOrIntoCell(clone: FormNodeV2): void {
+    const selNode = selectedNode.value;
+    // 选中单元格：粘贴进该格
+    if (selNode?.type === "grid-cell") {
+      commit(appendNodeToCellV2(schema.value, selNode.id, clone));
+      selectedNodeId.value = clone.id;
+      return;
+    }
+    // 选中普通组件且其父是格：插到它后面
+    const ownerCell = selectedOwnerCell.value;
+    if (selNode && ownerCell) {
+      const idx = ownerCell.children.findIndex((c) => c.id === selectedNodeId.value);
+      const at = idx >= 0 ? idx + 1 : ownerCell.children.length;
+      const appended = appendNodeToCellV2(schema.value, ownerCell.id, clone);
+      commit(moveNodeToIndexV2(appended, clone.id, ownerCell.id, at));
+      selectedNodeId.value = clone.id;
+      return;
+    }
+    // 落到「插入槽」（新增组件的同一落点）
+    const slot = insertionSlot.value;
+    if (slot && (slot.type === "grid-cell" || slot.type === "table-cell-template")) {
+      commit(appendNodeToCellV2(schema.value, slot.id, clone));
+      selectedNodeId.value = clone.id;
+      return;
+    }
+    // 最终兜底：复制/剪切时的源格（cut 后选中已清空，仍能粘贴回原格）
+    if (clipboardSourceCellId) {
+      const src = nodeIndex.value.get(clipboardSourceCellId)?.node;
+      if (src && src.type === "grid-cell") {
+        commit(appendNodeToCellV2(schema.value, src.id, clone));
+        selectedNodeId.value = clone.id;
+        return;
+      }
+    }
+    // 无合法落点：丢弃克隆（不 commit）
+  }
+
+  function copySelected(): void {
+    if (!ctx.editable()) return;
+    const node = selectedCopiableNode();
+    if (!node) return;
+    clipboard = cloneNodeWithFreshIdsV2(node) as FormNodeV2;
+    clipboardSourceCellId = selectedOwnerCell.value?.id ?? null;
+  }
+
+  function cutSelected(): void {
+    if (!ctx.editable()) return;
+    const node = selectedCopiableNode();
+    if (!node) return;
+    clipboard = cloneNodeWithFreshIdsV2(node) as FormNodeV2;
+    clipboardSourceCellId = selectedOwnerCell.value?.id ?? null;
+    removeSelectedNode();
+  }
+
+  function pasteClipboard(): void {
+    if (!ctx.editable()) return;
+    if (!clipboard) return;
+    insertCloneAfterSelectedOrIntoCell(cloneNodeWithFreshIdsV2(clipboard));
+  }
+
+  function duplicateSelected(): void {
+    if (!ctx.editable()) return;
+    const node = selectedCopiableNode();
+    if (!node) return;
+    insertCloneAfterSelectedOrIntoCell(cloneNodeWithFreshIdsV2(node) as FormNodeV2);
   }
 
   // ── 单元格合并 / 拆分 ──
@@ -597,6 +687,10 @@ export function useSchemaEdits(ctx: SchemaEditsContext) {
     addGrid,
     addNodeToSelectedCell,
     removeSelectedNode,
+    copySelected,
+    cutSelected,
+    pasteClipboard,
+    duplicateSelected,
     mergeSelectedCellRight,
     splitSelectedCell,
     onCanvasNodeDragStart,
