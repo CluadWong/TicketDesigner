@@ -598,6 +598,8 @@ onUnmounted(() => {
         :paper-size="schema.paper.size"
         :base-row-height="schema.baseRowHeight"
         :paper-margin="paperMargin"
+        :header="schema.paper.header"
+        :footer="schema.paper.footer"
         @select-issue="selectIssue"
       />
     </div>

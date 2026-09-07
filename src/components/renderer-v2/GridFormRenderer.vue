@@ -3,15 +3,18 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import type { CSSProperties } from "vue";
 import {
   resolvePaperSizeV2,
+  DEFAULT_BAND_HEIGHT_MM,
   type FormSchemaV2,
   type FormDataV2,
   type FormNodeV2,
   type EdgeInsetsV2,
+  type HeaderFooterV2,
 } from "@/types";
 import GridSchemaNode from "./GridSchemaNode.vue";
 import { registerPageSizeStyle, setPageSizeStyle } from "./page-size-style";
+import { measureHeightMm } from "./measure-rows";
 import type { PhysicalPage } from "@/engine-v2/pagination";
-import { paginatePage, paginateSchema } from "@/engine-v2/pagination";
+import { gridRowHeightMm, paginatePage, paginateSchema } from "@/engine-v2/pagination";
 
 defineOptions({ name: "GridFormRenderer" });
 
@@ -80,11 +83,14 @@ onUnmounted(registerPageSizeStyle());
  *
  * 之所以分页开启用 `height` 而非 `min-height`：`min-height` 只设下限，会让单物理页被无限撑开、
  * 看不出「已超出一张纸」；而分页本就会把内容切走，固定高度恰为一张纸。
+ *
+ * `position: relative` 供页眉 / 页脚带绝对定位（驻留上/下边距区）。
  */
 function paperStyle(margin: EdgeInsetsV2): CSSProperties {
   const size = paperSize.value;
   const useFixed = props.paginate;
   return {
+    position: "relative",
     width: `${size.widthMm}mm`,
     ...(useFixed
       ? { height: `${size.heightMm}mm` }
@@ -134,12 +140,17 @@ const renderedPages = computed<PhysicalPage[]>(() => {
  * 实际渲染却溢出纸外。这里在浏览器里测量每个 Grid 行的真实渲染高度，用测量结果二次分页，
  * 保证内容超高一律自动换页、永不溢出纸外（设计态与渲染态共用同一通道，因都在本内核内）。
  *
- * 纯测试 / SSR 环境无真实布局 → `getBoundingClientRect().height` 为 0，测量跳过，
+ * 纯测试 / SSR 环境无真实布局 → `offsetHeight` 为 0，测量跳过，
  * 回退到确定性分页（测试即基于此路径，结果稳定可断言）。
  */
-const PX_PER_MM = 96 / 25.4;
 const measuredPages = ref<PhysicalPage[] | null>(null);
 
+/**
+ * 测量每个 Grid 行的真实渲染高度（mm）。
+ * ⚠️ `measureHeightMm` 用 `offsetHeight` 而非 `getBoundingClientRect().height`：
+ * 纸张被 `PaperViewport`（panzoom）以 `transform: scale()` 包裹，后者含祖先 transform，
+ * 缩放 60% 时 10mm 的行被量成 6mm → 分页引擎判定「放得下」→ 内容溢出纸张却不换页。
+ */
 function measureRowHeights(): Map<string, number> | null {
   if (typeof document === "undefined") return null;
   const map = new Map<string, number>();
@@ -148,7 +159,7 @@ function measureRowHeights(): Map<string, number> | null {
     .forEach((el) => {
       const id = el.dataset.layoutId;
       if (!id) return;
-      const h = el.getBoundingClientRect().height / PX_PER_MM;
+      const h = measureHeightMm(el);
       if (Number.isFinite(h) && h > 0) map.set(id, h);
     });
   return map.size ? map : null;
@@ -163,7 +174,13 @@ function correctPagination(): void {
   if (!rowHeights) return;
   const result = paginateSchema(props.schema, {
     data: props.data ?? null,
-    measureRow: (row) => rowHeights.get(row.id),
+    measureRow: (row) => {
+      const measured = rowHeights.get(row.id);
+      if (measured === undefined) return undefined;
+      // 行有 `min-height: 行高 × 基准行高`，真实高度必然 ≥ 确定性估算值。取 max 兜底：
+      // 即使测量失真（如祖先 transform 缩放），也绝不会算出「比估算还矮」而漏分页。
+      return Math.max(measured, gridRowHeightMm(props.schema.baseRowHeight, row));
+    },
   });
   measuredPages.value = result.pages;
 }
@@ -174,6 +191,59 @@ onMounted(() => nextTick(correctPagination));
 
 /** 最终渲染的物理页：浏览器里经真实高度校正，否则用确定性分页（测试 / SSR 回退）。 */
 const displayedPages = computed<PhysicalPage[]>(() => measuredPages.value ?? renderedPages.value);
+
+// ── 页眉 / 页脚（paper 级全局配置，随每个物理页重复渲染，含打印）──────────
+/**
+ * 页眉/页脚是**纸张装饰**，不是 SchemaNode：不参与选中 / 拖拽 / 结构树，只能经
+ * Inspector 编辑。因渲染层对每个物理页各画一条带，故天然「每页重复」。
+ */
+/** 仅 `enabled === true` 时渲染（未设即关闭，不静默兜底）。 */
+function bandEnabled(band: HeaderFooterV2 | undefined): boolean {
+  return band?.enabled === true;
+}
+
+/** 带高（mm）：未设 / 非法回退 `DEFAULT_BAND_HEIGHT_MM`。 */
+function bandHeight(band: HeaderFooterV2 | undefined): number {
+  const h = band?.height;
+  return typeof h === "number" && Number.isFinite(h) && h > 0 ? h : DEFAULT_BAND_HEIGHT_MM;
+}
+
+/** 解析占位符：`{page}` 当前物理页序（1-based）、`{total}` 总物理页数。 */
+function resolveBandText(text: string | undefined, pp: PhysicalPage, total: number): string {
+  if (!text) return "";
+  return text.replace(/\{page\}/g, String(pp.index)).replace(/\{total\}/g, String(total));
+}
+
+/**
+ * 页眉/页脚带样式：驻留上/下边距区（左右受纸张边距约束），带高 / 文本样式 / 分隔线均来自配置。
+ *
+ * **高度收敛（关键约束）**：页眉/页脚绘制在**页边距留白内**，不占正文区
+ * （上边距 = 页眉高度 + 页眉到正文的间距）。配置高度超过对应边距时按边距收敛，
+ * 否则带子会伸进正文、与内容重叠且打印被裁切。此处只影响渲染，不改写 schema。
+ */
+function bandStyle(
+  band: HeaderFooterV2 | undefined,
+  margin: EdgeInsetsV2,
+  position: "top" | "bottom",
+): CSSProperties {
+  const hasSeparator = band?.separator !== false;
+  const color = band?.separatorColor ?? "#111827";
+  const width = band?.separatorWidth ?? 1;
+  const line = `${width}px solid ${color}`;
+  const available = position === "top" ? margin.top : margin.bottom;
+  const height = Math.min(bandHeight(band), available);
+  return {
+    left: `${margin.left}mm`,
+    right: `${margin.right}mm`,
+    height: `${height}mm`,
+    ...(position === "top"
+      ? { top: 0, ...(hasSeparator ? { borderBottom: line } : {}) }
+      : { bottom: 0, ...(hasSeparator ? { borderTop: line } : {}) }),
+    fontSize: band?.style?.fontSize ? `${band.style.fontSize}px` : undefined,
+    fontWeight: band?.style?.fontWeight ?? undefined,
+    color: band?.style?.color ?? undefined,
+  };
+}
 
 /**
  * 合并边框抑制：兄弟级去重（相邻外框 Grid 抑制后一个 top）与跨页片段的连续外观抑制。
@@ -209,6 +279,15 @@ function pageSiblingSuppressBorders(children: FormNodeV2[], index: number): { to
       :style="paperStyle(pp.margin)"
       :data-node-id="pp.id"
     >
+      <div
+        v-if="bandEnabled(schema.paper.header)"
+        class="grid-form-band grid-form-band--header"
+        :style="bandStyle(schema.paper.header, pp.margin, 'top')"
+      >
+        <span class="grid-form-band__zone">{{ resolveBandText(schema.paper.header?.content?.left, pp, displayedPages.length) }}</span>
+        <span class="grid-form-band__zone grid-form-band__zone--center">{{ resolveBandText(schema.paper.header?.content?.center, pp, displayedPages.length) }}</span>
+        <span class="grid-form-band__zone grid-form-band__zone--right">{{ resolveBandText(schema.paper.header?.content?.right, pp, displayedPages.length) }}</span>
+      </div>
       <GridSchemaNode
         v-for="(child, index) in pp.children"
         :key="child.node.id"
@@ -220,6 +299,15 @@ function pageSiblingSuppressBorders(children: FormNodeV2[], index: number): { to
         :suppress-borders="suppressFor(pp, index, child.suppressBorders)"
         @field-change="(field, value) => emit('field-change', field, value)"
       />
+      <div
+        v-if="bandEnabled(schema.paper.footer)"
+        class="grid-form-band grid-form-band--footer"
+        :style="bandStyle(schema.paper.footer, pp.margin, 'bottom')"
+      >
+        <span class="grid-form-band__zone">{{ resolveBandText(schema.paper.footer?.content?.left, pp, displayedPages.length) }}</span>
+        <span class="grid-form-band__zone grid-form-band__zone--center">{{ resolveBandText(schema.paper.footer?.content?.center, pp, displayedPages.length) }}</span>
+        <span class="grid-form-band__zone grid-form-band__zone--right">{{ resolveBandText(schema.paper.footer?.content?.right, pp, displayedPages.length) }}</span>
+      </div>
     </main>
   </div>
 </template>
@@ -246,6 +334,45 @@ function pageSiblingSuppressBorders(children: FormNodeV2[], index: number): { to
   background: white;
   box-sizing: border-box;
   box-shadow: 0 4px 12px rgb(15 23 42 / 14%);
+}
+
+/* 页眉 / 页脚带：绝对定位于纸张上/下边距区（偏移与高度由内联样式给出，高度已按边距收敛），
+   每个物理页各渲染一份，故自动「每页重复」，打印随 `break-after: page` 一同输出。
+
+   左/中/右是**对齐锚点，不是三等分固定区块**：
+   - 中列 `auto` = 取自身内容宽度，完整显示（标题再长也不省略），因此**两侧被挤压**；
+   - 两侧 `minmax(0, 1fr)` 平分剩余空间，放不下才省略号；
+   - 不换行：内容过高/过宽一律由 `overflow:hidden` 裁切（与 Word 一致，不会撑开带子压到正文）。 */
+.grid-form-band {
+  position: absolute;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  box-sizing: border-box;
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #111827;
+}
+
+.grid-form-band__zone {
+  min-width: 0;
+  white-space: nowrap;
+}
+
+/* 两侧是被挤压的一方（放不下才省略）；中间区不做省略，保证标题完整显示。 */
+.grid-form-band__zone--left,
+.grid-form-band__zone--right {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.grid-form-band__zone--center {
+  text-align: center;
+}
+
+.grid-form-band__zone--right {
+  text-align: right;
 }
 
 @media print {

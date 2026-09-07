@@ -6,7 +6,7 @@
  * 不含任何改 schema 的逻辑：编辑动作统一来自 `api`（`useSchemaEdits()` 的返回对象），
  * 避免为每个字段声明一个 emit。
  */
-import type { EditorNodeV2, SchemaIssueV2 } from "@/types";
+import type { EditorNodeV2, HeaderFooterV2, SchemaIssueV2 } from "@/types";
 import type { SchemaEdits } from "./composables/useSchemaEdits";
 import PageInspector from "./inspectors/PageInspector.vue";
 import GridInspector from "./inspectors/GridInspector.vue";
@@ -38,6 +38,10 @@ withDefaults(
     paperSize: "A4" | "A3";
     baseRowHeight: number;
     paperMargin: number;
+    /** 页眉配置（paper 级，透传给 PageInspector）。 */
+    header?: HeaderFooterV2;
+    /** 页脚配置（paper 级，透传给 PageInspector）。 */
+    footer?: HeaderFooterV2;
   }>(),
   { node: null, nodeId: null },
 );
@@ -65,6 +69,8 @@ const emit = defineEmits<{ selectIssue: [issue: SchemaIssueV2] }>();
       :paper-size="paperSize"
       :base-row-height="baseRowHeight"
       :paper-margin="paperMargin"
+      :header="header"
+      :footer="footer"
       :api="api"
     />
     <GridInspector v-else-if="node?.type === 'grid'" :node="node" :api="api" />

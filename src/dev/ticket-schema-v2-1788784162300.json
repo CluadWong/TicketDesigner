@@ -1,0 +1,439 @@
+{
+  "version": 2,
+  "paper": {
+    "size": "A4",
+    "header": {
+      "enabled": true,
+      "content": {
+        "center": "云南铝业股份有限公司 电气第二种工作票"
+      },
+      "style": {
+        "fontSize": 20,
+        "fontWeight": "bold"
+      },
+      "height": 12
+    },
+    "footer": {
+      "enabled": true,
+      "content": {
+        "center": "{page} / {total}"
+      }
+    }
+  },
+  "baseRowHeight": 10,
+  "pages": [
+    {
+      "id": "page-mtr7ss48-n2fdb",
+      "type": "page",
+      "mode": "fixed",
+      "margin": {
+        "top": 10,
+        "right": 10,
+        "bottom": 10,
+        "left": 10
+      },
+      "children": [
+        {
+          "id": "grid-mtr7ss48-2ahii",
+          "type": "grid",
+          "border": "all",
+          "rows": [
+            {
+              "id": "row-mtr7ss48-ix783",
+              "type": "grid-row",
+              "height": 1,
+              "cells": [
+                {
+                  "id": "cell-1-mtr7ss48-58wdq",
+                  "type": "grid-cell",
+                  "width": "1fr",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "row-mtr7tz65-xuca8",
+              "type": "grid-row",
+              "height": 1,
+              "cells": [
+                {
+                  "id": "cell-1-mtr7tz65-egvnh",
+                  "type": "grid-cell",
+                  "width": "1fr",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "row-mtr7tzau-kwagn",
+              "type": "grid-row",
+              "height": 1,
+              "cells": [
+                {
+                  "id": "cell-1-mtr7tzau-w6ng1",
+                  "type": "grid-cell",
+                  "width": "1fr",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "row-mtr7tzfv-wjysm",
+              "type": "grid-row",
+              "height": 1,
+              "cells": [
+                {
+                  "id": "cell-1-mtr7tzfv-mh4q9",
+                  "type": "grid-cell",
+                  "width": "1fr",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "row-mtr7vhaz-k4qek",
+              "type": "grid-row",
+              "height": 1,
+              "cells": [
+                {
+                  "id": "cell-1-mtr7vhaz-r5tw3",
+                  "type": "grid-cell",
+                  "width": "1fr",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "row-mtr7vhaz-x2wdw",
+              "type": "grid-row",
+              "height": 1,
+              "cells": [
+                {
+                  "id": "cell-1-mtr7vhaz-5f1j3",
+                  "type": "grid-cell",
+                  "width": "1fr",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "row-mtr7vhaz-cc6k6",
+              "type": "grid-row",
+              "height": 1,
+              "cells": [
+                {
+                  "id": "cell-1-mtr7vhaz-eu5bs",
+                  "type": "grid-cell",
+                  "width": "1fr",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "row-mtr7vhaz-bnet5",
+              "type": "grid-row",
+              "height": 1,
+              "cells": [
+                {
+                  "id": "cell-1-mtr7vhaz-4foam",
+                  "type": "grid-cell",
+                  "width": "1fr",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "row-mtr7vhaz-oneli",
+              "type": "grid-row",
+              "height": 1,
+              "cells": [
+                {
+                  "id": "cell-1-mtr7vhaz-c3qow",
+                  "type": "grid-cell",
+                  "width": "1fr",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "row-mtr7vhaz-62gph",
+              "type": "grid-row",
+              "height": 1,
+              "cells": [
+                {
+                  "id": "cell-1-mtr7vhaz-z4mh8",
+                  "type": "grid-cell",
+                  "width": "1fr",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "row-mtr7vhaz-wnt5y",
+              "type": "grid-row",
+              "height": 1,
+              "cells": [
+                {
+                  "id": "cell-1-mtr7vhaz-rgpms",
+                  "type": "grid-cell",
+                  "width": "1fr",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "row-mtr7vhaz-awq3x",
+              "type": "grid-row",
+              "height": 1,
+              "cells": [
+                {
+                  "id": "cell-1-mtr7vhaz-yke3n",
+                  "type": "grid-cell",
+                  "width": "1fr",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "row-mtr7vhaz-zv89o",
+              "type": "grid-row",
+              "height": 1,
+              "cells": [
+                {
+                  "id": "cell-1-mtr7vhaz-77aiu",
+                  "type": "grid-cell",
+                  "width": "1fr",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "row-mtr7vhaz-0iz1p",
+              "type": "grid-row",
+              "height": 1,
+              "cells": [
+                {
+                  "id": "cell-1-mtr7vhaz-ro7ul",
+                  "type": "grid-cell",
+                  "width": "1fr",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "row-mtr7vhaz-g3nmu",
+              "type": "grid-row",
+              "height": 1,
+              "cells": [
+                {
+                  "id": "cell-1-mtr7vhaz-90di5",
+                  "type": "grid-cell",
+                  "width": "1fr",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "row-mtr7vhaz-0xuf4",
+              "type": "grid-row",
+              "height": 1,
+              "cells": [
+                {
+                  "id": "cell-1-mtr7vhaz-626nt",
+                  "type": "grid-cell",
+                  "width": "1fr",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "row-mtr7vhaz-2d8tn",
+              "type": "grid-row",
+              "height": 1,
+              "cells": [
+                {
+                  "id": "cell-1-mtr7vhaz-hxalw",
+                  "type": "grid-cell",
+                  "width": "1fr",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "row-mtr7vhaz-nl52r",
+              "type": "grid-row",
+              "height": 1,
+              "cells": [
+                {
+                  "id": "cell-1-mtr7vhaz-fefhr",
+                  "type": "grid-cell",
+                  "width": "1fr",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "row-mtr7vhaz-nipxr",
+              "type": "grid-row",
+              "height": 1,
+              "cells": [
+                {
+                  "id": "cell-1-mtr7vhaz-b5y9n",
+                  "type": "grid-cell",
+                  "width": "1fr",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "row-mtr7vhaz-mwujr",
+              "type": "grid-row",
+              "height": 1,
+              "cells": [
+                {
+                  "id": "cell-1-mtr7vhaz-qnb7i",
+                  "type": "grid-cell",
+                  "width": "1fr",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "row-mtr7wbke-2fo1m",
+              "type": "grid-row",
+              "height": 1,
+              "cells": [
+                {
+                  "id": "cell-1-mtr7wbke-cb014",
+                  "type": "grid-cell",
+                  "width": "1fr",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "row-mtr7wbke-mcw8w",
+              "type": "grid-row",
+              "height": 1,
+              "cells": [
+                {
+                  "id": "cell-1-mtr7wbke-q08rf",
+                  "type": "grid-cell",
+                  "width": "1fr",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "row-mtr7wbke-iodsd",
+              "type": "grid-row",
+              "height": 1,
+              "cells": [
+                {
+                  "id": "cell-1-mtr7wbke-jyawp",
+                  "type": "grid-cell",
+                  "width": "1fr",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "row-mtr7wbke-0bmne",
+              "type": "grid-row",
+              "height": 1,
+              "cells": [
+                {
+                  "id": "cell-1-mtr7wbke-nvwul",
+                  "type": "grid-cell",
+                  "width": "1fr",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "row-mtr7wbke-prm7y",
+              "type": "grid-row",
+              "height": 1,
+              "cells": [
+                {
+                  "id": "cell-1-mtr7wbke-pib01",
+                  "type": "grid-cell",
+                  "width": "1fr",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "row-mtr7wbke-s7wpx",
+              "type": "grid-row",
+              "height": 1,
+              "cells": [
+                {
+                  "id": "cell-1-mtr7wbke-8gsxl",
+                  "type": "grid-cell",
+                  "width": "1fr",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "row-mtr7wbke-u4spp",
+              "type": "grid-row",
+              "height": 1,
+              "cells": [
+                {
+                  "id": "cell-1-mtr7wbke-mcqme",
+                  "type": "grid-cell",
+                  "width": "1fr",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "row-mtr7wbke-pjvpm",
+              "type": "grid-row",
+              "height": 1,
+              "cells": [
+                {
+                  "id": "cell-1-mtr7wbke-nx0zh",
+                  "type": "grid-cell",
+                  "width": "1fr",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "row-mtr7wbke-2mhhq",
+              "type": "grid-row",
+              "height": 1,
+              "cells": [
+                {
+                  "id": "cell-1-mtr7wbke-a0528",
+                  "type": "grid-cell",
+                  "width": "1fr",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "row-mtr7wbke-z3q5r",
+              "type": "grid-row",
+              "height": 1,
+              "cells": [
+                {
+                  "id": "cell-1-mtr7wbke-6sxsq",
+                  "type": "grid-cell",
+                  "width": "1fr",
+                  "children": []
+                }
+              ]
+            }
+          ],
+          "columns": [
+            "1fr"
+          ]
+        }
+      ]
+    }
+  ]
+}

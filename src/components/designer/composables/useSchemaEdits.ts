@@ -46,6 +46,7 @@ import type {
   GridNodeV2,
   GridRowV2,
   GridTrackV2,
+  HeaderFooterV2,
   TableColumnV2,
   TextStyleV2,
 } from "@/types";
@@ -64,6 +65,21 @@ export interface SchemaEditsContext {
 }
 
 export type SchemaEdits = ReturnType<typeof useSchemaEdits>;
+
+/**
+ * 解析「非负数值」输入（padding / gap 等，单位 mm）：
+ * 空串 / 非数字 / NaN → `undefined`（移除覆盖，**不静默兜底成 0**）；
+ * 合法有限数 → 向下收敛到 0（padding/gap 允许为 0，表示无间距）。
+ *
+ * 与项目既有金标准 `updateSelectedLineHeight`（`Number.isFinite(value)&&value>0?value:undefined`）
+ * 保持一致：空/非法绝不写垃圾进 schema。
+ */
+function parseNonNegativeMm(raw: string): number | undefined {
+  const trimmed = raw.trim();
+  if (trimmed === "") return undefined;
+  const n = Number(trimmed);
+  return Number.isFinite(n) ? Math.max(0, n) : undefined;
+}
 
 export function useSchemaEdits(ctx: SchemaEditsContext) {
   const { schema, commit } = ctx.document;
@@ -392,7 +408,10 @@ export function useSchemaEdits(ctx: SchemaEditsContext) {
   function updateGridDimensions(event: Event): void {
     if (selectedNode.value?.type !== "grid") return;
     const input = event.target as HTMLInputElement;
-    const value = Math.max(1, Math.floor(Number(input.value) || 1));
+    const parsed = Math.floor(Number(input.value));
+    // 空/非法/非正整数 → 不提交，保留现状（不静默兜底成 1）
+    if (!Number.isInteger(parsed) || parsed < 1) return;
+    const value = parsed;
     const rowCount =
       input.dataset.dimension === "rows" ? value : selectedNode.value.rows.length;
     const columnCount =
@@ -527,7 +546,7 @@ export function useSchemaEdits(ctx: SchemaEditsContext) {
     const raw = target.value;
     const patch =
       field === "cellPadding"
-        ? { cellPadding: raw === "" ? undefined : Math.max(0, Number(raw) || 0) }
+        ? { cellPadding: parseNonNegativeMm(raw) }
         : ({ [field]: raw === "" ? undefined : raw } as Partial<
             Pick<GridNodeV2, "cellAlign" | "cellVerticalAlign">
           >);
@@ -538,13 +557,14 @@ export function useSchemaEdits(ctx: SchemaEditsContext) {
   function updateGridGap(event: Event): void {
     if (selectedNode.value?.type !== "grid") return;
     const raw = (event.target as HTMLInputElement).value;
-    const gap = raw === "" ? undefined : Math.max(0, Number(raw) || 0);
+    const gap = parseNonNegativeMm(raw);
     commit(updateGridGapV2(schema.value, selectedNode.value.id, gap), "gridgap");
   }
 
   // ── 单元格（grid-cell）覆盖 ──
   function updateSelectedCellPadding(event: Event): void {
-    const value = Math.max(0, Number((event.target as HTMLInputElement).value) || 0);
+    const raw = (event.target as HTMLInputElement).value;
+    const value = parseNonNegativeMm(raw); // 空/非法 → undefined（移除覆盖，不静默写 0）
     updateSelectedNode(
       (node) => (node.type === "grid-cell" ? { ...node, padding: value } : node),
       selectedNodeId.value ? `cellpad:${selectedNodeId.value}` : undefined,
@@ -590,7 +610,9 @@ export function useSchemaEdits(ctx: SchemaEditsContext) {
 
   function updateSelectedCellRowHeight(event: Event): void {
     const raw = (event.target as HTMLInputElement).value;
-    const value = raw === "" ? undefined : Math.max(0, Math.floor(Number(raw)));
+    const n = Number(raw);
+    // 空/非法/非正 → undefined（移除覆盖，且不写 NaN）；有效才按整数行高写入
+    const value = Number.isFinite(n) && n > 0 ? Math.floor(n) : undefined;
     updateSelectedNode(
       (node) => (node.type === "grid-cell" ? { ...node, rowHeight: value } : node),
       selectedNodeId.value ? `cellrowh:${selectedNodeId.value}` : undefined,
@@ -610,7 +632,11 @@ export function useSchemaEdits(ctx: SchemaEditsContext) {
 
   function updateSelectedFontSize(event: Event): void {
     const raw = (event.target as HTMLInputElement).value;
-    updateSelectedTextStyle({ fontSize: Math.max(1, Math.floor(Number(raw) || 1)) });
+    const value = Number(raw);
+    // 金标准：非法/空 → undefined（移除覆盖），不静默兜底成 1
+    updateSelectedTextStyle({
+      fontSize: Number.isFinite(value) && value > 0 ? Math.floor(value) : undefined,
+    });
   }
 
   function updateSelectedLineHeight(event: Event): void {
@@ -705,8 +731,10 @@ export function useSchemaEdits(ctx: SchemaEditsContext) {
 
   // ── 页面级：行高 / 纸张 ──
   function updateBaseRowHeight(event: Event): void {
-    const value = Math.max(1, Math.floor(Number((event.target as HTMLInputElement).value) || 8));
-    commit(updateBaseRowHeightV2(schema.value, value));
+    const raw = Number((event.target as HTMLInputElement).value);
+    // 空/非法 → 不提交，保留现状（不静默兜底成 8）；有效正整数才写入
+    if (!Number.isFinite(raw) || raw < 1) return;
+    commit(updateBaseRowHeightV2(schema.value, Math.floor(raw)));
   }
 
   function updatePaperSize(event: Event): void {
@@ -721,7 +749,9 @@ export function useSchemaEdits(ctx: SchemaEditsContext) {
 
   function updatePaperMargin(event: Event): void {
     const raw = Number((event.target as HTMLInputElement).value);
-    const value = Number.isFinite(raw) ? Math.max(0, Math.floor(raw)) : 0;
+    // 空/非法 → 不提交，保留现状（不静默兜底成 0）
+    if (!Number.isFinite(raw)) return;
+    const value = Math.max(0, Math.floor(raw));
     commit({
       ...schema.value,
       pages: schema.value.pages.map((page) => ({
@@ -730,6 +760,79 @@ export function useSchemaEdits(ctx: SchemaEditsContext) {
       })),
     });
   }
+
+  // ── 页眉 / 页脚（paper 级全局配置，作用于所有物理页）──────────────
+  /**
+   * 生成一组页眉 / 页脚更新动作（header / footer 共用同一实现，避免两份重复）。
+   *
+   * 数值类沿用项目金标准：非法 / 空 → `undefined`（移除覆盖，不静默兜底成 1）；
+   * `enabled` / `separator` 是布尔开关，显式写 true/false（未设即关闭 / 默认开启）。
+   */
+  function makeHeaderFooterUpdaters(kind: "header" | "footer") {
+    function current(): HeaderFooterV2 | undefined {
+      const paper = schema.value.paper;
+      return kind === "header" ? paper?.header : paper?.footer;
+    }
+
+    function write(next: HeaderFooterV2): void {
+      const paper = schema.value.paper;
+      commit({
+        ...schema.value,
+        paper: kind === "header" ? { ...paper, header: next } : { ...paper, footer: next },
+      });
+    }
+
+    /** 合并补丁到 `paper[kind]`（未配置时以 `{}` 起步）。 */
+    function patch(next: Partial<HeaderFooterV2>): void {
+      write({ ...(current() ?? {}), ...next });
+    }
+
+    /** 三栏文本：空串视为「未设」（移除该栏），不写入空字符串。 */
+    function content(zone: "left" | "center" | "right", event: Event): void {
+      const value = (event.target as HTMLInputElement).value;
+      const prev = current()?.content ?? {};
+      patch({ content: { ...prev, [zone]: value || undefined } });
+    }
+
+    function enabled(event: Event): void {
+      patch({ enabled: (event.target as HTMLInputElement).checked });
+    }
+
+    function height(event: Event): void {
+      const raw = Number((event.target as HTMLInputElement).value);
+      patch({ height: Number.isFinite(raw) && raw > 0 ? raw : undefined });
+    }
+
+    function separator(event: Event): void {
+      patch({ separator: (event.target as HTMLInputElement).checked });
+    }
+
+    /** 文本样式：生效子集为 `fontSize` / `fontWeight` / `color`。 */
+    function style(next: Partial<TextStyleV2>): void {
+      const prev = current()?.style ?? {};
+      patch({ style: { ...prev, ...next } });
+    }
+
+    function fontSize(event: Event): void {
+      const raw = Number((event.target as HTMLInputElement).value);
+      style({ fontSize: Number.isFinite(raw) && raw > 0 ? raw : undefined });
+    }
+
+    function fontWeight(event: Event): void {
+      const value = (event.target as HTMLSelectElement).value;
+      style({ fontWeight: value === "bold" || value === "normal" ? value : undefined });
+    }
+
+    function color(event: Event): void {
+      const value = (event.target as HTMLInputElement).value;
+      style({ color: value || undefined });
+    }
+
+    return { patch, content, enabled, height, separator, style, fontSize, fontWeight, color };
+  }
+
+  const headerUpdaters = makeHeaderFooterUpdaters("header");
+  const footerUpdaters = makeHeaderFooterUpdaters("footer");
 
   return {
     addRootGrid,
@@ -792,5 +895,21 @@ export function useSchemaEdits(ctx: SchemaEditsContext) {
     updatePaperSize,
     paperMargin,
     updatePaperMargin,
+    updatePaperHeader: headerUpdaters.patch,
+    updatePaperHeaderContent: headerUpdaters.content,
+    updatePaperHeaderEnabled: headerUpdaters.enabled,
+    updatePaperHeaderHeight: headerUpdaters.height,
+    updatePaperHeaderSeparator: headerUpdaters.separator,
+    updatePaperHeaderFontSize: headerUpdaters.fontSize,
+    updatePaperHeaderFontWeight: headerUpdaters.fontWeight,
+    updatePaperHeaderColor: headerUpdaters.color,
+    updatePaperFooter: footerUpdaters.patch,
+    updatePaperFooterContent: footerUpdaters.content,
+    updatePaperFooterEnabled: footerUpdaters.enabled,
+    updatePaperFooterHeight: footerUpdaters.height,
+    updatePaperFooterSeparator: footerUpdaters.separator,
+    updatePaperFooterFontSize: footerUpdaters.fontSize,
+    updatePaperFooterFontWeight: footerUpdaters.fontWeight,
+    updatePaperFooterColor: footerUpdaters.color,
   };
 }

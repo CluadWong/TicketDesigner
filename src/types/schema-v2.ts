@@ -11,11 +11,47 @@ export type PageModeV2 = "fixed";
 export type GridTrackV2 = number | `${number}fr` | "auto";
 export type BorderModeV2 = "all" | "outer" | "inner" | "none";
 
+/** 页眉/页脚三栏文本。占位符：`{page}` 当前物理页序（1-based）、`{total}` 总物理页数。
+ *  三栏均可缺省；MVP 仅支持静态文本 + 页码占位符（字段绑定 `{field:key}` 暂不支持）。 */
+export interface HeaderFooterContentV2 {
+  left?: string;
+  center?: string;
+  right?: string;
+}
+
+/**
+ * 页眉 / 页脚配置。
+ *
+ * 驻留纸张**上/下边距区**，随每个物理页重复渲染（渲染层每个物理页各画一条带，
+ * 故天然每页重复、打印同理）；属于纸张装饰，**不进入 SchemaNode 树**（不参与
+ * 选中 / 拖拽 / 结构树，只能经 Inspector 编辑）。
+ */
+export interface HeaderFooterV2 {
+  /** 开关：仅 `true` 时渲染，未设即关闭。 */
+  enabled?: boolean;
+  content?: HeaderFooterContentV2;
+  /** 带高（mm）；未设/非法回退 `DEFAULT_BAND_HEIGHT_MM`（10）。大于纸张边距会压到正文，由 Inspector 提示。 */
+  height?: number;
+  /** 文本样式：生效子集为 `fontSize` / `fontWeight` / `color`（其余键忽略）。 */
+  style?: TextStyleV2;
+  /** 分隔线（页眉下 / 页脚上）：未设即 true。 */
+  separator?: boolean;
+  separatorColor?: string;
+  separatorWidth?: number;
+}
+
+/** 页眉/页脚带默认高度（mm）：`height` 未设或非法时的回退值（渲染与面板共用单一真源）。 */
+export const DEFAULT_BAND_HEIGHT_MM = 10;
+
 export interface PaperConfigV2 {
   size: PaperSizeV2;
   /** 废弃键：方向自 P11-3 起由纸张尺寸派生（A4→纵向、A3→横向），渲染与打印均忽略本字段。
    *  保留为可选仅为存量模板向后兼容；新模板不再写入，序列化导出自然丢弃。 */
   orientation?: OrientationV2;
+  /** 页眉（全局，作用于所有物理页）。 */
+  header?: HeaderFooterV2;
+  /** 页脚（全局，作用于所有物理页）。 */
+  footer?: HeaderFooterV2;
 }
 
 export interface EdgeInsetsV2 {

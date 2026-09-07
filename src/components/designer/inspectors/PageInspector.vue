@@ -1,12 +1,17 @@
 <script setup lang="ts">
-/** 页面设置：纸张 / 边距 / 基础行高 / 分页开关（Inspector 组件化，2026-09-07 批次 2）。 */
-import type { FormSchemaV2 } from "@/types";
+/** 页面设置：纸张 / 边距 / 基础行高 / 分页开关 / 页眉 / 页脚（Inspector 组件化，2026-09-07 批次 2）。 */
+import type { FormSchemaV2, HeaderFooterV2 } from "@/types";
 import type { SchemaEdits } from "../composables/useSchemaEdits";
+import HeaderFooterFields from "./HeaderFooterFields.vue";
 
 defineProps<{
   paperSize: FormSchemaV2["paper"]["size"];
   baseRowHeight: number;
   paperMargin: number;
+  /** 页眉（paper 级全局配置，作用于所有物理页）。 */
+  header?: HeaderFooterV2;
+  /** 页脚（paper 级全局配置，作用于所有物理页）。 */
+  footer?: HeaderFooterV2;
   api: SchemaEdits;
 }>();
 
@@ -48,4 +53,18 @@ const paginate = defineModel<boolean>("paginate", { required: true });
     <input v-model="paginate" type="checkbox" data-paginate="true" />
     <span>分页（仅设计态生效）</span>
   </label>
+  <HeaderFooterFields
+    label="页眉"
+    kind="header"
+    :band="header"
+    :margin="paperMargin"
+    :api="api"
+  />
+  <HeaderFooterFields
+    label="页脚"
+    kind="footer"
+    :band="footer"
+    :margin="paperMargin"
+    :api="api"
+  />
 </template>

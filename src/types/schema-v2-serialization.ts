@@ -111,12 +111,17 @@ export function normalizeFormSchemaV2(input: unknown): FormSchemaV2 {
     throw new SchemaV2SerializationError("Schema pages must be an array");
   }
   const paper = asRecord(source.paper ?? {}, "Schema paper");
+  const header = paper.header as FormSchemaV2["paper"]["header"];
+  const footer = paper.footer as FormSchemaV2["paper"]["footer"];
   return {
     version: 2,
     paper: {
       size: (paper.size ?? "A4") as FormSchemaV2["paper"]["size"],
       // `orientation` 为废弃键（方向自 P11-3 起由纸张尺寸派生，渲染/打印均忽略）：
       // 归一化时直接丢弃，不向前携带；旧模板中残留的 orientation 仅在解析时被忽略，不会回写导出。
+      // header / footer 为可选配置：存在则原样保留（此前 paper 只落 size，会导致导出丢失）。
+      ...(header ? { header } : {}),
+      ...(footer ? { footer } : {}),
     },
     baseRowHeight: (source.baseRowHeight ?? 8) as number,
     pages: source.pages.map(value => {

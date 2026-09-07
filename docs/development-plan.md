@@ -18,7 +18,19 @@
   - **P11-1 已完成**：full 样例对齐为**扁平 13 个独立段 grid**（与设计器导出 `ticket-schema-v2-1788315240965.json` 对齐；border 分布 all×3 / outer×9 / none×4，带 `columns`），消除段间 2px 双边框；前五行样例（P10 验收）字段键已同步到同一 JSON 键集（工作负责人（监护人）/ 电站设备 / 工作地点_* / 工作内容_*）。
   - **P11-3 已完成**：A4 整票打印真机核验通过；打印方向改为由纸张尺寸派生（A4 纵向 / A3 横向）；Table 新增边框配置（all/outer/inner/none，与 Grid 对齐）。（**2026-09-02 十三续补正**：打印纸张尺寸 `@page` 曾硬编码 `A4`，选 A3 时渲染正常但打印仍按 A4 出页致内容被裁；现由渲染内核按 `schema.paper` 运行时注入，设计器与消费页均生效。）
   - **下一步**：P11-2（完整票快照基线，可选）、P11-4（并入推迟项：P9.1c 专用控件、P9.2、P12 清理）。（P7.2e 完整编辑 UI 经用户澄清=「设计器人工编排符合参考图结构的整票模板」，已由导出 JSON `ticket-schema-v2-1788315240965.json` + 同步 `yunlv-second-ticket-full.ts` 完成；P7.2d/P7.2f/P9.1d 已于 2026-09-01 完成。）
-- 当前测试基线 **vitest 284/284（35 文件）**，`vue-tsc --noEmit` 干净；每轮详细过程见 **[execution-log.md](./execution-log.md)**。（第39续：列宽设置失效修复 +3 例；第40续：Table 表头样式配置 +4 例；第41续：表头默认16 + 结构树折叠/展开按钮 +3 例）
+- 当前测试基线 **vitest 312/312（38 文件）**，`vue-tsc --noEmit` 干净；每轮详细过程见 **[execution-log.md](./execution-log.md)**。（第39续：列宽设置失效修复 +3 例；第40续：Table 表头样式配置 +4 例；第41续：表头默认16 + 结构树折叠/展开按钮 +3 例；第42续：paper 页眉/页脚 MVP +16 例；第43续：页眉页脚布局与高度收敛纠错 +1 例；第44续：分页校正测量被视口缩放污染修复 +3 例；第45续：第38续 6+1 处静默兜底统一改金标准 +8 例）
+- **paper 页眉/页脚（第42续，MVP 已完成；第43续纠错）**：配置项挂在 `PaperConfigV2.header` / `.footer`（**全局**，作用于所有物理页），含 开关 / 左中右三栏文本 / `{page}`+`{total}` 占位符 / 带高(mm) / 字号·加粗·颜色 / 分隔线。渲染层在每个物理页内、节点循环之外画两条绝对定位带（驻留上/下边距区）→ **每页自动重复、打印同理**；页眉页脚是纸张装饰，**不进 SchemaNode 树**（不参与选中/拖拽/结构树）。
+  - **第43续纠错（用户实测）**：① 左中右是**对齐锚点、不是三等分** —— 布局由 `flex:1 1 0` 三等分改为 `grid: minmax(0,1fr) auto minmax(0,1fr)`，中列取内容宽**完整显示不省略**、自然挤压两侧（两侧放不下才省略）；② **页眉/页脚高度绝不超出页边距**（`Math.min(配置高度, margin.top|bottom)` 收敛，只影响渲染、不改 schema），否则会伸进正文、打印被裁；③ 面板在「配置高度 > 边距」时显示橙色提示，不静默收敛。
+  - **延后（进阶）**：字段绑定 `{field:key}`、logo 图片、首页不同/奇偶页不同。
+- **分页「内容溢出却不换页」修复（第44续，严重）**：现象为 27 行尚可、28 行压页脚分隔线、29 行跑到纸外，且始终只有 1 页。
+  - **根因不在分页引擎**（引擎确定性结果正确：30 行 → 27+3 两页），而在渲染层的**真实高度校正**：`GridFormRenderer.measureRowHeights` 用 `getBoundingClientRect().height` 测行高，而该值**包含祖先 CSS transform** —— 纸张被 `PaperViewport`（panzoom `transform: scale()`）包裹，缩放 60% 时 10mm 的行被量成 6mm，引擎据此判定「还放得下」→ 永不换页。缩放越小、漏分页越严重。
+  - 修复：① 新建 `renderer-v2/measure-rows.ts` 导出 `measureHeightMm()`，改用 **`offsetHeight`（布局高度，不受 transform 影响）**；② `paginateSchema` 的 `measureRow` 回调加下限 `Math.max(measured, gridRowHeightMm(baseRowHeight, row))` —— 行有 `min-height`，真实高度必然 ≥ 确定性估算值，故可挡住任何测量失真导致的「量得比估算还矮」。
+  - 复用要点：**任何对纸张内元素的测量都不能用 `getBoundingClientRect`**（除非先除以当前缩放）。
+
+- **第38续遗留的 6+1 处 inspector 静默兜底统一改金标准（第45续，按用户拍板"一并修"）**：第38续定位的 8 处「空/非法输入被静默写进 schema」隐患（updateGridDimensions / updateGridCellDefault(cellPadding) / updateGridGap / updateSelectedCellPadding / updateSelectedFontSize / updateBaseRowHeight / updatePaperMargin / updateSelectedCellRowHeight）已全部改为项目金标准。
+  - page/grid 级 commit 路径（dimensions / baseRowHeight / paperMargin）→ 空/非法 `return` 不提交，保留现状（不再静默成 1/8/0）；节点 override 路径（cellPadding / cell padding / fontSize / cellRowHeight）→ 空/非法 `undefined` 移除覆盖（不再静默写 0，且 cellRowHeight 不再写 NaN）。统一用 `Number.isFinite(value)&&范围守卫?值:undefined`。
+  - 抽模块级 `parseNonNegativeMm(raw)`（空/NaN→undefined，合法→`Math.max(0,n)`）供 padding/gap 复用；`updateGridGapV2` 自带 `gap>0?gap:undefined` 守卫，旧 handler 传 0 已被 op 转 undefined（不写垃圾），本次仅统一写法。
+  - 新增 `useSchemaEdits.test.ts`「第38续回归」describe 8 例（每函数：合法写值 + 空/非法不写垃圾）；验证 vue-tsc 干净、vitest **312/312（38 文件）**（304→312）。**附**：同类潜在点 `updateTableRows`（`Number(value)` 直传 `updateTableMinRowsV2`）未纳入本次 8 处，建议后续专项。
 
 ### 0.2 任务节点状态（2026-08-31 十续执行后）
 

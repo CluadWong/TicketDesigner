@@ -9,7 +9,7 @@ import { ref, type Ref } from "vue";
 import { useSchemaDocument, type SchemaDocument } from "../useSchemaDocument";
 import { useNodeSelection } from "../useNodeSelection";
 import { useSchemaEdits } from "../useSchemaEdits";
-import type { FormSchemaV2, GridCellV2, GridNodeV2, TableNodeV2 } from "@/types";
+import type { FormSchemaV2, GridCellV2, GridNodeV2, TableNodeV2, TextStyleV2 } from "@/types";
 
 function setup(editable = true) {
   const editableRef = ref(editable);
@@ -95,6 +95,25 @@ function withTextInCell() {
   const textId = cell.children[0].id;
   selection.selectNodeById(textId);
   return { ...ctx, cellId, textId };
+}
+
+/** 选中首个根 Grid（供 grid 级编辑动作测试）。 */
+function selectGridNode() {
+  const ctx = setup(true);
+  const { doc, selection } = ctx;
+  const gridId = (doc.schema.value.pages[0].children[0] as GridNodeV2).id;
+  selection.selectNodeById(gridId);
+  return { ...ctx, gridId };
+}
+
+/** 直接选中首个 grid-cell（供单元格级覆盖编辑测试）。 */
+function selectFirstCell() {
+  const ctx = setup(true);
+  const { doc, selection } = ctx;
+  const grid = doc.schema.value.pages[0].children[0] as GridNodeV2;
+  const cellId = grid.rows[0].cells[0].id;
+  selection.selectNodeById(cellId);
+  return { ...ctx, cellId };
 }
 
 describe("useSchemaEdits 复制/剪切/粘贴/原地复制", () => {
@@ -301,5 +320,153 @@ describe("Table 表头样式配置（表头字号/粗细/对齐）", () => {
     selection.selectNodeById(grid.id);
     edits.updateTableHeaderFontSize({ target: { value: "20" } } as unknown as Event);
     expect(tableOf(doc).headerStyle).toBeUndefined();
+  });
+});
+
+describe("页眉 / 页脚配置（paper 级，作用于所有物理页）", () => {
+  it("启用开关：写入 paper.header.enabled / paper.footer.enabled", () => {
+    const { doc, edits } = setup(true);
+    edits.updatePaperHeaderEnabled({ target: { checked: true } } as unknown as Event);
+    edits.updatePaperFooterEnabled({ target: { checked: true } } as unknown as Event);
+    expect(doc.schema.value.paper.header?.enabled).toBe(true);
+    expect(doc.schema.value.paper.footer?.enabled).toBe(true);
+    // 关闭是显式 false（布尔开关，不是未设）
+    edits.updatePaperHeaderEnabled({ target: { checked: false } } as unknown as Event);
+    expect(doc.schema.value.paper.header?.enabled).toBe(false);
+  });
+
+  it("三栏文本：写入对应栏，空串移除该栏（不写空字符串）", () => {
+    const { doc, edits } = setup(true);
+    edits.updatePaperHeaderContent("left", { target: { value: "云铝" } } as unknown as Event);
+    edits.updatePaperHeaderContent("center", { target: { value: "工作票" } } as unknown as Event);
+    const content = doc.schema.value.paper.header?.content;
+    expect(content?.left).toBe("云铝");
+    expect(content?.center).toBe("工作票");
+    expect(content?.right).toBeUndefined();
+    edits.updatePaperHeaderContent("left", { target: { value: "" } } as unknown as Event);
+    expect(doc.schema.value.paper.header?.content?.left).toBeUndefined();
+    // 另一栏不受影响
+    expect(doc.schema.value.paper.header?.content?.center).toBe("工作票");
+  });
+
+  it("带高非法/空：不静默兜底（undefined，不写 1）", () => {
+    const { doc, edits } = setup(true);
+    edits.updatePaperHeaderHeight({ target: { value: "12" } } as unknown as Event);
+    expect(doc.schema.value.paper.header?.height).toBe(12);
+    edits.updatePaperHeaderHeight({ target: { value: "abc" } } as unknown as Event);
+    expect(doc.schema.value.paper.header?.height).toBeUndefined();
+  });
+
+  it("样式：字号 / 加粗 / 颜色写入 paper.header.style", () => {
+    const { doc, edits } = setup(true);
+    edits.updatePaperHeaderFontSize({ target: { value: "14" } } as unknown as Event);
+    edits.updatePaperHeaderFontWeight({ target: { value: "bold" } } as unknown as Event);
+    edits.updatePaperHeaderColor({ target: { value: "#123456" } } as unknown as Event);
+    const style = doc.schema.value.paper.header?.style;
+    expect(style?.fontSize).toBe(14);
+    expect(style?.fontWeight).toBe("bold");
+    expect(style?.color).toBe("#123456");
+    // 非法字号移除覆盖
+    edits.updatePaperHeaderFontSize({ target: { value: "0" } } as unknown as Event);
+    expect(doc.schema.value.paper.header?.style?.fontSize).toBeUndefined();
+  });
+
+  it("页眉与页脚互不干扰，且不影响纸张尺寸/边距", () => {
+    const { doc, edits } = setup(true);
+    const beforeSize = doc.schema.value.paper.size;
+    const beforeMargin = doc.schema.value.pages[0].margin.top;
+    edits.updatePaperHeaderContent("left", { target: { value: "H" } } as unknown as Event);
+    edits.updatePaperFooterContent("right", { target: { value: "F" } } as unknown as Event);
+    expect(doc.schema.value.paper.header?.content?.left).toBe("H");
+    expect(doc.schema.value.paper.footer?.content?.right).toBe("F");
+    expect(doc.schema.value.paper.header?.content?.right).toBeUndefined();
+    expect(doc.schema.value.paper.footer?.content?.left).toBeUndefined();
+    expect(doc.schema.value.paper.size).toBe(beforeSize);
+    expect(doc.schema.value.pages[0].margin.top).toBe(beforeMargin);
+  });
+});
+
+describe("第38续回归：inspector 静默兜底清零（8 处统一改金标准）", () => {
+  it("updateGridDimensions：合法正整数提交；空/非法不提交（不静默成 1）", () => {
+    const { doc, edits } = selectGridNode();
+    edits.updateGridDimensions({
+      target: { value: "3", dataset: { dimension: "rows" } },
+    } as unknown as Event);
+    expect((doc.schema.value.pages[0].children[0] as GridNodeV2).rows).toHaveLength(3);
+    const before = doc.schema.value;
+    edits.updateGridDimensions({
+      target: { value: "abc", dataset: { dimension: "rows" } },
+    } as unknown as Event);
+    expect(doc.schema.value).toBe(before); // 不提交，保留现状
+    edits.updateGridDimensions({
+      target: { value: "", dataset: { dimension: "columns" } },
+    } as unknown as Event);
+    expect(doc.schema.value).toBe(before);
+  });
+
+  it("updateGridCellDefault(cellPadding)：合法写值；空/非法→undefined（不静默写 0）", () => {
+    const { doc, edits } = selectGridNode();
+    edits.updateGridCellDefault("cellPadding", { target: { value: "5" } } as unknown as Event);
+    expect((doc.schema.value.pages[0].children[0] as GridNodeV2).cellPadding).toBe(5);
+    edits.updateGridCellDefault("cellPadding", { target: { value: "abc" } } as unknown as Event);
+    expect(
+      (doc.schema.value.pages[0].children[0] as GridNodeV2).cellPadding,
+    ).toBeUndefined();
+  });
+
+  it("updateGridGap：合法写值；空/非法→undefined（不静默写 0）", () => {
+    const { doc, edits } = selectGridNode();
+    edits.updateGridGap({ target: { value: "6" } } as unknown as Event);
+    expect((doc.schema.value.pages[0].children[0] as GridNodeV2).gap).toBe(6);
+    edits.updateGridGap({ target: { value: "abc" } } as unknown as Event);
+    expect((doc.schema.value.pages[0].children[0] as GridNodeV2).gap).toBeUndefined();
+  });
+
+  it("updateSelectedCellPadding：合法写值；空/非法→undefined（不静默写 0）", () => {
+    const { doc, edits, cellId } = selectFirstCell();
+    edits.updateSelectedCellPadding({ target: { value: "4" } } as unknown as Event);
+    expect(findCell(doc, cellId).padding).toBe(4);
+    edits.updateSelectedCellPadding({ target: { value: "abc" } } as unknown as Event);
+    expect(findCell(doc, cellId).padding).toBeUndefined();
+  });
+
+  it("updateSelectedFontSize：合法写值；空/非法→undefined（不静默兜底成 1）", () => {
+    const { doc, selection, edits } = withTextInCell();
+    edits.updateSelectedFontSize({ target: { value: "14" } } as unknown as Event);
+    expect((selection.selectedNode.value as { style?: TextStyleV2 }).style?.fontSize).toBe(14);
+    edits.updateSelectedFontSize({ target: { value: "abc" } } as unknown as Event);
+    expect(
+      (selection.selectedNode.value as { style?: TextStyleV2 }).style?.fontSize,
+    ).toBeUndefined();
+  });
+
+  it("updateBaseRowHeight：合法正整数提交；空/非法不提交（不静默兜底成 8）", () => {
+    const { doc, edits } = setup(true);
+    edits.updateBaseRowHeight({ target: { value: "12" } } as unknown as Event);
+    expect(doc.schema.value.baseRowHeight).toBe(12);
+    const snapshot = doc.schema.value;
+    edits.updateBaseRowHeight({ target: { value: "abc" } } as unknown as Event);
+    expect(doc.schema.value).toBe(snapshot); // 不提交
+    expect(doc.schema.value.baseRowHeight).toBe(12); // 保留 12
+  });
+
+  it("updatePaperMargin：合法提交；空/非法不提交（不静默写 0）", () => {
+    const { doc, edits } = setup(true);
+    edits.updatePaperMargin({ target: { value: "15" } } as unknown as Event);
+    expect(doc.schema.value.pages[0].margin.top).toBe(15);
+    const snapshot = doc.schema.value;
+    edits.updatePaperMargin({ target: { value: "abc" } } as unknown as Event);
+    expect(doc.schema.value).toBe(snapshot);
+    expect(doc.schema.value.pages[0].margin.top).toBe(15);
+  });
+
+  it("updateSelectedCellRowHeight：合法写值；空/非法→undefined（且不写 NaN）", () => {
+    const { doc, edits, cellId } = selectFirstCell();
+    edits.updateSelectedCellRowHeight({ target: { value: "20" } } as unknown as Event);
+    expect(findCell(doc, cellId).rowHeight).toBe(20);
+    edits.updateSelectedCellRowHeight({ target: { value: "abc" } } as unknown as Event);
+    const rh = findCell(doc, cellId).rowHeight;
+    expect(rh).toBeUndefined();
+    expect(Number.isNaN(rh as unknown as number)).toBe(false);
   });
 });
