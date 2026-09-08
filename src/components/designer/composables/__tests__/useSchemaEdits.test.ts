@@ -9,7 +9,7 @@ import { ref, type Ref } from "vue";
 import { useSchemaDocument, type SchemaDocument } from "../useSchemaDocument";
 import { useNodeSelection } from "../useNodeSelection";
 import { useSchemaEdits } from "../useSchemaEdits";
-import type { FormSchemaV2, GridCellV2, GridNodeV2, TableNodeV2, TextStyleV2 } from "@/types";
+import type { FieldPNodeV2, FormSchemaV2, GridCellV2, GridNodeV2, TableNodeV2, TextStyleV2 } from "@/types";
 
 function setup(editable = true) {
   const editableRef = ref(editable);
@@ -450,14 +450,38 @@ describe("第38续回归：inspector 静默兜底清零（8 处统一改金标�
     expect(doc.schema.value.baseRowHeight).toBe(12); // 保留 12
   });
 
-  it("updatePaperMargin：合法提交；空/非法不提交（不静默写 0）", () => {
+  it("updatePaperMarginSide：单边合法提交且不影响其他边；空/非法不提交", () => {
     const { doc, edits } = setup(true);
-    edits.updatePaperMargin({ target: { value: "15" } } as unknown as Event);
+    edits.updatePaperMarginSide("top", { target: { value: "15" } } as unknown as Event);
     expect(doc.schema.value.pages[0].margin.top).toBe(15);
+    // 其余三边保持缺省 12（不联动四边）
+    expect(doc.schema.value.pages[0].margin.right).toBe(12);
+    expect(doc.schema.value.pages[0].margin.bottom).toBe(12);
+    expect(doc.schema.value.pages[0].margin.left).toBe(12);
     const snapshot = doc.schema.value;
-    edits.updatePaperMargin({ target: { value: "abc" } } as unknown as Event);
-    expect(doc.schema.value).toBe(snapshot);
-    expect(doc.schema.value.pages[0].margin.top).toBe(15);
+    edits.updatePaperMarginSide("left", { target: { value: "abc" } } as unknown as Event);
+    expect(doc.schema.value).toBe(snapshot); // 不提交，保留现状
+    expect(doc.schema.value.pages[0].margin.left).toBe(12);
+  });
+
+  it("updateSelectedDateFormat：写入 actionParams.format；清空移除该键", () => {
+    const { doc, selection, edits } = setup(true);
+    const grid = doc.schema.value.pages[0].children[0] as GridNodeV2;
+    const cellId = grid.rows[0].cells[0].id;
+    selection.selectNodeById(cellId);
+    edits.addNodeToSelectedCell("field");
+    const fieldId = findCell(doc, cellId).children[0].id;
+    selection.selectNodeById(fieldId);
+    edits.updateSelectedDateFormat({
+      target: { value: "{YYYY}年{MM}月{DD}" },
+    } as unknown as Event);
+    const node = findCell(doc, cellId).children[0] as FieldPNodeV2;
+    expect(node.type).toBe("p");
+    expect(node.actionParams?.format).toBe("{YYYY}年{MM}月{DD}");
+    // 清空 → 移除 format 键（actionParams 空则整体移除）
+    edits.updateSelectedDateFormat({ target: { value: "  " } } as unknown as Event);
+    const node2 = findCell(doc, cellId).children[0] as FieldPNodeV2;
+    expect(node2.actionParams?.format).toBeUndefined();
   });
 
   it("updateSelectedCellRowHeight：合法写值；空/非法→undefined（且不写 NaN）", () => {

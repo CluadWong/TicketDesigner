@@ -113,20 +113,20 @@ describe("页眉 / 页脚渲染", () => {
 
   it("带高超过边距：收敛到边距，不伸进正文区（防重叠/打印裁切）", () => {
     const schema = schemaWithPages(1, {
-      // 边距 10mm，却配了 12mm 带高 → 渲染必须收敛到 10mm
-      header: { enabled: true, height: 12 },
+      // 默认边距 12mm，却配了 20mm 带高 → 渲染必须收敛到 12mm
+      header: { enabled: true, height: 20 },
       footer: { enabled: true, height: 30 },
     });
     const margin = schema.pages[0].margin;
-    expect(margin.top).toBe(10);
+    expect(margin.top).toBe(12);
     const wrapper = render(schema);
     const headerRaw = wrapper.find(".grid-form-band--header").attributes("style") ?? "";
     const footerRaw = wrapper.find(".grid-form-band--footer").attributes("style") ?? "";
     expect(headerRaw).toContain(`height: ${margin.top}mm`);
-    expect(headerRaw).not.toContain("height: 12mm");
+    expect(headerRaw).not.toContain("height: 20mm");
     expect(footerRaw).toContain(`height: ${margin.bottom}mm`);
     // 收敛只影响渲染，schema 原值不动（不静默改写配置）
-    expect(schema.paper.header?.height).toBe(12);
+    expect(schema.paper.header?.height).toBe(20);
   });
 
   it("未设带高：回退 DEFAULT_BAND_HEIGHT_MM(10)", () => {

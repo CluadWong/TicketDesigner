@@ -181,8 +181,11 @@ const {
   updateSelectedImageFit,
   updateBaseRowHeight,
   updatePaperSize,
-  paperMargin,
-  updatePaperMargin,
+  paperMarginTop,
+  paperMarginRight,
+  paperMarginBottom,
+  paperMarginLeft,
+  updatePaperMarginSide,
 } = edits;
 
 // ── 填充数据（预览态） ─────────────────────────────────────
@@ -413,7 +416,10 @@ onUnmounted(() => {
         :api="edits"
         :paper-size="schema.paper.size"
         :base-row-height="schema.baseRowHeight"
-        :paper-margin="paperMargin"
+        :paper-margin-top="paperMarginTop"
+        :paper-margin-right="paperMarginRight"
+        :paper-margin-bottom="paperMarginBottom"
+        :paper-margin-left="paperMarginLeft"
         :header="schema.paper.header"
         :footer="schema.paper.footer"
         @select-issue="selectIssue"

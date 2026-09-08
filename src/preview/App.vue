@@ -2,6 +2,7 @@
 import { ref } from "vue";
 import type { FieldActionTriggerV2, FormDataV2 } from "@/types";
 import FormRenderer from "@/components/renderer-v2/FormRenderer.vue";
+import { formatDateValue, parseDateValue, formatHasTime } from "@/utils/date-format";
 import { makeYunlvSecondTicketFullSchema } from "@/dev/yunlv-second-ticket-full";
 import {
   htmlComplexTableData,
@@ -69,15 +70,25 @@ function runValidate(): void {
 // ── 专用控件演示（P9.1c）：date 字段点击字段元素 → 原生日期选择器 → 回写 data ──
 function onAction(payload: FieldActionTriggerV2): void {
   if (payload.action !== "date") return; // signature/upload 等复杂控件由宿主自行实现
+  // 日期格式（actionParams.format）：含时间 token → datetime-local，否则 date 选择器
+  const format = payload.actionParams?.format;
   const input = document.createElement("input");
-  input.type = "date";
+  input.type = formatHasTime(format) ? "datetime-local" : "date";
+  // 回填已填值：把 data 中已格式化的串还原为原生控件值，再次打开时定位到已填项
+  const existing = data.value?.[payload.field];
+  if (typeof existing === "string" && existing) {
+    const iso = parseDateValue(existing, format);
+    if (iso) input.value = iso;
+  }
   input.style.position = "fixed";
   input.style.opacity = "0";
   input.style.pointerEvents = "none";
   document.body.appendChild(input);
   input.addEventListener("change", () => {
     if (input.value) {
-      data.value = { ...data.value, [payload.field]: input.value };
+      // 按格式串套成中文显示串写回 data（无 format 则原样存原生值，向后兼容）
+      const formatted = formatDateValue(input.value, format);
+      data.value = { ...data.value, [payload.field]: formatted };
     }
     input.remove();
   });

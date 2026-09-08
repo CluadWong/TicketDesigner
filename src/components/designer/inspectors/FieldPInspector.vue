@@ -40,6 +40,19 @@ defineProps<{ node: FieldPNodeV2; api: SchemaEdits }>();
       @change="api.updateSelectedSafetyField"
     />
   </label>
+  <label v-if="node.action === 'date'" class="v2-control v2-control--full">
+    <span>日期格式</span>
+    <input
+      type="text"
+      placeholder="如 {YYYY}年{MM}月{DD} {hh}时{mm}分{ss}秒"
+      :value="node.actionParams?.format ?? ''"
+      @change="api.updateSelectedDateFormat"
+    />
+  </label>
+  <p v-if="node.action === 'date'" class="v2-hint">
+    留空则存原生日期（YYYY-MM-DD）；配置后填写值按格式显示，如
+    {{ "{" }}YYYY{{ "}" }}年{{ "{" }}MM{{ "}" }}月{{ "{" }}DD{{ "}" }}。
+  </p>
   <TextStyleFields :style="node.style" :api="api" />
   <label class="v2-control v2-control--full">
     <span>默认内容</span>

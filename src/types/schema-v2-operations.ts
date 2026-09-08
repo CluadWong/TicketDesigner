@@ -429,7 +429,7 @@ export function createEmptyFormSchemaV2(): FormSchemaV2 {
         id: createSchemaNodeIdV2("page"),
         type: "page",
         mode: "fixed",
-        margin: { top: 10, right: 10, bottom: 10, left: 10 },
+        margin: { top: 12, right: 12, bottom: 12, left: 12 },
         children: [],
       },
     ],

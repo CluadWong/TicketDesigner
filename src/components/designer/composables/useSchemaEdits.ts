@@ -382,6 +382,25 @@ export function useSchemaEdits(ctx: SchemaEditsContext) {
     );
   }
 
+  /** 日期选择器（action=date）的「显示格式」：写入 actionParams.format。
+   *  格式串支持 {YYYY}{MM}{DD}{hh}{mm}{ss}，由宿主在填写回写时套用（见 preview/App.vue onAction）。 */
+  function updateSelectedDateFormat(event: Event): void {
+    const raw = (event.target as HTMLInputElement).value.trim();
+    updateSelectedNode(
+      (node) => {
+        if (node.type !== "p" || node.mode !== "field") return node;
+        const params: Record<string, string> = { ...(node.actionParams ?? {}) };
+        if (raw) params.format = raw;
+        else delete params.format;
+        return {
+          ...node,
+          actionParams: Object.keys(params).length ? params : undefined,
+        };
+      },
+      selectedNodeId.value ? `actionParams:${selectedNodeId.value}` : undefined,
+    );
+  }
+
   // ── Grid / Table 结构 ──
   function updateGridBorder(event: Event): void {
     if (selectedNode.value?.type !== "grid") return;
@@ -744,19 +763,35 @@ export function useSchemaEdits(ctx: SchemaEditsContext) {
     commit(updatePaperConfigV2(schema.value, { size }));
   }
 
-  /** 纸张边距（mm）：统一作用于四边，展示为单一数值（取首页 top）。 */
-  const paperMargin: ComputedRef<number> = computed(() => schema.value.pages[0]?.margin.top ?? 10);
+  /** 纸张边距（mm）：四边独立配置，分别读取首页对应边（缺省 12）。
+   *  schema 单页（pages[0]）即唯一页面；多页未来如需分别配置再扩展。 */
+  const paperMarginTop: ComputedRef<number> = computed(
+    () => schema.value.pages[0]?.margin.top ?? 12,
+  );
+  const paperMarginRight: ComputedRef<number> = computed(
+    () => schema.value.pages[0]?.margin.right ?? 12,
+  );
+  const paperMarginBottom: ComputedRef<number> = computed(
+    () => schema.value.pages[0]?.margin.bottom ?? 12,
+  );
+  const paperMarginLeft: ComputedRef<number> = computed(
+    () => schema.value.pages[0]?.margin.left ?? 12,
+  );
 
-  function updatePaperMargin(event: Event): void {
+  /** 单边边距（mm）：只更新指定边，其余边保持现状（不联动四边）。
+   *  空/非法 → 不提交，保留现状（不静默兜底成 0）。 */
+  function updatePaperMarginSide(
+    side: "top" | "right" | "bottom" | "left",
+    event: Event,
+  ): void {
     const raw = Number((event.target as HTMLInputElement).value);
-    // 空/非法 → 不提交，保留现状（不静默兜底成 0）
     if (!Number.isFinite(raw)) return;
     const value = Math.max(0, Math.floor(raw));
     commit({
       ...schema.value,
       pages: schema.value.pages.map((page) => ({
         ...page,
-        margin: { top: value, right: value, bottom: value, left: value },
+        margin: { ...page.margin, [side]: value },
       })),
     });
   }
@@ -858,6 +893,7 @@ export function useSchemaEdits(ctx: SchemaEditsContext) {
     updateSelectedInnerBorder,
     updateSelectedAction,
     updateSelectedSafetyField,
+    updateSelectedDateFormat,
     updateGridBorder,
     updateTableBorder,
     updateGridDimensions,
@@ -893,8 +929,11 @@ export function useSchemaEdits(ctx: SchemaEditsContext) {
     updateSelectedImageFit,
     updateBaseRowHeight,
     updatePaperSize,
-    paperMargin,
-    updatePaperMargin,
+    paperMarginTop,
+    paperMarginRight,
+    paperMarginBottom,
+    paperMarginLeft,
+    updatePaperMarginSide,
     updatePaperHeader: headerUpdaters.patch,
     updatePaperHeaderContent: headerUpdaters.content,
     updatePaperHeaderEnabled: headerUpdaters.enabled,

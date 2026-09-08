@@ -31,7 +31,10 @@ function mockApi(): SchemaEdits {
     {},
     {
       get: (_target, key) => {
-        if (key === "paperMargin") return 10;
+        if (key === "paperMarginTop") return 12;
+        if (key === "paperMarginRight") return 12;
+        if (key === "paperMarginBottom") return 12;
+        if (key === "paperMarginLeft") return 12;
         if (typeof key === "string") return getSpy(key);
         return undefined;
       },
@@ -57,7 +60,10 @@ function mountPanel(options: {
       api,
       paperSize: "A4" as const,
       baseRowHeight: 8,
-      paperMargin: 10,
+      paperMarginTop: 12,
+      paperMarginRight: 12,
+      paperMarginBottom: 12,
+      paperMarginLeft: 12,
       paginate: true,
     },
   });

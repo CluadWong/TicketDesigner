@@ -40,7 +40,11 @@ const props = withDefaults(
     api: SchemaEdits;
     paperSize: "A4" | "A3";
     baseRowHeight: number;
-    paperMargin: number;
+    /** 四边边距（mm），独立配置；选中页面时取该页 margin，否则回退 12。 */
+    paperMarginTop: number;
+    paperMarginRight: number;
+    paperMarginBottom: number;
+    paperMarginLeft: number;
     /** 页眉配置（paper 级，透传给 PageInspector）。 */
     header?: HeaderFooterV2;
     /** 页脚配置（paper 级，透传给 PageInspector）。 */
@@ -48,6 +52,20 @@ const props = withDefaults(
   }>(),
   { node: null, nodeId: null },
 );
+
+/** 四边边距：选中页面节点时取其实际 margin（窄化到 PageSchemaV2），否则回退 12。 */
+const pageMargins = computed(() => {
+  const node = props.node;
+  if (node && node.type === "page") {
+    return {
+      top: node.margin.top ?? 12,
+      right: node.margin.right ?? 12,
+      bottom: node.margin.bottom ?? 12,
+      left: node.margin.left ?? 12,
+    };
+  }
+  return { top: 12, right: 12, bottom: 12, left: 12 };
+});
 
 /** 分页开关（仅设计态生效）：双向绑定到宿主的 `paginate`。 */
 const paginate = defineModel<boolean>("paginate", { required: true });
@@ -86,7 +104,10 @@ const selectedLabel = computed(() => {
       v-model:paginate="paginate"
       :paper-size="paperSize"
       :base-row-height="baseRowHeight"
-      :paper-margin="paperMargin"
+      :paper-margin-top="pageMargins.top"
+      :paper-margin-right="pageMargins.right"
+      :paper-margin-bottom="pageMargins.bottom"
+      :paper-margin-left="pageMargins.left"
       :header="header"
       :footer="footer"
       :api="api"
