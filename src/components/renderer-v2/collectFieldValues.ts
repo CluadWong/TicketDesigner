@@ -62,5 +62,55 @@ export function collectFieldValues(
     const text = el.innerText;
     result[field] = typeof text === "string" ? text : (el.textContent ?? "");
   }
+  // HTML 模块（Shadow DOM 隔离）：穿透 shadowRoot 采集两类绑定值。
+  // 1) {{field}} 占位（引擎生成 data-bind）：<input>（可写/只读回填）与 data-masked（HIDDEN 脱敏 ***）；
+  //    设计态占位 <span data-bind>（无 data-masked、非 input）跳过，避免把空占位当值采回。
+  // 2) 原生 [data-field]（作者控 markup，如 <p contenteditable data-field>）：HIDDEN 经 applyFieldState
+  //    标 data-masked（DOM 文本为 ***），其余取文本；与 GridSchemaNode 的 [data-field] 主路径同口径。
+  const htmlBlocks = [
+    ...(root instanceof HTMLElement && root.matches(".layout-html")
+      ? [root]
+      : []),
+    ...root.querySelectorAll<HTMLElement>(".layout-html"),
+  ];
+  for (const block of Array.from(htmlBlocks)) {
+    const sRoot = block.shadowRoot;
+    if (!sRoot) continue;
+    // 1) {{field}} 占位 → data-bind
+    sRoot.querySelectorAll<HTMLElement>("[data-bind]").forEach((el) => {
+      const field = el.getAttribute("data-bind");
+      if (!field) return;
+      if (el.hasAttribute("data-masked")) {
+        if (maskHidden) {
+          result[field] = "***";
+        } else {
+          const real = baseData?.[field];
+          if (real != null) result[field] = String(real);
+        }
+        return;
+      }
+      if (el instanceof HTMLInputElement) {
+        result[field] = el.value;
+        return;
+      }
+      // 设计态占位 span：跳过（见上）
+    });
+    // 2) 原生 [data-field]（作者直接写进 HTML 片段的绑定元素）
+    sRoot.querySelectorAll<HTMLElement>("[data-field]").forEach((el) => {
+      const field = el.getAttribute("data-field");
+      if (!field) return;
+      if (el.hasAttribute("data-masked")) {
+        if (maskHidden) {
+          result[field] = "***";
+        } else {
+          const real = baseData?.[field];
+          if (real != null) result[field] = String(real);
+        }
+        return;
+      }
+      const text = el.innerText;
+      result[field] = typeof text === "string" ? text : (el.textContent ?? "");
+    });
+  }
   return result as FormDataV2;
 }

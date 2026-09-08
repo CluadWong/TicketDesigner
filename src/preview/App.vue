@@ -3,6 +3,12 @@ import { ref } from "vue";
 import type { FieldActionTriggerV2, FormDataV2 } from "@/types";
 import FormRenderer from "@/components/renderer-v2/FormRenderer.vue";
 import { makeYunlvSecondTicketFullSchema } from "@/dev/yunlv-second-ticket-full";
+import {
+  htmlComplexTableData,
+  htmlComplexTablePermissions,
+  makeHtmlComplexTableSchema,
+  makeNativeHtmlComplexTableSchema,
+} from "@/dev/html-complex-table";
 import demoData from "@/dev/demoData";
 import demoPermissions from "@/dev/demoPermissions";
 import demoRules from "@/dev/demoRules";
@@ -41,6 +47,17 @@ const fieldPermissions = demoPermissions;
 
 /** 必填规则示例（P9.2c）：经 options.rules 注入，validate() 按当前数据校验（夹具见 dev/demoRules.ts）。 */
 const fieldRules = demoRules;
+
+/** P9.2d HTML 模块权限边界演示：复杂签名时间表（双层 colspan 表头 + 多行），
+ *  用 HTML 模块渲染，{{字段名}} 中文字段在填写态变为可编辑 input、READ 只读、
+ *  HIDDEN 脱敏 ***。与上方完整票共用同一 onAction 回写机制。 */
+const signSchema = makeHtmlComplexTableSchema();
+const signData = ref<FormDataV2>({ ...htmlComplexTableData });
+
+/** P9.2d 原生 [data-field] 变体演示：作者直接写 `<p contenteditable data-field>`，
+ *  引擎仅按权限设可编辑性/脱敏、按 data 回填，[data-field] 即通用采集钩子。 */
+const signNativeSchema = makeNativeHtmlComplexTableSchema();
+const signNativeData = ref<FormDataV2>({ ...htmlComplexTableData });
 
 // ── 校验演示（P9.2c）：点按钮调 validate()，展示值为空的必填字段 ──
 const rendererRef = ref<InstanceType<typeof FormRenderer> | null>(null);
@@ -95,6 +112,30 @@ const isNarrow =
       }"
       @action="onAction"
     />
+    <h2 class="preview-demo-heading">P9.2d HTML 模块示例：复杂签名时间表</h2>
+    <FormRenderer
+      v-model:data="signData"
+      :schema="signSchema"
+      :options="{
+        zoom: true,
+        fitOnMount: isNarrow,
+        readonly: false,
+        fieldPermissions: htmlComplexTablePermissions,
+      }"
+      @action="onAction"
+    />
+    <h2 class="preview-demo-heading">P9.2d HTML 模块示例：原生 data-field 变体</h2>
+    <FormRenderer
+      v-model:data="signNativeData"
+      :schema="signNativeSchema"
+      :options="{
+        zoom: true,
+        fitOnMount: isNarrow,
+        readonly: false,
+        fieldPermissions: htmlComplexTablePermissions,
+      }"
+      @action="onAction"
+    />
     <div class="preview-demo-bar">
       <button type="button" class="preview-demo-bar__btn" @click="runValidate">
         校验必填
@@ -113,6 +154,14 @@ const isNarrow =
 <style>
 .preview-page {
   font-family: system-ui, sans-serif;
+}
+
+.preview-demo-heading {
+  margin: 24px 0 8px;
+  padding: 0 16px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #1e293b;
 }
 
 /* 校验演示条（非工具栏）：固定在页尾，仅演示 validate() 接入方式。 */

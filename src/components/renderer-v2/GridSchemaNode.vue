@@ -702,7 +702,14 @@ function onImgError(): void {
     </tbody>
   </table>
 
-  <HtmlBlock v-else-if="node.type === 'html'" :node="node" :data="data" />
+  <HtmlBlock
+    v-else-if="node.type === 'html'"
+    :node="node"
+    :data="data"
+    :readonly="props.readonly"
+    :field-permissions="props.fieldPermissions"
+    @field-change="(field: string, value: string) => emit('field-change', field, value)"
+  />
 
   <img
     v-else
