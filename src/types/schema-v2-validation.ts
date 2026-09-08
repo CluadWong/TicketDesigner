@@ -104,7 +104,13 @@ function minNodeHeightMm(node: FormNodeV2, baseRowHeight: number): number {
     // 表头与数据行均固定为 1× 基准行高（表头高度 / 行高倍数配置已移至单元格）。
     return Math.max(0, 1 + node.minRows) * baseRowHeight;
   }
-  if (node.type === "image") return Math.max(0, node.height ?? 0);
+  if (node.type === "image") {
+    // 与渲染 / 分页同口径：没配地址的图片不占版面，估高为 0（避免误报「内容超高」）。
+    // 静态校验拿不到 data，故只按 schema 层判定——配了 `field` 就认为填数时可能有图（宁可高估）。
+    // 此判定与 `engine-v2/derivation.resolveImageSourceV2` 在无 data 时等价。
+    if (!node.src && !node.field) return 0;
+    return Math.max(0, node.height ?? 0);
+  }
   return 0;
 }
 

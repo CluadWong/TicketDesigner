@@ -17,6 +17,7 @@ import { resolveGridGapV2 } from "@/types";
 import {
   bindTableRowCell,
   resolveCellBoxV2,
+  resolveImageSourceV2,
   resolveTableRowCount,
 } from "@/engine-v2/derivation";
 
@@ -399,17 +400,21 @@ const BROKEN_PLACEHOLDER =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='60'%3E%3Crect width='100%25' height='100%25' fill='%23f1f5f9' stroke='%23cbd5e1'/%3E%3Ctext x='50%25' y='50%25' font-size='10' fill='%2394a3b8' text-anchor='middle' dominant-baseline='middle'%3E图片%3C/text%3E%3C/svg%3E";
 
 const imgError = ref(false);
+/** 可用图片来源：`null` = 没配地址也没有数据提供图（将显示占位灰框）。 */
+const imageSource = computed<string | null>(() =>
+  props.node.type === "image"
+    ? resolveImageSourceV2(props.node, {
+        data: props.data,
+        isDesign: resolvedMode.value === "design",
+      })
+    : null,
+);
 const imageSrc = computed<string>(() => {
   if (imgError.value) return BROKEN_PLACEHOLDER;
-  if (props.node.type !== "image") return BROKEN_PLACEHOLDER;
-  const fromData =
-    resolvedMode.value !== "design" && props.node.field
-      ? props.data?.[props.node.field]
-      : undefined;
-  return fromData != null
-    ? String(fromData)
-    : (props.node.src ?? BROKEN_PLACEHOLDER);
+  return imageSource.value ?? BROKEN_PLACEHOLDER;
 });
+/** 无来源的图片：设计态仍需占位（可点选编辑），但打印时不占版面（见 @media print）。 */
+const imageBlank = computed(() => props.node.type === "image" && imageSource.value === null);
 watch(
   () => [
     props.node.type === "image" ? props.node.src : null,
@@ -618,7 +623,7 @@ function onImgError(): void {
   <img
     v-else
     class="layout-image"
-    :class="{}"
+    :class="{ 'layout-image--blank': imageBlank }"
     :data-node-id="node.id"
     :data-field="node.field"
     :src="imageSrc"
@@ -929,6 +934,23 @@ function onImgError(): void {
 .layout-image {
   max-width: 100%;
   object-position: center;
+}
+
+/* 没配地址、也没有数据给图的图片：屏幕上保留占位灰框（设计态要靠它选中/编辑），
+   **打印时不占版面** —— 否则空图框会撑出一块空白，甚至导致内容被挤到下一张纸。
+   用 `display:none` 而非 `height:0`：高度归零仍会占据行内宽度并接收对齐，
+   彻底移出打印流才能保证与分页引擎的「无高度」估算同口径。 */
+@media print {
+  .layout-image--blank {
+    display: none;
+  }
+  /* 输入框下划线（.layout-p--underline）是设计/预览态的「可填写」提示线，打印时不输出
+     （手写票应保持干净）。显式勾选「显示内部边框」(innerBorder) 的逐行实线边框由独立的
+     .layout-p--inner-border :deep(div) 绘制、不在本媒体内，故仍正常打印——
+     即「默认无下划线，除非选了内部边框」。 */
+  .layout-p--underline {
+    border-bottom: none;
+  }
 }
 
 /* D3：插入指示线（`.v2-insertion-line`）与拖拽悬停态（`dragOverCellId` / `dragOverIndex`）

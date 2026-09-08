@@ -506,7 +506,7 @@ onUnmounted(() => {
           @dragstart="startPaletteDrag('grid', $event)"
           @click="addGrid"
         >
-          格子
+          网格
         </button>
         <button
           class="v2-palette-item v2-palette-item--button"

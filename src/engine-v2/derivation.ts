@@ -4,6 +4,7 @@ import type {
   FormSchemaV2,
   GridCellV2,
   GridNodeV2,
+  ImageNodeV2,
   TableNodeV2,
 } from "@/types";
 
@@ -24,6 +25,28 @@ export interface ResolvedCellBoxV2 {
   padding: number;
   align: "left" | "center" | "right";
   verticalAlign: "top" | "middle" | "bottom";
+}
+
+/**
+ * 解析图片节点的可显示来源（渲染 / 分页高度估算共用同一真相源）。
+ *
+ * 取值优先级（与渲染层历史行为一致）：
+ * 1. 非设计态且配了 `field`、**数据里该字段有值** → 用数据值（可覆盖 `src`）；
+ * 2. 否则用 `src`；
+ * 3. 都没有 → **`null`（无来源）**，渲染层显示占位灰框、分页按 0 高度计。
+ *
+ * ⚠️ 渲染层与分页估算必须与本函数同口径：屏幕/打印不显示的东西，就不能在分页里占高度，
+ *    否则会出现「图片没打印出来却多出一张空白纸」。
+ */
+export function resolveImageSourceV2(
+  node: ImageNodeV2,
+  options: { data?: FormDataV2 | null; isDesign?: boolean } = {},
+): string | null {
+  if (!options.isDesign && node.field) {
+    const fromData = options.data?.[node.field];
+    if (fromData != null) return String(fromData);
+  }
+  return node.src && node.src !== "" ? node.src : null;
 }
 
 const DEFAULT_CELL_PADDING = 0;

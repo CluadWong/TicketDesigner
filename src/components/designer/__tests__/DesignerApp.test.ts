@@ -57,7 +57,7 @@ describe("DesignerApp V2 selection and deletion", () => {
     expect(wrapper.findAll(".v2-inspector-row")[0]?.text()).toContain("格子");
 
     await field.trigger("click");
-    expect(wrapper.findAll(".v2-inspector-row")[0]?.text()).toContain("格子");
+    expect(wrapper.findAll(".v2-inspector-row")[0]?.text()).toContain("网格");
 
     await field.trigger("click");
     expect(wrapper.findAll(".v2-inspector-row")[0]?.text()).toContain("页面");
@@ -83,7 +83,7 @@ describe("DesignerApp V2 selection and deletion", () => {
     const wrapper = mountDesigner();
     const addGridButton = wrapper
       .findAll(".v2-palette-item--button")
-      .find(button => button.text().includes("格子"));
+      .find(button => button.text().includes("网格"));
 
     await addGridButton?.trigger("click");
     const grid = wrapper.find('[data-node-id^="grid-"]');
@@ -173,7 +173,7 @@ describe("DesignerApp V2 selection and deletion", () => {
     await issueEntry!.trigger("click");
 
     expect((wrapper.vm as unknown as { selectedNodeId: string | null }).selectedNodeId).toBe("ticket-layout");
-    expect(wrapper.findAll(".v2-inspector-row")[0]?.text()).toContain("格子");
+    expect(wrapper.findAll(".v2-inspector-row")[0]?.text()).toContain("网格");
   });
 
   it("falls back to the first Page for a schema-level issue without nodeId", async () => {
@@ -333,7 +333,7 @@ describe("DesignerApp 把 Grid 放进 / 拖进 cell（Grid 嵌套，九续）", 
 
     const gridButton = wrapper
       .findAll(".v2-palette-item--button")
-      .find(b => b.text().includes("格子"));
+      .find(b => b.text().includes("网格"));
     await gridButton?.trigger("click");
     await nextTick();
 
@@ -358,11 +358,11 @@ describe("DesignerApp 把 Grid 放进 / 拖进 cell（Grid 嵌套，九续）", 
     const cellId = findOwnerCellOfField(schemaOf(wrapper), "unit-field")!.cell.id;
     const gridButton = wrapper
       .findAll(".v2-palette-item--button")
-      .find(b => b.text().includes("格子"))!;
+      .find(b => b.text().includes("网格"))!;
     await gridButton.trigger("click");
     await nextTick();
 
-    // 该 cell 内现已有一个嵌套 Grid（树中 grid 标签已中文化为「格子」，不再显示 ID）
+    // 该 cell 内现已有一个嵌套 Grid（树中 grid 标签已中文化为「网格」，不再显示 ID）
     expect(
       findOwnerCellOfField(schemaOf(wrapper), "unit-field")!
         .cell.children.some(c => c.type === "grid"),
@@ -403,7 +403,7 @@ describe("DesignerApp 把 Grid 放进 / 拖进 cell（Grid 嵌套，九续）", 
 
     const gridButton = wrapper
       .findAll(".v2-palette-item--button")
-      .find(b => b.text().includes("格子"));
+      .find(b => b.text().includes("网格"));
     expect(gridButton?.attributes("disabled")).toBeDefined();
     await gridButton?.trigger("click");
     await nextTick();

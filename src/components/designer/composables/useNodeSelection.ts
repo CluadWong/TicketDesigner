@@ -27,12 +27,12 @@ import { LAYOUT_ID_ATTR, NODE_ID_ATTR } from "@/engine-v2/node-address";
 import type { TreeNode } from "../NodeTreeItem.vue";
 
 /**
- * 节点类型的用户可见中文名（面向普通用户；grid / grid-cell 统一称「格子」，
+ * 节点类型的用户可见中文名（面向普通用户；grid 称「网格」，grid-cell 称「格子」，
  * 与左侧组件面板的叫法保持一致）。
  */
 export const NODE_TYPE_LABELS: Record<string, string> = {
   page: "页面",
-  grid: "格子",
+  grid: "网格",
   "grid-cell": "格子",
   text: "文本",
   p: "字段",
@@ -50,7 +50,7 @@ export function nodeLabel(node: EditorNodeV2): string {
     case "page":
       return "页面";
     case "grid":
-      return "格子";
+      return "网格";
     case "text":
       return node.text ? `“${node.text}”` : "(空文本)";
     case "p":
@@ -86,7 +86,7 @@ export function buildGridTree(grid: GridNodeV2): TreeNode {
       cellNodes.push(buildCellTree(cell, ri, ci, row.cells.length, grid.rows.length));
     });
   });
-  return { id: grid.id, type: "格子", label: nodeLabel(grid), children: cellNodes };
+  return { id: grid.id, type: "网格", label: nodeLabel(grid), children: cellNodes };
 }
 
 export function buildCellTree(

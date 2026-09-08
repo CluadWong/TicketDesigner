@@ -7,18 +7,11 @@
  */
 
 import DesignerApp from '@/components/designer/DesignerApp.vue'
-import { makeYunlvSecondTicketFullSchema } from '@/dev/yunlv-second-ticket-full'
 import demoData from '@/dev/demoData'
 import type { SampleEntry } from '@/samples/types'
 
-const samples: SampleEntry[] = [
-  {
-    id: 'yunlv-second-ticket-full',
-    label: '完整工作票',
-    loadSchema: makeYunlvSecondTicketFullSchema,
-    previewData: demoData,
-  },
-]
+// 正式版隐藏「载入完整工作票」样例入口（内部演示/调试用，不参与发布）。
+const samples: SampleEntry[] = []
 </script>
 
 <template>

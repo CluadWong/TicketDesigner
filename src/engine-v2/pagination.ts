@@ -42,7 +42,7 @@ import type {
   ResolvedPaperSizeV2,
 } from "@/types";
 import { resolveGridGapV2, resolvePaperSizeV2 } from "@/types";
-import { resolveTableRowCount } from "@/engine-v2/derivation";
+import { resolveImageSourceV2, resolveTableRowCount } from "@/engine-v2/derivation";
 
 /** 1px（96DPI 下）换算成 mm，用于外框边框占用的高度。 */
 const ONE_PX_MM = 1 / (96 / 25.4); // ≈ 0.264583mm
@@ -166,7 +166,12 @@ function atomicNodeHeightMm(
       // 整 Grid 高度（无抑制边框）
       return gridFragmentHeightMm(ctx.baseRowHeight, node, node.rows, false, false, ctx.measureRow);
     case "image":
-      return imageHeightMm(node, ctx.baseRowHeight);
+      // 与渲染层同口径（`resolveImageSourceV2`）：没配地址、数据也没给图的图片，
+      // 屏幕上是占位灰框、**打印时不占版面**，故此处按 0 高度计——否则会算出
+      // 一张实际不存在内容的物理页（打印多出空白纸）。
+      return resolveImageSourceV2(node, { data: ctx.data }) === null
+        ? 0
+        : imageHeightMm(node, ctx.baseRowHeight);
     case "text":
       return textHeightMm(node, ctx.contentWidthMm);
     case "table":

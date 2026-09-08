@@ -52,4 +52,7 @@ defineProps<{ node: ImageNodeV2; api: SchemaEdits }>();
       <option value="fill">拉伸填满</option>
     </select>
   </label>
+  <p v-if="!node.src && !node.field" class="v2-sidebar__hint">
+    还没配置图片地址：画布上会显示占位框方便编辑，<strong>打印时不占位置</strong>。
+  </p>
 </template>
