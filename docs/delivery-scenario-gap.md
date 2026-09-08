@@ -71,7 +71,7 @@
 | **G4** | ◆ | 无版本迁移能力 | `normalizeFormSchemaV2` 首行 `if (source.version !== 2) throw` | Schema 一升级，旧模板全部不可用 | 预留迁移链 `migrate(input)`（v1→v2→v3…），迁移后再 normalize | **P2** |
 | **G7** | ◆ | 已废弃字段仍被保留与写回 | normalize 用展开 `{...node}` 保留未知键（已删除的 `repeatable`/`inputType` 被来回搬运）；仍写入 `orientation`（默认 `portrait`），而渲染层自 P11-3 起**方向由纸张尺寸派生、忽略 orientation** | 语义不一致：带 `orientation:"landscape"` 的模板会被保留却不生效 | normalize/migrate 时显式剔除已知废弃键 | **P2** |
 | **G13** | ◆ | 无字段级元数据 | `FieldPNodeV2` 无 label / required / 数据类型 / 校验规则 | 无法按字段做校验、导出表头或生成录入页 | 向后兼容地补 `label?` / `required?` / `rules?`（缺省即现状） | **P2** |
-| **G17** | ◆ | 外部组件 `action` 在渲染端**完全没有实现** | `FieldPNodeV2.action` 支持 `date/signature/upload/safetyGraphic`，设计器与渲染组件均无处理（设计器内"不实现"） | 这类字段退化为普通文本框，与消费页设计语义不符（日期不能选、签名不能签） | 渲染组件提供 action 扩展点（使用方注入处理器），至少把 action 透出到 DOM/事件 | **P2** |
+| **G17** | ◆ | 外部组件 `action` 在渲染端**完全没有实现** | `FieldPNodeV2.action` 支持 `date/signature/upload`，设计器与渲染组件均无处理（设计器内"不实现"） | 这类字段退化为普通文本框，与消费页设计语义不符（日期不能选、签名不能签） | 渲染组件提供 action 扩展点（使用方注入处理器），至少把 action 透出到 DOM/事件 | **P2** |
 | **G18** | ◆ | HTML 节点清洗可收紧 | 渲染侧已有 DOMPurify + Shadow DOM；但 `ADD_ATTR` 允许 `target`（`<a target>` 可 tabnabbing，缺 `rel="noopener"`） | 模板写入恶意 HTML 时，所有访问者受影响 | 收紧 `ALLOWED_ATTR` 并补 `rel`；保存侧清洗属服务器范围（◇ G18b） | **P3** |
 
 ### 2.2 ◇ 外部实现（服务器 / 消费页面，仅备案，不计入本应用行动清单）

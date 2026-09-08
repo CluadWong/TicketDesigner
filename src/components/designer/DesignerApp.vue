@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { computed, ref, provide, onMounted, onUnmounted } from "vue";
+import { computed, ref, watch, provide, onMounted, onUnmounted } from "vue";
 import CanvasSurface from "./CanvasSurface.vue";
 import PaperViewport from "@/components/renderer-v2/PaperViewport.vue";
 import { PALETTE_DRAG_MIME } from "@/engine-v2/node-address";
 import type { SampleEntry } from "@/samples/types";
+import type { DesignerUIConfig } from "./config";
+import { setLocale, DEFAULT_LOCALE } from "@/i18n";
 /** D2：打印触发收口到渲染内核，设计器不再裸调 `window.print()`。 */
 import { printForm } from "@/components/renderer-v2/print-form";
 import { validateFormSchemaV2 } from "@/types";
@@ -28,7 +30,17 @@ const props = defineProps<{
   initialSchema?: FormSchemaV2;
   /** 可载入的样例集（由外层注入，设计器不依赖 dev 目录，见 B3）。 */
   samples?: SampleEntry[];
+  /** 全局 UI 配置（设计页可见性开关）：缺省见 `defaultDesignerUIConfig`，
+   *  默认隐藏「填充数据」模块、显示其余按钮；宿主可局部覆盖。 */
+  uiConfig?: Partial<DesignerUIConfig>;
 }>();
+
+// 全局配置的语言注入 i18n（默认简体中文；宿主 `uiConfig.locale` 切换整页语言）。
+watch(
+  () => props.uiConfig?.locale,
+  (loc) => setLocale(loc ?? DEFAULT_LOCALE),
+  { immediate: true },
+);
 
 /**
  * 本文件是设计器**编排层**（2026-09-07 批次 1 拆分后）：装配四个 composable 并接线到模板，
@@ -150,7 +162,6 @@ const {
   updateSelectedDefault,
   updateSelectedInnerBorder,
   updateSelectedAction,
-  updateSelectedSafetyField,
   updateGridBorder,
   updateTableBorder,
   updateGridDimensions,
@@ -351,6 +362,7 @@ onUnmounted(() => {
       :can-undo="canUndo"
       :can-redo="canRedo"
       :preview-mode="previewMode"
+      :ui-config="uiConfig"
       @reset-blank="resetBlank"
       @load-sample="loadSample"
       @undo="undo"

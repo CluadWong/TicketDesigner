@@ -22,7 +22,7 @@ function buttonByText(
 
 describe("B2 填充数据导入/导出生命周期（三十续）", () => {
   it("设计态：填充数据组含 导入数据/导出数据/读取数据/保存数据，且导出/保存禁用", () => {
-    const wrapper = mount(DesignerApp);
+    const wrapper = mount(DesignerApp, { props: { uiConfig: { showFillDataModule: true } } });
     const group = findFillDataGroup(wrapper);
     const importBtn = buttonByText(group, "导入数据");
     const exportBtn = buttonByText(group, "导出数据");
@@ -39,7 +39,7 @@ describe("B2 填充数据导入/导出生命周期（三十续）", () => {
   });
 
   it("预览态：导出数据/保存数据转为可用", async () => {
-    const wrapper = mount(DesignerApp);
+    const wrapper = mount(DesignerApp, { props: { uiConfig: { showFillDataModule: true } } });
     await wrapper.find('[data-view-mode="preview"]').trigger("click");
     await vueNextTick();
 

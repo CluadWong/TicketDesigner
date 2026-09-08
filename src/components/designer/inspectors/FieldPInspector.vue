@@ -29,16 +29,7 @@ defineProps<{ node: FieldPNodeV2; api: SchemaEdits }>();
       <option value="date">日期选择器</option>
       <option value="signature">签名板</option>
       <option value="upload">文件上传</option>
-      <option value="safetyGraphic">图形安措</option>
     </select>
-  </label>
-  <label v-if="node.action === 'safetyGraphic'" class="v2-control">
-    <span>安措匹配字段</span>
-    <input
-      type="text"
-      :value="node.actionParams?.matchField ?? ''"
-      @change="api.updateSelectedSafetyField"
-    />
   </label>
   <label v-if="node.action === 'date'" class="v2-control v2-control--full">
     <span>日期格式</span>

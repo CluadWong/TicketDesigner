@@ -105,10 +105,9 @@ export interface FieldPNodeV2 extends SchemaNodeBaseV2 {
   /** Optional inline label rendered after the input area. */
   suffix?: string;
   /** 外部组件触发类型（选项值）：由宿主弹窗调用、在回调里把数据回写 data 再渲染到票面上。
-   *  text=无（纯文本输入）、date=日期选择器、signature=签名板、upload=文件上传、
-   *  safetyGraphic=图形安措（选中后需在 `actionParams.matchField` 指定匹配字段）。 */
-  action?: "text" | "date" | "signature" | "upload" | "safetyGraphic";
-  /** 外部组件的额外参数（含义由 `action` 决定）。图形安措用 `matchField` 指定要匹配的字段名。 */
+   *  text=无（纯文本输入）、date=日期选择器、signature=签名板、upload=文件上传。 */
+  action?: "text" | "date" | "signature" | "upload";
+  /** 外部组件的额外参数（含义由 `action` 决定，如 date 的 `format`）。 */
   actionParams?: Record<string, string>;
   underline?: boolean;
   webUnderline?: boolean;
@@ -163,7 +162,7 @@ export interface FieldActionTriggerV2 {
   field: string;
   /** 外部组件类型。 */
   action: NonNullable<FieldPNodeV2["action"]>;
-  /** 外部组件额外参数（含义由 action 决定，如 safetyGraphic 的 matchField）。 */
+  /** 外部组件额外参数（含义由 action 决定，如 date 的 format）。 */
   actionParams?: Record<string, string>;
 }
 

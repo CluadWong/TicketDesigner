@@ -364,24 +364,6 @@ export function useSchemaEdits(ctx: SchemaEditsContext) {
     );
   }
 
-  /** 图形安措（action=safetyGraphic）的「安措匹配字段」：写入 actionParams.matchField。 */
-  function updateSelectedSafetyField(event: Event): void {
-    const raw = (event.target as HTMLInputElement).value.trim();
-    updateSelectedNode(
-      (node) => {
-        if (node.type !== "p" || node.mode !== "field") return node;
-        const params: Record<string, string> = { ...(node.actionParams ?? {}) };
-        if (raw) params.matchField = raw;
-        else delete params.matchField;
-        return {
-          ...node,
-          actionParams: Object.keys(params).length ? params : undefined,
-        };
-      },
-      selectedNodeId.value ? `actionParams:${selectedNodeId.value}` : undefined,
-    );
-  }
-
   /** 日期选择器（action=date）的「显示格式」：写入 actionParams.format。
    *  格式串支持 {YYYY}{MM}{DD}{hh}{mm}{ss}，由宿主在填写回写时套用（见 preview/App.vue onAction）。 */
   function updateSelectedDateFormat(event: Event): void {
@@ -892,7 +874,6 @@ export function useSchemaEdits(ctx: SchemaEditsContext) {
     updateSelectedDefault,
     updateSelectedInnerBorder,
     updateSelectedAction,
-    updateSelectedSafetyField,
     updateSelectedDateFormat,
     updateGridBorder,
     updateTableBorder,

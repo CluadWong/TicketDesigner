@@ -7,9 +7,12 @@
  *   不随工具栏下放；`.v2-toolbar` 基础样式在非 scoped `styles/designer-ui.css`。
  * - `data-view-mode` / `data-help-toggle` 为测试钩子，拆件时必须原样保留。
  */
+import { computed } from "vue";
 import type { SampleEntry } from "@/samples/types";
+import { resolveDesignerUIConfig, type DesignerUIConfig } from "./config";
+import { t } from "@/i18n";
 
-defineProps<{
+const props = defineProps<{
   /** 可载入样例集（B3 注入，正式版可为空数组）。 */
   samples?: SampleEntry[];
   /** 模板脏标记（左上「未保存 / 已保存」）。 */
@@ -18,7 +21,12 @@ defineProps<{
   canRedo: boolean;
   /** 预览态：决定「导出/保存数据」禁用、预览按钮激活态与文案。 */
   previewMode: boolean;
+  /** 全局 UI 配置（设计页可见性开关），缺省见 `defaultDesignerUIConfig`。 */
+  uiConfig?: Partial<DesignerUIConfig>;
 }>();
+
+/** 合并全局默认后的完整 UI 配置，模板按 `cfg.showXxx` 控制模块显隐。 */
+const cfg = computed(() => resolveDesignerUIConfig(props.uiConfig));
 
 const emit = defineEmits<{
   (e: "reset-blank"): void;
@@ -44,30 +52,32 @@ const emit = defineEmits<{
     <span
       class="v2-toolbar__dirty"
       :class="{ 'v2-toolbar__dirty--on': dirty }"
-      >{{ dirty ? "● 未保存" : "已保存" }}</span
+      >{{ dirty ? t("toolbar.dirty") : t("toolbar.saved") }}</span
     >
-    <div class="v2-toolbar__group">
-      <button class="v2-toolbar__button" type="button" @click="emit('reset-blank')">
-        新建空白
+    <div v-if="cfg.showNewBlank || cfg.showSamples" class="v2-toolbar__group">
+      <button v-if="cfg.showNewBlank" class="v2-toolbar__button" type="button" @click="emit('reset-blank')">
+        {{ t("toolbar.newBlank") }}
       </button>
-      <button
-        v-for="sample in samples"
-        :key="sample.id"
-        class="v2-toolbar__button"
-        type="button"
-        @click="emit('load-sample', sample)"
-      >
-        载入{{ sample.label }}
-      </button>
+      <template v-if="cfg.showSamples">
+        <button
+          v-for="sample in samples"
+          :key="sample.id"
+          class="v2-toolbar__button"
+          type="button"
+          @click="emit('load-sample', sample)"
+        >
+          {{ t("toolbar.loadSamplePrefix") }}{{ sample.label }}
+        </button>
+      </template>
     </div>
-    <div class="v2-toolbar__group">
+    <div v-if="cfg.showUndoRedo" class="v2-toolbar__group">
       <button
         class="v2-toolbar__button"
         type="button"
         :disabled="!canUndo"
         @click="emit('undo')"
       >
-        撤销
+        {{ t("toolbar.undo") }}
       </button>
       <button
         class="v2-toolbar__button"
@@ -75,83 +85,85 @@ const emit = defineEmits<{
         :disabled="!canRedo"
         @click="emit('redo')"
       >
-        重做
+        {{ t("toolbar.redo") }}
       </button>
     </div>
-    <div class="v2-toolbar__group">
-      <span class="v2-toolbar__label">模板</span>
+    <div v-if="cfg.showTemplateModule" class="v2-toolbar__group">
+      <span class="v2-toolbar__label">{{ t("toolbar.module.template") }}</span>
       <button class="v2-toolbar__button" type="button" @click="emit('save-template')">
-        保存
+        {{ t("toolbar.saveTemplate") }}
       </button>
       <button class="v2-toolbar__button" type="button" @click="emit('load-template')">
-        读取
+        {{ t("toolbar.loadTemplate") }}
       </button>
       <button class="v2-toolbar__button" type="button" @click="emit('export-template')">
-        导出文件
+        {{ t("toolbar.exportTemplate") }}
       </button>
       <button class="v2-toolbar__button" type="button" @click="emit('import-template')">
-        导入文件
+        {{ t("toolbar.importTemplate") }}
       </button>
     </div>
-    <div class="v2-toolbar__group">
-      <span class="v2-toolbar__label">填充数据</span>
+    <div v-if="cfg.showFillDataModule" class="v2-toolbar__group">
+      <span class="v2-toolbar__label">{{ t("toolbar.module.fillData") }}</span>
       <button
         class="v2-toolbar__button"
         type="button"
-        title="选择填写数据 JSON 文件并进入预览态"
+        :title="t('toolbar.importFillDataTip')"
         @click="emit('import-fill-data')"
       >
-        导入数据
+        {{ t("toolbar.importFillData") }}
       </button>
       <button
         class="v2-toolbar__button"
         type="button"
-        title="需先进入预览态填写，再导出当前填写值"
+        :title="t('toolbar.exportFillDataTip')"
         :disabled="!previewMode"
         @click="emit('export-fill-data')"
       >
-        导出数据
+        {{ t("toolbar.exportFillData") }}
       </button>
       <button
         class="v2-toolbar__button"
         type="button"
-        title="读取本地已保存的填写数据并进入预览态"
+        :title="t('toolbar.loadFillDataTip')"
         @click="emit('load-fill-data')"
       >
-        读取数据
+        {{ t("toolbar.loadFillData") }}
       </button>
       <button
         class="v2-toolbar__button"
         type="button"
-        title="需先进入预览态填写，再保存到本地"
+        :title="t('toolbar.saveFillDataTip')"
         :disabled="!previewMode"
         @click="emit('save-fill-data')"
       >
-        保存数据
+        {{ t("toolbar.saveFillData") }}
       </button>
     </div>
-    <div class="v2-toolbar__group">
+    <div v-if="cfg.showPreviewPrint || cfg.showHelp" class="v2-toolbar__group">
       <button
+        v-if="cfg.showPreviewPrint"
         class="v2-toolbar__button"
         type="button"
         data-view-mode="preview"
         :class="{ 'v2-toolbar__button--active': previewMode }"
-        title="查看表单的实际填写效果；预览中可直接输入内容，并可导出为填写数据"
+        :title="t('toolbar.previewTip')"
         @click="emit('toggle-preview')"
       >
-        {{ previewMode ? "退出预览" : "预览" }}
+        {{ previewMode ? t("toolbar.exitPreview") : t("toolbar.preview") }}
       </button>
-      <button class="v2-toolbar__button" type="button" @click="emit('print')">
-        打印
+      <button v-if="cfg.showPreviewPrint" class="v2-toolbar__button" type="button" @click="emit('print')">
+        {{ t("toolbar.print") }}
       </button>
       <button
+        v-if="cfg.showHelp"
         class="v2-toolbar__button"
         type="button"
         data-help-toggle
-        title="查看使用说明"
+        :title="t('toolbar.helpTip')"
         @click="emit('help')"
       >
-        帮助
+        {{ t("toolbar.help") }}
       </button>
     </div>
   </header>
