@@ -51,19 +51,19 @@ describe("DesignerApp V2 selection and deletion", () => {
     const field = wrapper.find('[data-node-id="unit-field"]');
 
     await field.trigger("click");
-    expect(wrapper.findAll(".v2-inspector-row")[0]?.text()).toContain("p");
+    expect(wrapper.findAll(".v2-inspector-row")[0]?.text()).toContain("字段");
 
     await field.trigger("click");
-    expect(wrapper.findAll(".v2-inspector-row")[0]?.text()).toContain("grid-cell");
+    expect(wrapper.findAll(".v2-inspector-row")[0]?.text()).toContain("格子");
 
     await field.trigger("click");
-    expect(wrapper.findAll(".v2-inspector-row")[0]?.text()).toContain("grid");
+    expect(wrapper.findAll(".v2-inspector-row")[0]?.text()).toContain("格子");
 
     await field.trigger("click");
-    expect(wrapper.findAll(".v2-inspector-row")[0]?.text()).toContain("page");
+    expect(wrapper.findAll(".v2-inspector-row")[0]?.text()).toContain("页面");
 
     await field.trigger("click");
-    expect(wrapper.findAll(".v2-inspector-row")[0]?.text()).toContain("p");
+    expect(wrapper.findAll(".v2-inspector-row")[0]?.text()).toContain("字段");
   });
 
   it("removes a selected root grid from the rendered page", async () => {
@@ -83,17 +83,17 @@ describe("DesignerApp V2 selection and deletion", () => {
     const wrapper = mountDesigner();
     const addGridButton = wrapper
       .findAll(".v2-palette-item--button")
-      .find(button => button.text().includes("Grid"));
+      .find(button => button.text().includes("格子"));
 
     await addGridButton?.trigger("click");
     const grid = wrapper.find('[data-node-id^="grid-"]');
     const cell = grid.find('[data-layout-id^="cell-"]');
     await cell.trigger("click");
 
-    // 选中单元格：删除禁用，检查器显示 grid-cell
+    // 选中格子：删除禁用，检查器显示「格子」
     const deleteButton = wrapper.find(".v2-tree__delete");
     expect(deleteButton.attributes("disabled")).toBeDefined();
-    expect(wrapper.findAll(".v2-inspector-row")[0]?.text()).toContain("grid-cell");
+    expect(wrapper.findAll(".v2-inspector-row")[0]?.text()).toContain("格子");
 
     // 选中 Grid 本身仍可删除
     await grid.trigger("click");
@@ -101,7 +101,7 @@ describe("DesignerApp V2 selection and deletion", () => {
     await wrapper.find(".v2-tree__delete").trigger("click");
 
     expect(wrapper.find('[data-node-id^="grid-"]').exists()).toBe(false);
-    expect(wrapper.findAll(".v2-issue").some(issue => issue.text().includes("INVALID_GRID_ROWS"))).toBe(false);
+    expect(wrapper.findAll(".v2-issue").some(issue => issue.text().includes("至少需要一行"))).toBe(false);
   });
 
   it("updates row and column counts from the selected Grid inspector", async () => {
@@ -154,12 +154,12 @@ describe("DesignerApp V2 selection and deletion", () => {
     unitLabel.text = "这是一个非常长的固定文本内容，用于触发内容溢出警告";
     await nextTick();
 
-    const issueEntry = wrapper.findAll(".v2-issue").find(entry => entry.text().includes("CONTENT_OVERFLOW"));
+    const issueEntry = wrapper.findAll(".v2-issue").find(entry => entry.text().includes("显示不全"));
     expect(issueEntry).toBeDefined();
     await issueEntry!.trigger("click");
 
-    expect(wrapper.findAll(".v2-inspector-row")[1]?.text()).toContain("unit-label");
-    expect(wrapper.findAll(".v2-inspector-row")[0]?.text()).toContain("text");
+    expect((wrapper.vm as unknown as { selectedNodeId: string | null }).selectedNodeId).toBe("unit-label");
+    expect(wrapper.findAll(".v2-inspector-row")[0]?.text()).toContain("文本");
   });
 
   it("falls back to the nearest selectable Grid for a row-level issue", async () => {
@@ -168,12 +168,12 @@ describe("DesignerApp V2 selection and deletion", () => {
     gridById(schema, "ticket-layout").rows.find(r => r.id === "row-unit-number")!.cells = [];
     await nextTick();
 
-    const issueEntry = wrapper.findAll(".v2-issue").find(entry => entry.text().includes("INVALID_GRID_CELLS"));
+    const issueEntry = wrapper.findAll(".v2-issue").find(entry => entry.text().includes("至少需要一个格子"));
     expect(issueEntry).toBeDefined();
     await issueEntry!.trigger("click");
 
-    expect(wrapper.findAll(".v2-inspector-row")[1]?.text()).toContain("ticket-layout");
-    expect(wrapper.findAll(".v2-inspector-row")[0]?.text()).toContain("grid");
+    expect((wrapper.vm as unknown as { selectedNodeId: string | null }).selectedNodeId).toBe("ticket-layout");
+    expect(wrapper.findAll(".v2-inspector-row")[0]?.text()).toContain("格子");
   });
 
   it("falls back to the first Page for a schema-level issue without nodeId", async () => {
@@ -182,12 +182,12 @@ describe("DesignerApp V2 selection and deletion", () => {
     schema.baseRowHeight = 0;
     await nextTick();
 
-    const issueEntry = wrapper.findAll(".v2-issue").find(entry => entry.text().includes("INVALID_BASE_ROW_HEIGHT"));
+    const issueEntry = wrapper.findAll(".v2-issue").find(entry => entry.text().includes("基础行高"));
     expect(issueEntry).toBeDefined();
     await issueEntry!.trigger("click");
 
-    expect(wrapper.findAll(".v2-inspector-row")[1]?.text()).toContain("ticket-page-1");
-    expect(wrapper.findAll(".v2-inspector-row")[0]?.text()).toContain("page");
+    expect((wrapper.vm as unknown as { selectedNodeId: string | null }).selectedNodeId).toBe("ticket-page-1");
+    expect(wrapper.findAll(".v2-inspector-row")[0]?.text()).toContain("页面");
   });
 
   it("renders a structure tree and selects a node by clicking it", async () => {
@@ -204,22 +204,22 @@ describe("DesignerApp V2 selection and deletion", () => {
     expect(wrapper.find('[data-node-id="title-text"]').exists()).toBe(true);
   });
 
-  it("结构树：不显示行(grid-row)，单元格(grid-cell)可直接点击选中并打开其样式面板", async () => {
+  it("结构树：不显示行(grid-row)，格子(grid-cell)可直接点击选中并打开其样式面板", async () => {
     const wrapper = mountDesigner();
     // 行不再进入树
     const typeBadges = wrapper.findAll(".v2-tree-type").map((el) => el.text());
     expect(typeBadges).not.toContain("grid-row");
-    // 单元格在树中且可点击选中
+    // 格子在树中且可点击选中（ticket-layout 首行首格标签为「格子 1-1」）
     const cellRow = wrapper
       .findAll(".v2-tree-row")
-      .find((r) => r.text().includes("单元格"));
+      .find((r) => r.text().includes("格子 1-1"));
     expect(cellRow).toBeDefined();
     await cellRow!.trigger("click");
     const selected = (wrapper.vm as unknown as { selectedNodeId: string | null })
       .selectedNodeId;
     expect(selected).toBeTruthy();
-    // 选中单元格后检查器首行显示 grid-cell（样式面板），且删除按钮禁用
-    expect(wrapper.findAll(".v2-inspector-row")[0]?.text()).toContain("grid-cell");
+    // 选中格子后检查器首行显示「格子」（样式面板），且删除按钮禁用
+    expect(wrapper.findAll(".v2-inspector-row")[0]?.text()).toContain("格子");
     expect(wrapper.find(".v2-tree__delete").attributes("disabled")).toBeDefined();
   });
 
@@ -333,7 +333,7 @@ describe("DesignerApp 把 Grid 放进 / 拖进 cell（Grid 嵌套，九续）", 
 
     const gridButton = wrapper
       .findAll(".v2-palette-item--button")
-      .find(b => b.text().includes("Grid"));
+      .find(b => b.text().includes("格子"));
     await gridButton?.trigger("click");
     await nextTick();
 
@@ -347,7 +347,7 @@ describe("DesignerApp 把 Grid 放进 / 拖进 cell（Grid 嵌套，九续）", 
     expect(ownerCellEl.find('[data-node-id^="grid-"]').exists()).toBe(true);
 
     // 3. 结构校验不再报错（嵌套 Grid 已纳入索引与校验）
-    expect(wrapper.findAll(".v2-issue").some(i => i.text().includes("INVALID_GRID_ROWS"))).toBe(false);
+    expect(wrapper.findAll(".v2-issue").some(i => i.text().includes("至少需要一行"))).toBe(false);
   });
 
   it("选中已含 Grid 的 cell 本身再添加 Grid：新 Grid 追加到同一 cell（并列），而非 page", async () => {
@@ -358,22 +358,22 @@ describe("DesignerApp 把 Grid 放进 / 拖进 cell（Grid 嵌套，九续）", 
     const cellId = findOwnerCellOfField(schemaOf(wrapper), "unit-field")!.cell.id;
     const gridButton = wrapper
       .findAll(".v2-palette-item--button")
-      .find(b => b.text().includes("Grid"))!;
+      .find(b => b.text().includes("格子"))!;
     await gridButton.trigger("click");
     await nextTick();
 
-    // 该 cell 内现已有一个嵌套 Grid
-    const nestedGridId = findOwnerCellOfField(schemaOf(wrapper), "unit-field")!
-      .cell.children.find(c => c.type === "grid")!.id;
+    // 该 cell 内现已有一个嵌套 Grid（树中 grid 标签已中文化为「格子」，不再显示 ID）
+    expect(
+      findOwnerCellOfField(schemaOf(wrapper), "unit-field")!
+        .cell.children.some(c => c.type === "grid"),
+    ).toBe(true);
 
-    // 2. 在结构树里选中「该 cell 本身」（即用户点单元格节点，而非内部 grid）
-    const gridTreeRow = wrapper
+    // 2. 在结构树里选中「该 cell 本身」（unit-field 位于 ticket-layout 首行第 2 格，标签「格子 1-2」）
+    const cellRowEl = wrapper
       .findAll(".v2-tree-row")
-      .find(r => r.text().includes(nestedGridId))!;
-    const cellRowEl = gridTreeRow.element.closest(".v2-tree-children")
-      ?.previousElementSibling as HTMLElement | null;
+      .find(r => r.text().includes("格子 1-2"))!.element as HTMLElement;
     expect(cellRowEl).toBeTruthy();
-    cellRowEl!.click();
+    cellRowEl.click();
     await nextTick();
     expect(
       (wrapper.vm as unknown as { selectedNodeId: string | null }).selectedNodeId,
@@ -403,7 +403,7 @@ describe("DesignerApp 把 Grid 放进 / 拖进 cell（Grid 嵌套，九续）", 
 
     const gridButton = wrapper
       .findAll(".v2-palette-item--button")
-      .find(b => b.text().includes("Grid"));
+      .find(b => b.text().includes("格子"));
     expect(gridButton?.attributes("disabled")).toBeDefined();
     await gridButton?.trigger("click");
     await nextTick();

@@ -41,14 +41,14 @@ defineProps<{
       <span
         :class="['status-item', 'warning-count', { 'has-warning': warningCount > 0 }]"
       >
-        警告：<strong>{{ warningCount }}</strong>
+        待处理问题：<strong>{{ warningCount }}</strong>
       </span>
       <span
         v-if="paginateWarningCount"
         class="status-item warning-count has-warning"
         data-paginate-warning-count="true"
       >
-        分页告警：<strong>{{ paginateWarningCount }}</strong>
+        内容超高：<strong>{{ paginateWarningCount }}</strong>
       </span>
     </div>
     <div class="status-group status-right">

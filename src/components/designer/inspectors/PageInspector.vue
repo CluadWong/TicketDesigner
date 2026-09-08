@@ -51,7 +51,7 @@ const paginate = defineModel<boolean>("paginate", { required: true });
   </label>
   <label class="v2-control v2-control--toggle">
     <input v-model="paginate" type="checkbox" data-paginate="true" />
-    <span>分页（仅设计态生效）</span>
+    <span>分页显示（仅影响编辑画面，打印始终分页）</span>
   </label>
   <HeaderFooterFields
     label="页眉"

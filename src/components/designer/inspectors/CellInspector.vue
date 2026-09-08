@@ -18,7 +18,7 @@ defineProps<{
 
 <template>
   <label class="v2-control v2-control--inline">
-    <span>弹性布局</span>
+    <span>内容撑满格子</span>
     <input
       type="checkbox"
       data-flex="true"
@@ -49,7 +49,7 @@ defineProps<{
   </div>
   <div class="v2-grid-dimensions">
     <label class="v2-control">
-      <span>内边距(padding, mm)</span>
+      <span>内边距(mm)</span>
       <input
         type="number"
         min="0"
@@ -84,7 +84,7 @@ defineProps<{
         :value="node.verticalAlign ?? ''"
         @change="api.updateSelectedCellVerticalAlign"
       >
-        <option value="">默认（继承 Grid）</option>
+        <option value="">默认（跟随格子设置）</option>
         <option value="top">顶部</option>
         <option value="middle">居中</option>
         <option value="bottom">底部</option>

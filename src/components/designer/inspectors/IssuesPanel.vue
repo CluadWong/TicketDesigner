@@ -9,7 +9,7 @@ const emit = defineEmits<{ select: [issue: SchemaIssueV2] }>();
 <template>
   <div class="v2-issues" :class="{ 'v2-issues--ok': issues.length === 0 }">
     <strong>{{
-      issues.length === 0 ? "结构校验通过" : issues.length + " 个结构问题"
+      issues.length === 0 ? "检查通过" : "发现 " + issues.length + " 个问题"
     }}</strong>
     <div
       v-for="issue in issues"
@@ -17,7 +17,7 @@ const emit = defineEmits<{ select: [issue: SchemaIssueV2] }>();
       class="v2-issue v2-issue--selectable"
       @click="emit('select', issue)"
     >
-      {{ issue.code }}：{{ issue.message }}
+      {{ issue.message }}
     </div>
   </div>
 </template>

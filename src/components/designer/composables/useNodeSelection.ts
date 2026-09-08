@@ -26,24 +26,43 @@ import { resolveCellBoxV2 } from "@/engine-v2/derivation";
 import { LAYOUT_ID_ATTR, NODE_ID_ATTR } from "@/engine-v2/node-address";
 import type { TreeNode } from "../NodeTreeItem.vue";
 
+/**
+ * 节点类型的用户可见中文名（面向普通用户；grid / grid-cell 统一称「格子」，
+ * 与左侧组件面板的叫法保持一致）。
+ */
+export const NODE_TYPE_LABELS: Record<string, string> = {
+  page: "页面",
+  grid: "格子",
+  "grid-cell": "格子",
+  text: "文本",
+  p: "字段",
+  table: "表格",
+  image: "图片",
+  html: "HTML 模块",
+};
+
+export function nodeTypeLabel(type: string): string {
+  return NODE_TYPE_LABELS[type] ?? type;
+}
+
 export function nodeLabel(node: EditorNodeV2): string {
   switch (node.type) {
     case "page":
       return "页面";
     case "grid":
-      return node.id;
+      return "格子";
     case "text":
       return node.text ? `“${node.text}”` : "(空文本)";
     case "p":
-      return `字段:${node.field}`;
+      return `字段：${node.field}`;
     case "table":
-      return node.field ? `表格:${node.field}` : "表格";
+      return node.field ? `表格：${node.field}` : "表格";
     case "image":
       return "图片";
     case "html":
       return "HTML 模块";
     default:
-      return node.type;
+      return nodeTypeLabel(node.type);
   }
 }
 
@@ -52,12 +71,12 @@ export function buildTreeNode(node: EditorNodeV2): TreeNode {
   if (node.type === "page")
     return {
       id: node.id,
-      type: node.type,
+      type: nodeTypeLabel(node.type),
       label: nodeLabel(node),
       children: node.children.map(buildTreeNode),
     };
   // 其余组件节点（text / p / table / image / html）：无独立子节点
-  return { id: node.id, type: node.type, label: nodeLabel(node), children: [] };
+  return { id: node.id, type: nodeTypeLabel(node.type), label: nodeLabel(node), children: [] };
 }
 
 export function buildGridTree(grid: GridNodeV2): TreeNode {
@@ -67,7 +86,7 @@ export function buildGridTree(grid: GridNodeV2): TreeNode {
       cellNodes.push(buildCellTree(cell, ri, ci, row.cells.length, grid.rows.length));
     });
   });
-  return { id: grid.id, type: "grid", label: nodeLabel(grid), children: cellNodes };
+  return { id: grid.id, type: "格子", label: nodeLabel(grid), children: cellNodes };
 }
 
 export function buildCellTree(
@@ -78,10 +97,10 @@ export function buildCellTree(
   rowCount: number,
 ): TreeNode {
   const label =
-    rowCount > 1 ? `单元格 ${ri + 1}-${ci + 1}` : colCount > 1 ? `单元格 ${ci + 1}` : "单元格";
+    rowCount > 1 ? `格子 ${ri + 1}-${ci + 1}` : colCount > 1 ? `格子 ${ci + 1}` : "格子";
   return {
     id: cell.id,
-    type: "grid-cell",
+    type: "格子",
     label,
     children: cell.children.map(buildTreeNode),
   };
@@ -126,7 +145,10 @@ export function useNodeSelection(
     const id = selectedNodeId.value;
     return id && isStyleEditableNodeId(id) ? (nodeIndex.value.get(id)?.node ?? null) : null;
   });
-  const selectedNodeType = computed(() => selectedNode.value?.type ?? "未选择");
+  /** 选中组件的用户可见中文名（未选择时为「未选择」）。 */
+  const selectedNodeType = computed(() =>
+    selectedNode.value ? nodeTypeLabel(selectedNode.value.type) : "未选择",
+  );
   const selectedOwnerCell = computed(() =>
     selectedNodeId.value ? (nodeIndex.value.get(selectedNodeId.value)?.ownerCell ?? null) : null,
   );

@@ -6,8 +6,10 @@
  * 不含任何改 schema 的逻辑：编辑动作统一来自 `api`（`useSchemaEdits()` 的返回对象），
  * 避免为每个字段声明一个 emit。
  */
+import { computed } from "vue";
 import type { EditorNodeV2, HeaderFooterV2, SchemaIssueV2 } from "@/types";
 import type { SchemaEdits } from "./composables/useSchemaEdits";
+import { nodeLabel } from "./composables/useNodeSelection";
 import PageInspector from "./inspectors/PageInspector.vue";
 import GridInspector from "./inspectors/GridInspector.vue";
 import CellInspector from "./inspectors/CellInspector.vue";
@@ -19,7 +21,7 @@ import TableInspector from "./inspectors/TableInspector.vue";
 import IssuesPanel from "./inspectors/IssuesPanel.vue";
 import "./styles/designer-ui.css";
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     /** 当前选中节点（Table 内派生节点不可选中，故为 null 时不渲染类型分支）。 */
     node: EditorNodeV2 | null;
@@ -50,17 +52,32 @@ withDefaults(
 const paginate = defineModel<boolean>("paginate", { required: true });
 
 const emit = defineEmits<{ selectIssue: [issue: SchemaIssueV2] }>();
+
+/**
+ * 当前选中的可读名称（面向普通用户，不显示内部 ID）：
+ * 选中格子时附带行列位置（如「格子 1-2」），其余组件显示语义名称
+ * （如 “单位” 文本、字段：unit）。
+ */
+const selectedLabel = computed(() => {
+  const node = props.node;
+  if (!node) return "未选择";
+  if (node.type === "grid-cell" && props.cellContext) {
+    const { rowIndex, columnIndex } = props.cellContext;
+    if (rowIndex >= 0) return `格子 ${rowIndex + 1}-${columnIndex + 1}`;
+  }
+  return nodeLabel(node);
+});
 </script>
 
 <template>
   <aside class="v2-sidebar v2-sidebar--right">
     <div class="v2-inspector-row">
-      <span>节点类型</span>
+      <span>组件类型</span>
       <strong>{{ nodeType }}</strong>
     </div>
     <div class="v2-inspector-row v2-inspector-row--head">
-      <span>当前节点</span>
-      <code>{{ nodeId ?? "未选择" }}</code>
+      <span>当前选中</span>
+      <code>{{ selectedLabel }}</code>
     </div>
 
     <PageInspector

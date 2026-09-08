@@ -90,7 +90,7 @@ function validatePWidthOverflow(
       "CONTENT_OVERFLOW",
       node,
       path,
-      `P text estimated width ${formatMm(estimatedWidthMm)}mm exceeds cell width ${formatMm(availableMm)}mm`,
+      `字段内容估算宽度约 ${formatMm(estimatedWidthMm)}mm，超过可用宽度 ${formatMm(availableMm)}mm，可能显示不全`,
     );
   }
 }
@@ -132,7 +132,7 @@ function validatePageOverflow(
       "PAPER_OVERFLOW",
       page,
       path,
-      `Page minimum content height ${formatMm(contentMinHeightMm)}mm exceeds usable height ${formatMm(usableHeightMm)}mm`,
+      `页面内容最低高度约 ${formatMm(contentMinHeightMm)}mm，超过一页可用高度 ${formatMm(usableHeightMm)}mm，打印时会自动分成多页`,
     );
   }
 }
@@ -163,12 +163,12 @@ function validateGrid(
   issues: SchemaIssueV2[],
 ): void {
   if (!Array.isArray(node.rows) || node.rows.length === 0) {
-    issue(issues, "error", "INVALID_GRID_ROWS", node, path, "Grid must contain at least one row");
+    issue(issues, "error", "INVALID_GRID_ROWS", node, path, "格子至少需要一行");
     return;
   }
   node.rows.forEach((row, rowIndex) => validateRow(row, node, [...path, "rows", rowIndex], issues));
   if (node.gap !== undefined && !isPositiveNumber(node.gap)) {
-    issue(issues, "warning", "INVALID_GRID_GAP", node, path, "Grid gap must be a positive number (mm)");
+    issue(issues, "warning", "INVALID_GRID_GAP", node, path, "格子间距必须是正数（mm）");
   }
 }
 
@@ -179,10 +179,10 @@ function validateRow(
   issues: SchemaIssueV2[],
 ): void {
   if (!isPositiveNumber(row.height)) {
-    issue(issues, "error", "INVALID_ROW_HEIGHT", row, path, "Grid row height must be positive");
+    issue(issues, "error", "INVALID_ROW_HEIGHT", row, path, "行高必须是正数");
   }
   if (!Array.isArray(row.cells) || row.cells.length === 0) {
-    issue(issues, "error", "INVALID_GRID_CELLS", row, path, "Grid row must contain at least one cell");
+    issue(issues, "error", "INVALID_GRID_CELLS", row, path, "该行至少需要一个格子");
     return;
   }
   let occupiedColumns = 0;
@@ -190,54 +190,54 @@ function validateRow(
     validateCell(cell, [...path, "cells", cellIndex], issues);
     const span = cell.colspan ?? 1;
     if (!Number.isInteger(span) || span < 1) {
-      issue(issues, "error", "INVALID_COLSPAN", cell, [...path, "cells", cellIndex], "colspan must be a positive integer");
+      issue(issues, "error", "INVALID_COLSPAN", cell, [...path, "cells", cellIndex], "合并格数必须是正整数");
     }
     occupiedColumns += Number.isInteger(span) && span > 0 ? span : 0;
   });
   if (grid.rows.some(current => current.cells.length > 0) && occupiedColumns < 1) {
-    issue(issues, "error", "INVALID_GRID_COLUMNS", grid, path, "Grid row has no occupied columns");
+    issue(issues, "error", "INVALID_GRID_COLUMNS", grid, path, "该行没有可用的格子");
   }
 }
 
 function validateCell(cell: GridCellV2, path: Array<string | number>, issues: SchemaIssueV2[]): void {
   if (cell.width !== undefined && !isValidTrack(cell.width)) {
-    issue(issues, "error", "INVALID_CELL_WIDTH", cell, path, "Cell width must be a positive mm value, fr track, or auto");
+    issue(issues, "error", "INVALID_CELL_WIDTH", cell, path, "格子宽度必须是正数（mm）、比例（如 1fr）或 auto");
   }
   if (cell.padding !== undefined && (!Number.isFinite(cell.padding) || cell.padding < 0)) {
-    issue(issues, "error", "INVALID_CELL_PADDING", cell, path, "Cell padding must be non-negative");
+    issue(issues, "error", "INVALID_CELL_PADDING", cell, path, "内边距不能是负数");
   }
 }
 
 function validateTable(node: TableNodeV2, path: Array<string | number>, issues: SchemaIssueV2[]): void {
   if (!Array.isArray(node.columns) || node.columns.length === 0) {
-    issue(issues, "error", "INVALID_TABLE_COLUMNS", node, path, "Table must contain at least one column");
+    issue(issues, "error", "INVALID_TABLE_COLUMNS", node, path, "表格至少需要一列");
     return;
   }
   const keys = new Set<string>();
   node.columns.forEach((column, columnIndex) => {
     const columnPath = [...path, "columns", columnIndex];
     if (!column.key.trim() || keys.has(column.key)) {
-      issue(issues, "error", "DUPLICATE_TABLE_COLUMN", node, columnPath, `Duplicate or empty table column key: ${column.key}`);
+      issue(issues, "error", "DUPLICATE_TABLE_COLUMN", node, columnPath, `列字段重复或为空：${column.key}`);
     }
     keys.add(column.key);
     if (column.width !== undefined && !isValidTrack(column.width)) {
-      issue(issues, "error", "INVALID_TABLE_COLUMN_WIDTH", node, columnPath, `Invalid width for table column ${column.key}`);
+      issue(issues, "error", "INVALID_TABLE_COLUMN_WIDTH", node, columnPath, `列「${column.key}」的宽度不合法`);
     }
   });
   if (!Number.isInteger(node.minRows) || node.minRows < 0) {
-    issue(issues, "error", "INVALID_TABLE_MIN_ROWS", node, path, "Table minRows must be a non-negative integer");
+    issue(issues, "error", "INVALID_TABLE_MIN_ROWS", node, path, "表格最小行数必须是不小于 0 的整数");
   }
   const templateKeys = new Set<string>();
   node.rowTemplate.forEach((template, templateIndex) => {
     const templatePath = [...path, "rowTemplate", templateIndex];
     if (!keys.has(template.columnKey) || templateKeys.has(template.columnKey)) {
-      issue(issues, "error", "INVALID_TABLE_TEMPLATE", template, templatePath, `Invalid table template column: ${template.columnKey}`);
+      issue(issues, "error", "INVALID_TABLE_TEMPLATE", template, templatePath, `行模板引用了不存在的列：${template.columnKey}`);
     }
     templateKeys.add(template.columnKey);
   });
   for (const key of keys) {
     if (!templateKeys.has(key)) {
-      issue(issues, "warning", "MISSING_TABLE_TEMPLATE", node, path, `Table has no row template for column: ${key}`);
+      issue(issues, "warning", "MISSING_TABLE_TEMPLATE", node, path, `列「${key}」缺少行模板`);
     }
   }
 }
@@ -260,7 +260,7 @@ function scanNode(
       "UNKNOWN_NODE_TYPE",
       node as unknown as EditorNodeV2,
       path,
-      `Unknown Schema node type: ${String((node as { type?: unknown }).type)}`,
+      `未知组件类型：${String((node as { type?: unknown }).type)}`,
     );
     return;
   }
@@ -276,12 +276,12 @@ function scanNode(
           "CONTENT_OVERFLOW",
           node,
           path,
-          `Text estimated width ${formatMm(estimatedWidthMm)}mm exceeds cell width ${formatMm(availableMm)}mm`,
+          `文本估算宽度约 ${formatMm(estimatedWidthMm)}mm，超过格子可用宽度 ${formatMm(availableMm)}mm，可能显示不全`,
         );
       }
     }
     if (!node.text.trim()) {
-      issue(issues, "warning", "EMPTY_STATIC_TEXT", node, path, "Text node has empty text");
+      issue(issues, "warning", "EMPTY_STATIC_TEXT", node, path, "文本内容为空");
     }
   } else if (node.type === "p") {
     validatePWidthOverflow(node, cellContext, path, issues);
@@ -289,9 +289,9 @@ function scanNode(
     // 故跳过 EMPTY_FIELD / DUPLICATE_FIELD 命名检查（避免派生型字段误报）。
     if (node.mode === "field" && !insideTableRowTemplate) {
       if (!node.field.trim()) {
-        issue(issues, "warning", "EMPTY_FIELD", node, path, "Field P has an empty field name");
+        issue(issues, "warning", "EMPTY_FIELD", node, path, "字段名为空");
       } else if (fields.has(node.field)) {
-        issue(issues, "warning", "DUPLICATE_FIELD", node, path, `Field is already used by ${fields.get(node.field)}`);
+        issue(issues, "warning", "DUPLICATE_FIELD", node, path, `字段名已被其他字段使用：${node.field}`);
       } else {
         fields.set(node.field, node.id);
       }
@@ -330,9 +330,9 @@ function scanNode(
       );
     });
   } else if (node.type === "image") {
-    if (!node.src && !node.field) issue(issues, "warning", "IMAGE_WITHOUT_SOURCE", node, path, "Image has neither src nor field");
+    if (!node.src && !node.field) issue(issues, "warning", "IMAGE_WITHOUT_SOURCE", node, path, "图片未设置地址或数据字段");
     if ((node.width !== undefined && !isPositiveNumber(node.width)) || (node.height !== undefined && !isPositiveNumber(node.height))) {
-      issue(issues, "error", "INVALID_IMAGE_DIMENSION", node, path, "Image dimensions must be positive");
+      issue(issues, "error", "INVALID_IMAGE_DIMENSION", node, path, "图片宽高必须是正数");
     }
   }
 }
@@ -340,21 +340,21 @@ function scanNode(
 export function validateFormSchemaV2(schema: FormSchemaV2): SchemaIssueV2[] {
   const issues: SchemaIssueV2[] = [];
   if (schema.version !== 2) {
-    issue(issues, "error", "INVALID_VERSION", undefined, undefined, "Expected Schema V2");
+    issue(issues, "error", "INVALID_VERSION", undefined, undefined, "不是有效的表单模板文件（Schema V2）");
   }
   if (!isPositiveNumber(schema.baseRowHeight)) {
-    issue(issues, "error", "INVALID_BASE_ROW_HEIGHT", undefined, ["baseRowHeight"], "baseRowHeight must be positive");
+    issue(issues, "error", "INVALID_BASE_ROW_HEIGHT", undefined, ["baseRowHeight"], "基础行高必须是正数");
   }
   const seenIds = new Set<string>();
   const fields = new Map<string, string>();
   const visit = (node: EditorNodeV2, path: Array<string | number>): void => {
-    if (seenIds.has(node.id)) issue(issues, "error", "DUPLICATE_ID", node, path, `Duplicate node id: ${node.id}`);
+    if (seenIds.has(node.id)) issue(issues, "error", "DUPLICATE_ID", node, path, `存在重复的节点 ID：${node.id}`);
     seenIds.add(node.id);
   };
   schema.pages.forEach((page, pageIndex) => {
     const pagePath = ["pages", pageIndex] as Array<string | number>;
     visit(page, pagePath);
-    if (!page.children.length) issue(issues, "warning", "EMPTY_PAGE", page, pagePath, "Page has no children");
+    if (!page.children.length) issue(issues, "warning", "EMPTY_PAGE", page, pagePath, "页面没有内容");
     validatePageOverflow(schema, page, pagePath, issues);
     page.children.forEach((child, childIndex) =>
       scanNode(child, [...pagePath, "children", childIndex], issues, fields, undefined),

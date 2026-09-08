@@ -421,6 +421,7 @@ onUnmounted(() => {
           type="button"
           data-view-mode="preview"
           :class="{ 'v2-toolbar__button--active': viewMode === 'preview' }"
+          title="查看表单的实际填写效果；预览中可直接输入内容，并可导出为填写数据"
           @click="toggleViewMode('preview')"
         >
           {{ viewMode === "preview" ? "退出预览" : "预览" }}
@@ -459,7 +460,7 @@ onUnmounted(() => {
           @dragstart="startPaletteDrag('text', $event)"
           @click="addNodeToSelectedCell('text')"
         >
-          文本 Text
+          文本
         </button>
         <button
           class="v2-palette-item v2-palette-item--button"
@@ -481,7 +482,7 @@ onUnmounted(() => {
           @dragstart="startPaletteDrag('image', $event)"
           @click="addNodeToSelectedCell('image')"
         >
-          图片 Image
+          图片
         </button>
         <button
           class="v2-palette-item v2-palette-item--button"
@@ -505,7 +506,7 @@ onUnmounted(() => {
           @dragstart="startPaletteDrag('grid', $event)"
           @click="addGrid"
         >
-          格子 Grid
+          格子
         </button>
         <button
           class="v2-palette-item v2-palette-item--button"
@@ -516,7 +517,7 @@ onUnmounted(() => {
           @dragstart="startPaletteDrag('table', $event)"
           @click="addNodeToSelectedCell('table')"
         >
-          表格 Table
+          表格
         </button>
 
         <div class="v2-sidebar__heading v2-sidebar__heading--tree v2-tree-head">
@@ -530,7 +531,7 @@ onUnmounted(() => {
               selectedNode?.type === 'page' ||
               selectedNode?.type === 'grid-cell'
             "
-            :title="editable ? '删除选中节点' : '预览态不可编辑结构'"
+            :title="editable ? '删除选中的组件' : '预览状态下不可编辑结构'"
             @click="removeSelectedNode"
           >
             删除

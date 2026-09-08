@@ -23,7 +23,7 @@ defineProps<{ node: FieldPNodeV2; api: SchemaEdits }>();
     </label>
   </div>
   <label class="v2-control">
-    <span>外部组件（action）</span>
+    <span>输入方式</span>
     <select :value="node.action ?? 'text'" @change="api.updateSelectedAction">
       <option value="text">无（纯文本输入）</option>
       <option value="date">日期选择器</option>
@@ -52,10 +52,11 @@ defineProps<{ node: FieldPNodeV2; api: SchemaEdits }>();
     ></textarea>
   </label>
   <div class="v2-grid-dimensions">
-    <label class="v2-control">
-      <span>输入区宽度（mm / 1px / %）</span>
+    <label class="v2-control v2-control--full">
+      <span>输入区宽度</span>
       <input
         data-field-width="true"
+        placeholder="如 30mm、50%，留空不限"
         :value="node.width ?? ''"
         @input="api.updateSelectedWidth"
       />

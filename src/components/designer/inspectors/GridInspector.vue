@@ -31,7 +31,7 @@ defineProps<{ node: GridNodeV2; api: SchemaEdits }>();
       />
     </label>
   </div>
-  <div class="v2-sidebar__subheading">列宽（mm / fr / auto）</div>
+  <div class="v2-sidebar__subheading">列宽（mm / 比例 / 自动）</div>
   <div class="v2-grid-dimensions">
     <label
       v-for="(cell, columnIndex) in node.rows[0].cells"
@@ -41,6 +41,7 @@ defineProps<{ node: GridNodeV2; api: SchemaEdits }>();
       <span>第 {{ columnIndex + 1 }} 列</span>
       <input
         :value="node.columns?.[columnIndex] ?? cell.width ?? '1fr'"
+        placeholder="如 30、1fr、auto"
         @change="api.updateGridColumnWidth(columnIndex, $event)"
       />
     </label>
@@ -54,10 +55,10 @@ defineProps<{ node: GridNodeV2; api: SchemaEdits }>();
       <option value="none">无边框</option>
     </select>
   </label>
-  <div class="v2-sidebar__subheading">单元格默认（padding / 对齐）</div>
+  <div class="v2-sidebar__subheading">格子默认样式（内边距 / 对齐）</div>
   <div class="v2-grid-dimensions">
     <label class="v2-control v2-control--inline">
-      <span>单元格间距(mm)</span>
+      <span>格子间距(mm)</span>
       <input
         type="number"
         min="0"
@@ -91,7 +92,7 @@ defineProps<{ node: GridNodeV2; api: SchemaEdits }>();
         <option value="right">右</option>
       </select>
     </label>
-    <label class="v2-control v2-control--inline v2-control--full">
+    <label class="v2-control v2-control--inline">
       <span>默认垂直对齐</span>
       <select
         data-cell-default="valign"
@@ -107,5 +108,4 @@ defineProps<{ node: GridNodeV2; api: SchemaEdits }>();
   </div>
 </template>
 
-<style scoped>
-</style>
+<style scoped></style>

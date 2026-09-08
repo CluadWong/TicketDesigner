@@ -104,7 +104,9 @@ describe("InspectorPanel", () => {
     const { wrapper } = mountPanel({ issues: [issue] });
     const items = wrapper.findAll(".v2-issue");
     expect(items).toHaveLength(1);
-    expect(items[0].text()).toContain("INVALID_GRID_ROWS");
+    expect(items[0].text()).toContain("行数非法");
+    // 面向普通用户：问题条目只显示中文 message，不再露出内部 code
+    expect(items[0].text()).not.toContain("INVALID_GRID_ROWS");
     await items[0].trigger("click");
     expect(wrapper.emitted("selectIssue")?.[0]?.[0]).toMatchObject(issue);
   });

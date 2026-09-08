@@ -82,7 +82,7 @@ const active = computed(() => props.band?.enabled === true);
     </label>
     <div class="v2-grid-dimensions">
       <label class="v2-control v2-control--inline">
-        <span>带高(mm)</span>
+        <span>高度(mm)</span>
         <input
           type="number"
           min="1"
@@ -107,8 +107,8 @@ const active = computed(() => props.band?.enabled === true);
       class="v2-hint"
       style="color: #b45309"
     >
-      带高 {{ band.height }}mm 超过纸张边距 {{ margin }}mm：渲染时已按 {{ margin }}mm
-      收敛（页眉/页脚绘制在页边距内，超出会压到正文、打印被裁切）。
+      高度 {{ band.height }}mm 超过纸张边距 {{ margin }}mm：显示时已按边距
+      收敛（页眉/页脚画在边距内，超出会压到正文、打印被裁切）。
     </p>
     <div class="v2-grid-dimensions">
       <label class="v2-control v2-control--inline">

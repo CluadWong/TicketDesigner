@@ -17,7 +17,7 @@ defineProps<{ node: HtmlNodeV2; api: SchemaEdits }>();
     ></textarea>
   </label>
   <label class="v2-control v2-control--full">
-    <span>CSS（仅 Shadow DOM 内生效）</span>
+    <span>样式代码（仅模块内生效）</span>
     <textarea
       class="v2-textarea"
       rows="4"
@@ -26,6 +26,6 @@ defineProps<{ node: HtmlNodeV2; api: SchemaEdits }>();
     ></textarea>
   </label>
   <p class="v2-sidebar__hint" v-pre>
-    支持 {{ 字段 }} 占位符，渲染时由引擎原地填充；样式仅在模块内部生效，不污染整张表单。
+    支持 {{ 字段 }} 占位符，展示时自动替换为填写内容；样式仅在模块内部生效，不影响整张表单。
   </p>
 </template>
