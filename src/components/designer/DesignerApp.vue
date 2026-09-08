@@ -22,8 +22,6 @@ const props = defineProps<{
   initialSchema?: FormSchemaV2;
   /** 可载入的样例集（由外层注入，设计器不依赖 dev 目录，见 B3）。 */
   samples?: SampleEntry[];
-  /** 预览/填写态默认种子数据（由外层注入，替代原先写死的 demoData）。 */
-  previewData?: FormDataV2;
 }>();
 
 /**
@@ -201,7 +199,9 @@ function toggleViewMode(mode: "preview"): void {
     previewFormData.value = null;
     return;
   }
-  enterPreview({ ...(props.previewData ?? {}) });
+  // 预览不再注入预置种子数据（2026-09-08）：进入预览即为空表单，
+  // 填写值由用户就地输入或经「导入数据 / 读取数据」产生。
+  enterPreview({});
 }
 
 /** 撤销 / 重做：文档回退后清空选中（旧节点可能已不存在）。 */

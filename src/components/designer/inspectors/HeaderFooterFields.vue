@@ -21,25 +21,39 @@ const props = defineProps<{
 
 /** 按 kind 选取对应的更新动作（header / footer 两套 handler 由同一工厂生成）。 */
 const onEnabled = computed(() =>
-  props.kind === "header" ? props.api.updatePaperHeaderEnabled : props.api.updatePaperFooterEnabled,
+  props.kind === "header"
+    ? props.api.updatePaperHeaderEnabled
+    : props.api.updatePaperFooterEnabled,
 );
 const onContent = computed(() =>
-  props.kind === "header" ? props.api.updatePaperHeaderContent : props.api.updatePaperFooterContent,
+  props.kind === "header"
+    ? props.api.updatePaperHeaderContent
+    : props.api.updatePaperFooterContent,
 );
 const onHeight = computed(() =>
-  props.kind === "header" ? props.api.updatePaperHeaderHeight : props.api.updatePaperFooterHeight,
+  props.kind === "header"
+    ? props.api.updatePaperHeaderHeight
+    : props.api.updatePaperFooterHeight,
 );
 const onSeparator = computed(() =>
-  props.kind === "header" ? props.api.updatePaperHeaderSeparator : props.api.updatePaperFooterSeparator,
+  props.kind === "header"
+    ? props.api.updatePaperHeaderSeparator
+    : props.api.updatePaperFooterSeparator,
 );
 const onFontSize = computed(() =>
-  props.kind === "header" ? props.api.updatePaperHeaderFontSize : props.api.updatePaperFooterFontSize,
+  props.kind === "header"
+    ? props.api.updatePaperHeaderFontSize
+    : props.api.updatePaperFooterFontSize,
 );
 const onFontWeight = computed(() =>
-  props.kind === "header" ? props.api.updatePaperHeaderFontWeight : props.api.updatePaperFooterFontWeight,
+  props.kind === "header"
+    ? props.api.updatePaperHeaderFontWeight
+    : props.api.updatePaperFooterFontWeight,
 );
 const onColor = computed(() =>
-  props.kind === "header" ? props.api.updatePaperHeaderColor : props.api.updatePaperFooterColor,
+  props.kind === "header"
+    ? props.api.updatePaperHeaderColor
+    : props.api.updatePaperFooterColor,
 );
 
 /** 未启用时不展开细节（避免配置了一堆却看不到效果）。 */
@@ -49,7 +63,11 @@ const active = computed(() => props.band?.enabled === true);
 <template>
   <div class="v2-sidebar__subheading">{{ label }}</div>
   <label class="v2-control v2-control--toggle">
-    <input type="checkbox" :checked="band?.enabled === true" @change="onEnabled" />
+    <input
+      type="checkbox"
+      :checked="band?.enabled === true"
+      @change="onEnabled"
+    />
     <span>启用{{ label }}</span>
   </label>
   <template v-if="active">
@@ -58,7 +76,7 @@ const active = computed(() => props.band?.enabled === true);
       <input
         type="text"
         :value="band?.content?.left ?? ''"
-        placeholder="支持 {page} {total}"
+        placeholder="变量： {page} {total}"
         @change="onContent('left', $event)"
       />
     </label>
@@ -67,7 +85,7 @@ const active = computed(() => props.band?.enabled === true);
       <input
         type="text"
         :value="band?.content?.center ?? ''"
-        placeholder="支持 {page} {total}"
+        placeholder="变量： {page} {total}"
         @change="onContent('center', $event)"
       />
     </label>
@@ -76,7 +94,7 @@ const active = computed(() => props.band?.enabled === true);
       <input
         type="text"
         :value="band?.content?.right ?? ''"
-        placeholder="支持 {page} {total}"
+        placeholder="变量： {page} {total}"
         @change="onContent('right', $event)"
       />
     </label>
@@ -113,7 +131,10 @@ const active = computed(() => props.band?.enabled === true);
     <div class="v2-grid-dimensions">
       <label class="v2-control v2-control--inline">
         <span>粗细</span>
-        <select :value="band?.style?.fontWeight ?? 'normal'" @change="onFontWeight">
+        <select
+          :value="band?.style?.fontWeight ?? 'normal'"
+          @change="onFontWeight"
+        >
           <option value="normal">常规</option>
           <option value="bold">加粗</option>
         </select>
@@ -128,7 +149,11 @@ const active = computed(() => props.band?.enabled === true);
       </label>
     </div>
     <label class="v2-control v2-control--toggle">
-      <input type="checkbox" :checked="band?.separator !== false" @change="onSeparator" />
+      <input
+        type="checkbox"
+        :checked="band?.separator !== false"
+        @change="onSeparator"
+      />
       <span>分隔线</span>
     </label>
   </template>

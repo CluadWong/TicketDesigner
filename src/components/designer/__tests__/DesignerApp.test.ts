@@ -4,7 +4,6 @@ import { mount, type VueWrapper } from "@vue/test-utils";
 import DesignerApp from "@/components/designer/DesignerApp.vue";
 import type { FormSchemaV2 } from "@/types";
 import { makeYunlvSecondTicketFirstFiveRowsSchema } from "@/dev/yunlv-second-ticket-first-five-rows";
-import demoData from "@/dev/demoData";
 
 function schemaOf(wrapper: VueWrapper): FormSchemaV2 {
   return (wrapper.vm as unknown as { schema: FormSchemaV2 }).schema;
@@ -39,8 +38,7 @@ function mountDesigner() {
   return mount(DesignerApp, {
     props: {
       initialSchema: makeYunlvSecondTicketFirstFiveRowsSchema(),
-      // 预览态种子数据原由 DesignerApp 写死 demoData，B3 解耦后改为 props 注入
-      previewData: demoData,
+      // 预览不再注入预置种子数据（2026-09-08）：进入预览即为空表单。
     },
   });
 }
@@ -534,11 +532,12 @@ describe("DesignerApp 预览态只读（不可添加组件 / 不可输入）", (
     //    用户输入经 DOM 遍历采集，不逐键回写响应式 data，见十续）。
     const unitField = wrapper.find('[data-node-id="unit-field"]');
     expect(unitField.attributes("contenteditable")).toBe("true");
-    expect(unitField.text()).not.toBe("");
+    // 预览不再注入预置种子数据（2026-09-08）：进入预览即为空表单，字段可就地输入。
+    expect(unitField.text()).toBe("");
     const memberInput = wrapper.find('[data-node-id="member-count-field"] .layout-p__input');
     expect(memberInput.exists()).toBe(true);
     expect(memberInput.attributes("contenteditable")).toBe("true");
-    // 3. 预览仍带数据渲染（展示而非清空）
+    // 3. 模板固定文本（复合字段前/后缀「共…人」，来自 schema 而非数据）仍随模板渲染
     expect(wrapper.text()).toContain("共");
     expect(wrapper.text()).toContain("人");
   });

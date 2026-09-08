@@ -2,12 +2,12 @@
 /**
  * 应用根组件（dev 入口）
  *
- * 设计器核心不依赖 `dev` 样例目录（B3）：样例与预览数据由本 dev 入口通过 props 注入，
+ * 设计器核心不依赖 `dev` 样例目录（B3）：样例由本 dev 入口通过 props 注入，
  * 生产/消费端可传入自己的样例集，无需改动 `DesignerApp`。
+ * 预览态不注入预置数据（2026-09-08）：点击「预览」进入空表单，数据经填写/导入产生。
  */
 
 import DesignerApp from '@/components/designer/DesignerApp.vue'
-import demoData from '@/dev/demoData'
 import type { SampleEntry } from '@/samples/types'
 
 // 正式版隐藏「载入完整工作票」样例入口（内部演示/调试用，不参与发布）。
@@ -15,5 +15,5 @@ const samples: SampleEntry[] = []
 </script>
 
 <template>
-  <DesignerApp :samples="samples" :preview-data="demoData" />
+  <DesignerApp :samples="samples" />
 </template>
