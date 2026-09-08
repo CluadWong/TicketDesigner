@@ -7,13 +7,18 @@
  * 预览态不注入预置数据（2026-09-08）：点击「预览」进入空表单，数据经填写/导入产生。
  */
 
-import DesignerApp from '@/components/designer/DesignerApp.vue'
-import type { SampleEntry } from '@/samples/types'
+import DesignerApp from "@/components/designer/DesignerApp.vue";
+import type { SampleEntry } from "@/samples/types";
+import type { DesignerUIConfig } from "@/components/designer/config";
 
 // 正式版隐藏「载入完整工作票」样例入口（内部演示/调试用，不参与发布）。
-const samples: SampleEntry[] = []
+const samples: SampleEntry[] = [];
+const config: DesignerUIConfig = {
+  showFillDataModule: true,
+  locale: "zh-CN",
+};
 </script>
 
 <template>
-  <DesignerApp :samples="samples" />
+  <DesignerApp :samples="samples" :ui-config="config" />
 </template>

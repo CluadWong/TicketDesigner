@@ -37,9 +37,13 @@ export function setLocale(locale: Locale): void {
   }
 }
 
-/** 取当前语言文案；缺失 key 回退默认语言，仍缺失回退 key 本身。 */
-export function t(key: string, params?: Record<string, string | number>): string {
-  const dict = dictionaries[currentLocale.value] ?? dictionaries[DEFAULT_LOCALE];
+/** 按指定语言取文案；缺失 key 回退默认语言，仍缺失回退 key 本身。纯函数，便于配置驱动与测试。 */
+export function translate(
+  locale: Locale,
+  key: string,
+  params?: Record<string, string | number>,
+): string {
+  const dict = dictionaries[locale] ?? dictionaries[DEFAULT_LOCALE];
   let msg = dict[key];
   if (msg == null) msg = dictionaries[DEFAULT_LOCALE][key] ?? key;
   if (params) {
@@ -48,4 +52,16 @@ export function t(key: string, params?: Record<string, string | number>): string
     }
   }
   return msg;
+}
+
+/**
+ * 取当前语言文案（默认读全局 `currentLocale`，可被 `setLocale` 改变，供未迁移组件/运行时切换）。
+ * 传入 `locale` 则按指定语言取——设计页已迁移组件应显式传 `cfg.locale`（配置驱动，确定性、可测）。
+ */
+export function t(
+  key: string,
+  params?: Record<string, string | number>,
+  locale?: Locale,
+): string {
+  return translate(locale ?? currentLocale.value, key, params);
 }

@@ -55,4 +55,18 @@ describe("DesignerToolbar 全局 UI 配置（2026-09-08）", () => {
     expect(wrapper.text()).not.toContain("打印");
     expect(wrapper.text()).not.toContain("帮助");
   });
+
+  it("locale=en：工具栏文案切为英文（i18n 生效）", () => {
+    const wrapper = mountToolbar({ locale: "en" });
+    const text = wrapper.text();
+    expect(text).toContain("New Blank");
+    expect(text).toContain("Template");
+    expect(text).toContain("Undo");
+    expect(text).toContain("Preview");
+    expect(text).toContain("Print");
+    expect(text).toContain("Help");
+    // 中文不应再出现（证明走 t() 而非硬编码）。
+    expect(text).not.toContain("新建空白");
+    expect(text).not.toContain("模板");
+  });
 });

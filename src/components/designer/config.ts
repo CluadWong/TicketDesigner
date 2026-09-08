@@ -20,21 +20,21 @@ import type { Locale } from "@/i18n";
 /** 设计页 UI 可见性开关 + 语言（每个开关独立，缺省见 `defaultDesignerUIConfig`）。 */
 export interface DesignerUIConfig {
   /** 新建空白按钮。 */
-  showNewBlank: boolean;
+  showNewBlank?: boolean;
   /** 样例载入按钮（B3 注入的样例集）。 */
-  showSamples: boolean;
+  showSamples?: boolean;
   /** 撤销 / 重做按钮组。 */
-  showUndoRedo: boolean;
+  showUndoRedo?: boolean;
   /** 模板模块组（保存 / 读取 / 导出文件 / 导入文件）。 */
-  showTemplateModule: boolean;
+  showTemplateModule?: boolean;
   /** 填充数据模块组（导入数据 / 导出数据 / 读取数据 / 保存数据）。默认隐藏。 */
-  showFillDataModule: boolean;
+  showFillDataModule?: boolean;
   /** 预览 / 打印按钮。 */
-  showPreviewPrint: boolean;
+  showPreviewPrint?: boolean;
   /** 帮助按钮。 */
-  showHelp: boolean;
+  showHelp?: boolean;
   /** 界面语言（默认简体中文）。 */
-  locale: Locale;
+  locale?: Locale;
 }
 
 /** 全局默认：显示除「填充数据」之外的所有模块，语言简体中文。 */
@@ -50,6 +50,8 @@ export const defaultDesignerUIConfig: DesignerUIConfig = {
 };
 
 /** 浅合并宿主覆盖到默认配置，返回完整 `DesignerUIConfig`。 */
-export function resolveDesignerUIConfig(partial?: Partial<DesignerUIConfig>): DesignerUIConfig {
+export function resolveDesignerUIConfig(
+  partial?: Partial<DesignerUIConfig>,
+): DesignerUIConfig {
   return { ...defaultDesignerUIConfig, ...(partial ?? {}) };
 }
