@@ -145,3 +145,58 @@ describe("FormRenderer（G8 公共入口）", () => {
     }
   });
 });
+
+describe("FormRenderer validate()（P9.2c 必填校验，rules 经 options 注入）", () => {
+  const exposedOf = (wrapper: ReturnType<typeof mount>) =>
+    wrapper.vm as unknown as { validate: () => string[] };
+
+  it("rules 声明必填：空值/缺失返回字段名；补齐数据后返回空数组", async () => {
+    const wrapper = mount(FormRenderer, {
+      props: {
+        schema: sampleSchema,
+        data: { 单位: "" },
+        options: {
+          readonly: false,
+          rules: { 单位: { required: true }, 编号: { required: true } },
+        },
+      },
+    });
+    expect(exposedOf(wrapper).validate()).toEqual(["单位", "编号"]);
+
+    await wrapper.setProps({ data: { 单位: "x", 编号: "y" } });
+    expect(exposedOf(wrapper).validate()).toEqual([]);
+  });
+
+  it("未声明 required 的字段不参与校验；rules 缺省 → 恒通过（向后兼容）", () => {
+    const partial = mount(FormRenderer, {
+      props: {
+        schema: sampleSchema,
+        data: {},
+        options: { readonly: false, rules: { 备注: {} } },
+      },
+    });
+    expect(exposedOf(partial).validate()).toEqual([]);
+
+    const none = mount(FormRenderer, {
+      props: { schema: sampleSchema, data: {}, options: { readonly: false } },
+    });
+    expect(exposedOf(none).validate()).toEqual([]);
+  });
+
+  it("rules 与 fieldPermissions 叠加：HIDDEN 脱敏不影响校验（真实值在数据侧）", () => {
+    const wrapper = mount(FormRenderer, {
+      props: {
+        schema: sampleSchema,
+        data: { 单位: "121" },
+        options: {
+          readonly: false,
+          rules: { 单位: { required: true } },
+          fieldPermissions: { 单位: "HIDDEN" },
+        },
+      },
+    });
+    // DOM 中显示 ***（脱敏），但响应式数据仍是真实值 → 校验通过
+    expect(wrapper.find('[data-field="单位"]').text()).toBe("***");
+    expect(exposedOf(wrapper).validate()).toEqual([]);
+  });
+});

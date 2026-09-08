@@ -700,3 +700,21 @@ describe("结构树 折叠全部 / 展开全部", () => {
     expect(wrapper.findAll(".v2-tree-children").length).toBeGreaterThan(0);
   });
 });
+
+describe("DesignerApp 帮助面板接线", () => {
+  it("工具栏「帮助」按钮打开面板，面板内 ✕ 关闭", async () => {
+    const wrapper = mountDesigner();
+    expect(wrapper.find(".v2-help").exists()).toBe(false);
+
+    const helpButton = wrapper
+      .findAll(".v2-toolbar__button")
+      .find((b) => b.text() === "帮助");
+    expect(helpButton).toBeDefined();
+    await helpButton!.trigger("click");
+    expect(wrapper.find(".v2-help__panel").exists()).toBe(true);
+    expect(wrapper.text()).toContain("术语速查");
+
+    await wrapper.find(".v2-help__close").trigger("click");
+    expect(wrapper.find(".v2-help").exists()).toBe(false);
+  });
+});

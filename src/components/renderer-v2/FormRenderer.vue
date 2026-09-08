@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import type { FormDataV2, FormSchemaV2 } from "@/types";
+import type {
+  FieldActionTriggerV2,
+  FieldPermissionV2,
+  FieldRuleV2,
+  FormDataV2,
+  FormSchemaV2,
+} from "@/types";
+import { findEmptyRequiredFields } from "@/engine-v2/derivation";
 import GridFormRenderer from "./GridFormRenderer.vue";
 import PaperViewport from "./PaperViewport.vue";
 import { printForm } from "./print-form";
@@ -36,6 +43,20 @@ export interface FormRendererOptions {
    * 设计态的「不回写 schema 的就地输入」是另一回事（内核 `mode="design"`，由设计器控制），与此无关。
    */
   readonly?: boolean;
+  /**
+   * 字段级运行时权限（P9.2a / P9.2b）：与 `data` 同轨经 props 注入、不进 schema。
+   * `{ 字段名: "READ" | "EDIT" | "HIDDEN" }`——EDIT=可输入（缺省）、READ=只读回显、
+   * HIDDEN=脱敏显示（输入内容以 `***` 替代，占位与前后标签保留；真实值不进 DOM，
+   * `collectFieldValues` 跳过该字段，`getFormData` 仍返回真实值）。
+   * 未注明的字段一律 EDIT，向后兼容。
+   */
+  fieldPermissions?: Record<string, FieldPermissionV2>;
+  /**
+   * 字段级校验规则（P9.2c）：与 `data` / `fieldPermissions` 同轨经 props 注入、不进
+   * schema。`{ 字段名: { required: true } }`——经 `validate()` 对当前数据做必填校验，
+   * 返回值为空的字段名数组（空数组 = 全部通过）。后续可扩展更多规则。
+   */
+  rules?: Record<string, FieldRuleV2>;
 }
 
 /**
@@ -64,6 +85,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   (e: "field-change", field: string, value: string): void;
   (e: "update:data", data: FormDataV2): void;
+  (e: "action", payload: FieldActionTriggerV2): void;
 }>();
 
 // 内部持有 data，使填写态输入可回写并被消费页 v-model:data 接管。
@@ -92,6 +114,15 @@ function onFieldChange(field: string, value: string): void {
 }
 
 /**
+ * P9.1c 专用控件触发（弹窗事件示范）：内核在填写态对 action 字段发出触发事件，
+ * 此处原样 re-emit 为 `action`——**弹窗/选择器由宿主实现**，宿主在回调里回写
+ * data（v-model:data / props.data）后票面自动重渲染。
+ */
+function onAction(payload: FieldActionTriggerV2): void {
+  emit("action", payload);
+}
+
+/**
  * D2：向消费页暴露打印能力，使「触发」与「呈现」同归渲染层。
  * 消费页 `ref.value.print()` 即可打印，无需自己 `window.print()`、也无需关心
  * `@page` 纸张注入（由本组件持有内核渲染实例在挂载期完成）。
@@ -110,7 +141,17 @@ function getFormData(): FormDataV2 {
   return { ...data.value };
 }
 
-defineExpose({ print, getFormData });
+/**
+ * P9.2c 提交校验：对当前数据执行 `options.rules` 里的必填规则（引擎
+ * `findEmptyRequiredFields` 为真相源），返回**值为空**的必填字段名数组。
+ * 空数组 = 全部通过。规则与 data 同轨经 props 注入、不进 schema；
+ * HIDDEN 脱敏字段的真实值在响应式数据侧，此处校验不受脱敏影响。
+ */
+function validate(): string[] {
+  return findEmptyRequiredFields(props.options?.rules, data.value);
+}
+
+defineExpose({ print, getFormData, validate });
 </script>
 
 <template>
@@ -120,8 +161,10 @@ defineExpose({ print, getFormData });
       :mode="renderMode"
       :data="data"
       :readonly="readonly"
+      :field-permissions="options?.fieldPermissions"
       :bare="true"
       @field-change="onFieldChange"
+      @action-trigger="onAction"
     />
   </PaperViewport>
   <GridFormRenderer
@@ -130,7 +173,9 @@ defineExpose({ print, getFormData });
     :mode="renderMode"
     :data="data"
     :readonly="readonly"
+    :field-permissions="options?.fieldPermissions"
     :bare="options?.bare"
     @field-change="onFieldChange"
+    @action-trigger="onAction"
   />
 </template>

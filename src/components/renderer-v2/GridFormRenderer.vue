@@ -4,9 +4,11 @@ import type { CSSProperties } from "vue";
 import {
   resolvePaperSizeV2,
   DEFAULT_BAND_HEIGHT_MM,
+  type FieldActionTriggerV2,
   type FormSchemaV2,
   type FormDataV2,
   type FormNodeV2,
+  type FieldPermissionV2,
   type EdgeInsetsV2,
   type HeaderFooterV2,
 } from "@/types";
@@ -20,6 +22,7 @@ defineOptions({ name: "GridFormRenderer" });
 
 const emit = defineEmits<{
   (e: "field-change", field: string, value: string): void;
+  (e: "action-trigger", payload: FieldActionTriggerV2): void;
 }>();
 
 const props = withDefaults(
@@ -52,6 +55,13 @@ const props = withDefaults(
      * 设计态传 false，整页连续渲染便于编辑（不切分）。
      */
     paginate?: boolean;
+    /**
+     * 字段级运行时权限（P9.2a/P9.2b，与 `data` 同轨经 props 注入，不进 schema）：
+     * `{ 字段名: "READ" | "EDIT" | "HIDDEN" }`。EDIT=可输入（缺省）；READ=只读回显；
+     * HIDDEN=隐藏且保留固定空间（visibility:hidden，占位/分页高度不变，值仍可采集）。
+     * 未注明的字段一律 EDIT，向后兼容。
+     */
+    fieldPermissions?: Record<string, FieldPermissionV2>;
   }>(),
   { paginate: true },
 );
@@ -296,8 +306,10 @@ function pageSiblingSuppressBorders(children: FormNodeV2[], index: number): { to
         :mode="props.mode"
         :data="data"
         :readonly="props.readonly"
+        :field-permissions="props.fieldPermissions"
         :suppress-borders="suppressFor(pp, index, child.suppressBorders)"
         @field-change="(field, value) => emit('field-change', field, value)"
+        @action-trigger="(payload) => emit('action-trigger', payload)"
       />
       <div
         v-if="bandEnabled(schema.paper.footer)"

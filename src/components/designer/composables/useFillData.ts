@@ -60,7 +60,8 @@ export function useFillData(options: {
     const root = options.canvasEl.value;
     if (!root || !options.isPreview()) return;
     try {
-      const values = collectFieldValues(root);
+      // 「导出数据」外发场景：脱敏字段（HIDDEN）保持 *** 导出（P9.2b 脱敏导出口径）
+      const values = collectFieldValues(root, { maskHidden: true });
       const blob = new Blob([JSON.stringify(values, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
@@ -78,7 +79,11 @@ export function useFillData(options: {
     const root = options.canvasEl.value;
     if (!root || !options.isPreview()) return;
     try {
-      localStorage.setItem(DATA_STORAGE_KEY, JSON.stringify(collectFieldValues(root)));
+      localStorage.setItem(
+        DATA_STORAGE_KEY,
+        // 本机「保存数据」：脱敏字段（HIDDEN）从 previewFormData 回源真实值，保存→读取不丢数据
+        JSON.stringify(collectFieldValues(root, { baseData: previewFormData.value })),
+      );
     } catch (error) {
       alert(`保存数据失败：${error instanceof Error ? error.message : String(error)}`);
     }

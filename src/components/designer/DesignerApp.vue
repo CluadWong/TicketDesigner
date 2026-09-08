@@ -10,8 +10,14 @@ import { validateFormSchemaV2 } from "@/types";
 import type { FormDataV2, FormSchemaV2 } from "@/types";
 import { paginateSchema } from "@/engine-v2/pagination";
 import StatusBar from "./StatusBar.vue";
-import NodeTreeItem from "./NodeTreeItem.vue";
+import DesignerToolbar from "./DesignerToolbar.vue";
+import PaletteSidebar from "./PaletteSidebar.vue";
 import InspectorPanel from "./InspectorPanel.vue";
+import HelpPanel from "./HelpPanel.vue";
+// 批次 4（2026-09-08）：共用控件样式上移到宿主引入——批次 3 后 DesignerToolbar /
+// PaletteSidebar / InspectorPanel 都依赖这些非 scoped 类，挂在 InspectorPanel 上
+// 会造成「宿主壳层样式依赖右侧面板引入」的错误归属与时序耦合。
+import "./styles/designer-ui.css";
 import { buildBlankSchema, useSchemaDocument } from "./composables/useSchemaDocument";
 import { useNodeSelection } from "./composables/useNodeSelection";
 import { useSchemaEdits, type NodeKind } from "./composables/useSchemaEdits";
@@ -51,6 +57,8 @@ const editable = computed(() => !previewMode.value);
  * 此开关只影响设计态画布。
  */
 const paginate = ref(true);
+/** 应用内帮助面板开关（工具栏「帮助」按钮触发，HelpPanel 自管 Esc/遮罩关闭）。 */
+const helpOpen = ref(false);
 const canvasEl = ref<HTMLElement | null>(null);
 
 // ── 文档：schema / 历史 / 持久化 ────────────────────────────
@@ -89,6 +97,15 @@ const {
   selectIssue,
 } = selection;
 onDocumentReset = clearSelection;
+
+/** 结构树「删除」按钮完整禁用态（批次 3 拆件后由宿主计算传给 PaletteSidebar）。 */
+const canRemoveSelected = computed(
+  () =>
+    editable.value &&
+    selectedNodeId.value !== null &&
+    selectedNode.value?.type !== "page" &&
+    selectedNode.value?.type !== "grid-cell",
+);
 
 // ── 结构树全局折叠 / 展开（provide 下发信号，NodeTreeItem 经 inject 接收）──
 const treeControl: TreeControl = { token: ref(0), target: ref(true) };
@@ -325,245 +342,43 @@ onUnmounted(() => {
 
 <template>
   <div class="v2-designer">
-    <header class="v2-toolbar">
-      <span
-        class="v2-toolbar__dirty"
-        :class="{ 'v2-toolbar__dirty--on': dirty }"
-        >{{ dirty ? "● 未保存" : "已保存" }}</span
-      >
-      <div class="v2-toolbar__group">
-        <button class="v2-toolbar__button" type="button" @click="resetBlank">
-          新建空白
-        </button>
-        <button
-          v-for="sample in samples"
-          :key="sample.id"
-          class="v2-toolbar__button"
-          type="button"
-          @click="loadSample(sample)"
-        >
-          载入{{ sample.label }}
-        </button>
-      </div>
-      <div class="v2-toolbar__group">
-        <button
-          class="v2-toolbar__button"
-          type="button"
-          :disabled="!canUndo"
-          @click="undo"
-        >
-          撤销
-        </button>
-        <button
-          class="v2-toolbar__button"
-          type="button"
-          :disabled="!canRedo"
-          @click="redo"
-        >
-          重做
-        </button>
-      </div>
-      <div class="v2-toolbar__group">
-        <span class="v2-toolbar__label">模板</span>
-        <button class="v2-toolbar__button" type="button" @click="saveToLocal">
-          保存
-        </button>
-        <button class="v2-toolbar__button" type="button" @click="loadFromLocal">
-          读取
-        </button>
-        <button class="v2-toolbar__button" type="button" @click="exportFile">
-          导出文件
-        </button>
-        <button class="v2-toolbar__button" type="button" @click="triggerImport">
-          导入文件
-        </button>
-      </div>
-      <div class="v2-toolbar__group">
-        <span class="v2-toolbar__label">填充数据</span>
-        <button
-          class="v2-toolbar__button"
-          type="button"
-          title="选择填写数据 JSON 文件并进入预览态"
-          @click="triggerImportFillData"
-        >
-          导入数据
-        </button>
-        <button
-          class="v2-toolbar__button"
-          type="button"
-          title="需先进入预览态填写，再导出当前填写值"
-          :disabled="!previewMode"
-          @click="exportFillDataFile"
-        >
-          导出数据
-        </button>
-        <button
-          class="v2-toolbar__button"
-          type="button"
-          title="读取本地已保存的填写数据并进入预览态"
-          @click="loadFillDataFromLocal"
-        >
-          读取数据
-        </button>
-        <button
-          class="v2-toolbar__button"
-          type="button"
-          title="需先进入预览态填写，再保存到本地"
-          :disabled="!previewMode"
-          @click="saveFillDataToLocal"
-        >
-          保存数据
-        </button>
-      </div>
-      <div class="v2-toolbar__group">
-        <button
-          class="v2-toolbar__button"
-          type="button"
-          data-view-mode="preview"
-          :class="{ 'v2-toolbar__button--active': viewMode === 'preview' }"
-          title="查看表单的实际填写效果；预览中可直接输入内容，并可导出为填写数据"
-          @click="toggleViewMode('preview')"
-        >
-          {{ viewMode === "preview" ? "退出预览" : "预览" }}
-        </button>
-        <button class="v2-toolbar__button" type="button" @click="printDocument">
-          打印
-        </button>
-      </div>
-      <input
-        ref="fileInput"
-        type="file"
-        accept=".json,application/json"
-        class="v2-toolbar__file"
-        @change="importFile"
-      />
-      <input
-        ref="fillDataFileInput"
-        type="file"
-        accept=".json,application/json"
-        class="v2-toolbar__file"
-        @change="importFillDataFile"
-      />
-    </header>
+    <DesignerToolbar
+      :samples="samples"
+      :dirty="dirty"
+      :can-undo="canUndo"
+      :can-redo="canRedo"
+      :preview-mode="previewMode"
+      @reset-blank="resetBlank"
+      @load-sample="loadSample"
+      @undo="undo"
+      @redo="redo"
+      @save-template="saveToLocal"
+      @load-template="loadFromLocal"
+      @export-template="exportFile"
+      @import-template="triggerImport"
+      @import-fill-data="triggerImportFillData"
+      @export-fill-data="exportFillDataFile"
+      @load-fill-data="loadFillDataFromLocal"
+      @save-fill-data="saveFillDataToLocal"
+      @toggle-preview="toggleViewMode('preview')"
+      @print="printDocument"
+      @help="helpOpen = true"
+    />
 
     <div class="v2-designer__body">
-      <aside class="v2-sidebar v2-sidebar--left">
-        <div class="v2-sidebar__heading">模板</div>
-
-        <div class="v2-sidebar__group-title">基础组件</div>
-        <button
-          class="v2-palette-item v2-palette-item--button"
-          type="button"
-          draggable="true"
-          data-palette="text"
-          :disabled="!editable"
-          @dragstart="startPaletteDrag('text', $event)"
-          @click="addNodeToSelectedCell('text')"
-        >
-          文本
-        </button>
-        <button
-          class="v2-palette-item v2-palette-item--button"
-          type="button"
-          draggable="true"
-          data-palette="field"
-          :disabled="!editable"
-          @dragstart="startPaletteDrag('field', $event)"
-          @click="addNodeToSelectedCell('field')"
-        >
-          输入框
-        </button>
-        <button
-          class="v2-palette-item v2-palette-item--button"
-          type="button"
-          draggable="true"
-          data-palette="image"
-          :disabled="!editable"
-          @dragstart="startPaletteDrag('image', $event)"
-          @click="addNodeToSelectedCell('image')"
-        >
-          图片
-        </button>
-        <button
-          class="v2-palette-item v2-palette-item--button"
-          type="button"
-          draggable="true"
-          data-palette="html"
-          :disabled="!editable"
-          @dragstart="startPaletteDrag('html', $event)"
-          @click="addNodeToSelectedCell('html')"
-        >
-          HTML 模块
-        </button>
-
-        <div class="v2-sidebar__group-title">布局组件</div>
-        <button
-          class="v2-palette-item v2-palette-item--button"
-          type="button"
-          draggable="true"
-          data-palette="grid"
-          :disabled="!editable"
-          @dragstart="startPaletteDrag('grid', $event)"
-          @click="addGrid"
-        >
-          网格
-        </button>
-        <button
-          class="v2-palette-item v2-palette-item--button"
-          type="button"
-          draggable="true"
-          data-palette="table"
-          :disabled="!editable"
-          @dragstart="startPaletteDrag('table', $event)"
-          @click="addNodeToSelectedCell('table')"
-        >
-          表格
-        </button>
-
-        <div class="v2-sidebar__heading v2-sidebar__heading--tree v2-tree-head">
-          <span>结构</span>
-          <button
-            class="v2-tree__delete"
-            type="button"
-            :disabled="
-              !editable ||
-              !selectedNodeId ||
-              selectedNode?.type === 'page' ||
-              selectedNode?.type === 'grid-cell'
-            "
-            :title="editable ? '删除选中的组件' : '预览状态下不可编辑结构'"
-            @click="removeSelectedNode"
-          >
-            删除
-          </button>
-        </div>
-        <div class="v2-tree">
-          <NodeTreeItem
-            v-for="root in nodeTree"
-            :key="root.id"
-            :node="root"
-            :selected-id="selectedNodeId"
-            :depth="0"
-            @select="selectNodeById"
-          />
-        </div>
-        <div class="v2-tree__buttons">
-          <button
-            type="button"
-            class="v2-tree__btn"
-            @click="collapseAll"
-          >
-            折叠全部
-          </button>
-          <button
-            type="button"
-            class="v2-tree__btn"
-            @click="expandAll"
-          >
-            展开全部
-          </button>
-        </div>
-      </aside>
+      <PaletteSidebar
+        :editable="editable"
+        :can-remove="canRemoveSelected"
+        :node-tree="nodeTree"
+        :selected-node-id="selectedNodeId"
+        @add-node="addNodeToSelectedCell"
+        @add-grid="addGrid"
+        @palette-drag="startPaletteDrag"
+        @select="selectNodeById"
+        @remove-selected="removeSelectedNode"
+        @collapse-all="collapseAll"
+        @expand-all="expandAll"
+      />
 
       <main
         ref="canvasEl"
@@ -611,6 +426,24 @@ onUnmounted(() => {
       :physical-page-count="pagination.pages.length"
       :paginate-warning-count="pagination.warnings.length"
     />
+
+    <!-- 隐藏 file input 留在宿主（批次 3 拆件）：useSchemaDocument / useFillData 直接持有其 ref。 -->
+    <input
+      ref="fileInput"
+      type="file"
+      accept=".json,application/json"
+      class="v2-toolbar__file"
+      @change="importFile"
+    />
+    <input
+      ref="fillDataFileInput"
+      type="file"
+      accept=".json,application/json"
+      class="v2-toolbar__file"
+      @change="importFillDataFile"
+    />
+
+    <HelpPanel :open="helpOpen" @close="helpOpen = false" />
   </div>
 </template>
 
@@ -623,75 +456,11 @@ onUnmounted(() => {
   background: #f3f4f6;
 }
 
-.v2-toolbar__meta {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: #a9b5c7;
-  font-size: 12px;
-}
-
-.v2-toolbar__control {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  color: #a9b5c7;
-  font-size: 11px;
-}
-
-.v2-toolbar__control span {
-  white-space: nowrap;
-}
-
-.v2-toolbar__control select,
-.v2-toolbar__control input {
-  height: 24px;
-  padding: 0 4px;
-  border: 1px solid #4c6484;
-  border-radius: 3px;
-  color: #f8fafc;
-  background: #263957;
-  font-size: 11px;
-}
-
-.v2-toolbar__control input {
-  width: 44px;
-  text-align: center;
-}
-
-/* 分页开关：复选框不套用普通输入框的 44px 定宽与居中排版。 */
-.v2-toolbar__control--toggle {
-  cursor: pointer;
-  user-select: none;
-}
-
-.v2-toolbar__control--toggle input {
-  width: auto;
-  height: auto;
-  padding: 0;
-  cursor: pointer;
-}
-
-.v2-toolbar__dirty {
-  padding: 1px 8px;
-  border-radius: 10px;
-  color: #94a3b8;
-  background: rgb(255 255 255 / 8%);
-  font-size: 11px;
-}
-
-.v2-toolbar__dirty--on {
-  color: #fde68a;
-  background: rgb(253 230 138 / 18%);
-}
-
-.v2-toolbar__label {
-  align-self: center;
-  margin-right: 2px;
-  font-size: 12px;
-  color: #9fb3c8;
-}
-
+/* 批次 3 壳层拆件（2026-09-08）：工具栏样式随 DesignerToolbar、左栏样式随
+   PaletteSidebar 迁出；`.v2-toolbar` / `.v2-sidebar` 基础样式本就在非 scoped
+   `styles/designer-ui.css`。此处仅保留宿主布局与隐藏 file input 样式；
+   原 `.v2-toolbar__meta` / `.v2-toolbar__control*` / `.v2-grid-size-control*`
+   为无模板引用的死样式，已随之删除（批次 4 CSS 收敛的一部分）。 */
 .v2-toolbar__file {
   display: none;
 }
@@ -700,136 +469,6 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: 360px minmax(0, 1fr) 360px;
   min-height: 0;
-}
-
-.v2-sidebar__heading {
-  margin-bottom: 14px;
-  color: #334155;
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.v2-sidebar__heading--tree {
-  margin-top: 16px;
-  margin-bottom: 8px;
-  padding-top: 12px;
-  border-top: 1px solid #e2e8f0;
-}
-
-/* 结构行：标题居左、删除按钮靠右（节点删除按钮从右侧 Inspector 移入此处） */
-.v2-tree-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.v2-tree__delete {
-  padding: 3px 8px;
-  border: 1px solid #fca5a5;
-  border-radius: 4px;
-  color: #b91c1c;
-  background: #fff7f7;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.v2-tree__delete:hover:not(:disabled) {
-  background: #fee2e2;
-}
-
-.v2-tree__delete:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-/* 结构树底部：折叠全部 / 展开全部 */
-.v2-tree__buttons {
-  display: flex;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.v2-tree__btn {
-  flex: 1 1 0;
-  padding: 5px 0;
-  border: 1px solid #cbd5e1;
-  border-radius: 4px;
-  color: #334155;
-  background: #f8fafc;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.v2-tree__btn:hover {
-  background: #eef2f7;
-}
-
-.v2-tree {
-  max-height: 42vh;
-  overflow: auto;
-  border: 1px solid #e2e8f0;
-  border-radius: 4px;
-  padding: 4px 2px;
-  background: #fcfdff;
-}
-
-.v2-palette-item {
-  display: block;
-  width: 100%;
-  margin-bottom: 8px;
-  padding: 9px 10px;
-  border: 1px solid #d8dee8;
-  border-radius: 4px;
-  color: #334155;
-  background: #f8fafc;
-  font-size: 12px;
-}
-
-.v2-palette-item--button {
-  text-align: left;
-  cursor: pointer;
-}
-
-.v2-palette-item--button:disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
-}
-
-.v2-grid-size-control {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.v2-grid-size-control label {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  color: #64748b;
-  font-size: 11px;
-}
-
-.v2-grid-size-control input {
-  width: 100%;
-  min-height: 28px;
-  padding: 0 6px;
-  border: 1px solid #cbd5e1;
-  border-radius: 4px;
-  box-sizing: border-box;
-  color: #1e293b;
-  background: #fff;
-  font-size: 12px;
-}
-
-.v2-sidebar__group-title {
-  margin: 16px 0 8px;
-  padding-left: 8px;
-  border-left: 3px solid #2563eb;
-  color: #1e293b;
-  font-size: 12px;
-  font-weight: 700;
 }
 
 .v2-canvas {

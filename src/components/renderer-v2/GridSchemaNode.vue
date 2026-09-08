@@ -3,6 +3,8 @@ import { computed, ref, watch, onMounted } from "vue";
 import type { CSSProperties } from "vue";
 import type {
   FormNodeV2,
+  FieldActionTriggerV2,
+  FieldPermissionV2,
   GridCellV2,
   GridNodeV2,
   PNodeV2,
@@ -25,6 +27,7 @@ defineOptions({ name: "GridSchemaNodeV2" });
 
 const emit = defineEmits<{
   (e: "field-change", field: string, value: string): void;
+  (e: "action-trigger", payload: FieldActionTriggerV2): void;
 }>();
 
 const props = defineProps<{
@@ -56,6 +59,12 @@ const props = defineProps<{
     bottom?: boolean;
     left?: boolean;
   };
+  /**
+   * 字段级运行时权限（P9.2a/P9.2b，与 `data` 同轨经 props 注入，不进 schema）：
+   * 按字段名映射 READ（只读回显）/ EDIT（可输入，缺省）/ HIDDEN（隐藏但保留占位）。
+   * 设计态不注入（undefined）→ 恒为 EDIT，设计交互不受影响。
+   */
+  fieldPermissions?: Record<string, FieldPermissionV2>;
 }>();
 
 /** 该节点是否为绘制外框（all/outer）的 Grid。 */
@@ -299,6 +308,58 @@ function isCompositeField(node: PNodeV2): boolean {
 }
 
 /**
+ * 当前字段节点的运行时权限（P9.2a）：缺省 EDIT（向后兼容——未注明的字段可输入）。
+ * 仅对字段 P 生效；权限由消费方经 `fieldPermissions` 注入，设计态不传 → 恒为 EDIT。
+ * HIDDEN / READ 是比 `readonly` 会话闸门更细的一层：READ/HIDDEN 一律不可就地输入。
+ */
+const fieldPermission = computed<FieldPermissionV2>(() => {
+  if (props.node.type !== "p" || props.node.mode !== "field") return "EDIT";
+  return props.fieldPermissions?.[props.node.field] ?? "EDIT";
+});
+
+/**
+ * 专用控件触发（P9.1c，用户拍板：**表单不加任何额外元素**）：字段配置了 `action`
+ * （非 text）时，**点击字段元素本身** emit `action-trigger`，把触发权交还宿主——
+ * **宿主负责召唤外部输入组件（弹窗/选择器）并在回调里回写 data**（票面自动重渲染）；
+ * 内核不做任何弹窗实现（分层：内核不认识宿主 UI）。设计态 / 只读态 / action=text
+ * （或未配置）不触发。点击与就地输入并存：内核不改 contenteditable 语义。
+ */
+function onFieldActivate(node: PNodeV2, event: MouseEvent): void {
+  if (!canFill.value) return;
+  if (node.mode !== "field" || !node.action || node.action === "text") return;
+  emit("action-trigger", {
+    nodeId: node.id,
+    field: node.field,
+    action: node.action,
+    actionParams: node.actionParams,
+  });
+}
+
+/**
+ * HIDDEN 脱敏口径（P9.2b，2026-09-08 用户拍板）：字段外壳（前/后标签、占位）保留，
+ * **输入内容以 `***` 替代显示**（不再用 visibility 整字段隐藏）。
+ * **空值不打码**（2026-09-08 补充口径）：无内容可脱敏，显示 `***` 反而暗示
+ * 「这里有隐藏数据」——空串/纯空白保持原样渲染。
+ * ⚠️ 真实值不进 DOM → `collectFieldValues` 必须跳过脱敏字段（见 collectFieldValues.ts），
+ * 否则 DOM 遍历采集会把假值 `***` 写回数据造成污染；消费页 `getFormData`（响应式数据侧）
+ * 不受影响，仍返回真实值。
+ */
+const fieldMasked = computed(() => fieldPermission.value === "HIDDEN");
+const MASK_TEXT = "***";
+/** 展示值：HIDDEN 字段以 `***` 替代非空真实值；空值保持原样（不打码）。 */
+function displayValue(node: PNodeV2): string {
+  if (!fieldMasked.value) return fieldValue(node);
+  const raw = fieldValue(node);
+  return raw.trim() === "" ? raw : MASK_TEXT;
+}
+/** 展示行：HIDDEN 字段有任一非空行 → 整体一行 `***`（多行不展开，避免行数泄露内容长度）；全空 → 保持原行（占位）。 */
+function displayLines(node: PNodeV2): string[] {
+  if (!fieldMasked.value) return fieldLines(node);
+  const lines = fieldLines(node);
+  return lines.some((line) => line.trim() !== "") ? [MASK_TEXT] : lines;
+}
+
+/**
  * 设计态可编辑（contenteditable 临时文本，不回写，A2 已拍板保留）；填充态由同一 DOM 承载输入。
  *
  * 字段「能否输入」的口径只有一条：**`readonly` 是真的硬闸门，`preview` 与 `fill` 同口径
@@ -356,7 +417,7 @@ function syncInnerLinesFromData(): void {
   // 用户正在输入时（焦点在可编辑区）不重建，避免光标跳位
   if (el === (el.ownerDocument?.activeElement ?? null)) return;
   while (el.firstChild) el.removeChild(el.firstChild);
-  for (const line of fieldLines(props.node)) {
+  for (const line of displayLines(props.node)) {
     const d = document.createElement("div");
     d.className = "layout-p__line";
     d.textContent = line;
@@ -470,12 +531,17 @@ function onImgError(): void {
             :mode="resolvedMode"
             :data="data"
             :readonly="props.readonly"
+            :field-permissions="props.fieldPermissions"
             :suppress-borders="
               cellSiblingSuppressBorders(cell.children, childIndex)
             "
             @field-change="
               (field: string, value: string) =>
                 emit('field-change', field, value)
+            "
+            @action-trigger="
+              (payload: FieldActionTriggerV2) =>
+                emit('action-trigger', payload)
             "
           />
         </template>
@@ -501,13 +567,21 @@ function onImgError(): void {
       'layout-p--composite': isCompositeField(node),
       'layout-p--underline': node.underline && !isCompositeField(node),
       'layout-p--inner-border': node.innerBorder,
+      'layout-p--hidden': fieldPermission === 'HIDDEN',
     }"
     :style="pStyle(node)"
     :contenteditable="
-      isCompositeField(node) ? undefined : canFill ? 'true' : isEditable(node)
+      isCompositeField(node)
+        ? undefined
+        : fieldPermission === 'EDIT'
+          ? canFill
+            ? 'true'
+            : isEditable(node)
+          : undefined
     "
     :data-field="node.field"
     :data-node-id="node.id"
+    @click="onFieldActivate(node, $event)"
     @blur="onFillBlur(node.field, $event)"
   >
     <span v-if="node.prefix" class="layout-p__label">{{ node.prefix }}</span>
@@ -519,18 +593,26 @@ function onImgError(): void {
       class="layout-p__input"
       :class="{ 'layout-p--underline': node.underline }"
       :style="fieldInputStyle(node)"
-      :contenteditable="canFill ? 'true' : props.readonly ? undefined : 'true'"
+      :contenteditable="
+        fieldPermission === 'EDIT'
+          ? canFill
+            ? 'true'
+            : props.readonly
+              ? undefined
+              : 'true'
+          : undefined
+      "
       :data-field="node.field"
       @blur="onFillBlur(node.field, $event)"
       ><template v-if="node.innerBorder"
         ><div
-          v-for="(line, li) in fieldLines(node)"
+          v-for="(line, li) in displayLines(node)"
           :key="li"
           class="layout-p__line"
         >
           {{ line }}
         </div></template
-      ><template v-else>{{ fieldValue(node) }}</template></span
+      ><template v-else>{{ displayValue(node) }}</template></span
     >
 
     <!-- 非复合字段：innerBorder 时逐行渲染（v-once 静态 + 填写态 DOM 重建）。 -->
@@ -540,7 +622,7 @@ function onImgError(): void {
       class="layout-p__lines"
       v-once
       ><div
-        v-for="(line, li) in fieldLines(node)"
+        v-for="(line, li) in displayLines(node)"
         :key="li"
         class="layout-p__line"
       >
@@ -550,7 +632,7 @@ function onImgError(): void {
 
     <!-- 非复合字段：普通展示值。直接作为 <p> 的 v-else 子项（不经 <template v-else>
          包裹，否则 contenteditable <p> 的数据晚到时文本子节点不会重新 patch）。 -->
-    <span v-else class="layout-p__value">{{ fieldValue(node) }}</span>
+    <span v-else class="layout-p__value">{{ displayValue(node) }}</span>
 
     <span v-if="node.suffix" class="layout-p__label">{{ node.suffix }}</span>
   </p>
@@ -607,9 +689,14 @@ function onImgError(): void {
               :mode="resolvedMode"
               :data="data"
               :readonly="props.readonly"
+              :field-permissions="props.fieldPermissions"
               @field-change="
                 (field: string, value: string) =>
                   emit('field-change', field, value)
+              "
+              @action-trigger="
+                (payload: FieldActionTriggerV2) =>
+                  emit('action-trigger', payload)
               "
             />
           </template>
@@ -788,6 +875,14 @@ function onImgError(): void {
 
 .layout-p--field {
   cursor: text;
+}
+
+/* P9.2b 字段级 HIDDEN（2026-09-08 用户拍板改为脱敏口径）：字段外壳与前/后标签照常
+   渲染、占位与分页高度不变，**输入内容以 `***` 替代**（真实值不进 DOM）。
+   `.layout-p--hidden` 类不再做视觉隐藏，保留为功能钩子——collectFieldValues 靠它
+   区分脱敏字段（导出保持 *** / 保存回源真实值）。 */
+.layout-p--hidden {
+  /* 无视觉样式：脱敏由 displayValue/displayLines 在值层面完成。 */
 }
 
 /* 设计态空字段（contenteditable 无内容）时，插入零宽行盒使光标垂直居中，

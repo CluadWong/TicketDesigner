@@ -19,7 +19,8 @@ import HtmlInspector from "./inspectors/HtmlInspector.vue";
 import ImageInspector from "./inspectors/ImageInspector.vue";
 import TableInspector from "./inspectors/TableInspector.vue";
 import IssuesPanel from "./inspectors/IssuesPanel.vue";
-import "./styles/designer-ui.css";
+// designer-ui.css 改由宿主 DesignerApp 统一引入（批次 4，2026-09-08）：
+// 工具栏/左栏壳层也依赖这些类，不应挂在右侧面板上引入。
 
 const props = withDefaults(
   defineProps<{

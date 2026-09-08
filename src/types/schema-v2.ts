@@ -126,6 +126,47 @@ export interface FieldPNodeV2 extends SchemaNodeBaseV2 {
 
 export type PNodeV2 = FieldPNodeV2;
 
+/**
+ * 字段级运行时权限（P9.2a / P9.2b）：**与 `data` 同轨，由消费方经 props 注入渲染组件**
+ * （`fieldPermissions: { 字段名: 权限 }`），**不进 schema**——权限是消费会话关注点，
+ * 设计模板不携带（设计态不注入 → 全部 EDIT，设计交互不受影响）。
+ * - `EDIT`：可输入（**缺省值**，未注明的字段一律可编辑，向后兼容）；
+ * - `READ`：只读回显（渲染值但不可就地输入）；
+ * - `HIDDEN`：**脱敏显示**（2026-09-08 用户拍板）：字段外壳与前/后标签照常渲染、
+ *   占位与分页高度不变，**非空输入内容以 `***` 替代**（空值不打码）；真实值不进 DOM，
+ *   `collectFieldValues` 跳过该字段（防止假值污染），消费页 `getFormData` 仍返回真实值。
+ */
+export type FieldPermissionV2 = "READ" | "EDIT" | "HIDDEN";
+
+/**
+ * 字段级校验规则（P9.2c）：**与 `data` / `fieldPermissions` 同轨，由消费方经 props
+ * （`FormRenderer` 的 `options.rules`）注入**，不进 schema——「哪些字段必填」是消费
+ * 会话的采集策略，模板不携带。键 = 字段名，值 = 规则对象（当前仅 `required`，
+ * 后续可扩展 min/max/pattern 等）。
+ */
+export interface FieldRuleV2 {
+  /** 必填：值为空（键缺失 / 空串 / 纯空白）时校验不通过。 */
+  required?: boolean;
+}
+
+/**
+ * 专用控件触发事件契约（P9.1c）：字段 P 配置了 `action`（非 text）时，渲染内核在
+ * **填写态**（canFill）由**点击字段元素本身**触发（表单不加任何额外按钮），经
+ * `action-trigger` 事件把触发权交还宿主——**宿主负责召唤外部输入组件（弹窗/选择器）并在
+ * 回调里回写 data**（与 data 同轨，回写后票面自动重渲染）。内核不做任何弹窗实现
+ * （分层：内核不认识宿主 UI）。
+ */
+export interface FieldActionTriggerV2 {
+  /** 触发源字段节点 id。 */
+  nodeId: string;
+  /** 字段名（宿主回写 data 的键）。 */
+  field: string;
+  /** 外部组件类型。 */
+  action: NonNullable<FieldPNodeV2["action"]>;
+  /** 外部组件额外参数（含义由 action 决定，如 safetyGraphic 的 matchField）。 */
+  actionParams?: Record<string, string>;
+}
+
 export interface GridNodeV2 extends SchemaNodeBaseV2 {
   type: "grid";
   border: BorderModeV2;

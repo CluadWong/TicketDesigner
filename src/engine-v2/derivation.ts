@@ -1,4 +1,5 @@
 import type {
+  FieldRuleV2,
   FormDataV2,
   FormNodeV2,
   FormSchemaV2,
@@ -211,4 +212,32 @@ export function collectSchemaFields(
     }
   }
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// 必填校验（P9.2c）
+// ---------------------------------------------------------------------------
+
+/**
+ * 找出当前数据下「值为空」的必填字段（P9.2c 提交校验的引擎侧真相源）。
+ *
+ * - **规则由消费方经 props 注入**（`FormRenderer` 的 `options.rules`，P9.2c 用户拍板），
+ *   与 `data` / `fieldPermissions` 同轨、**不进 schema**——「哪些字段必填」是消费
+ *   会话的采集策略，模板不携带。
+ * - 空值口径：键缺失 / `undefined` / `""` / 纯空白串都算空。
+ * - 只校验 `rules` 里声明了 `required: true` 的键；规则键应为 schema 字段名
+ *   （指向不存在字段的规则永远校验失败，会让配置错误自然浮出水面）。
+ * - 返回字段名数组（按 rules 声明顺序，天然去重——对象键唯一）。
+ */
+export function findEmptyRequiredFields(
+  rules: Record<string, FieldRuleV2> | undefined,
+  data: FormDataV2 | null | undefined,
+): string[] {
+  if (!rules) return [];
+  const isBlank = (value: unknown): boolean =>
+    typeof value !== "string" || value.trim() === "";
+  return Object.entries(rules)
+    .filter(([, rule]) => rule?.required === true)
+    .map(([field]) => field)
+    .filter((field) => isBlank(data?.[field]));
 }
