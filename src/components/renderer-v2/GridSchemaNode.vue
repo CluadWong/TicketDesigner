@@ -336,27 +336,24 @@ function onFieldActivate(node: PNodeV2, event: MouseEvent): void {
 }
 
 /**
- * HIDDEN 脱敏口径（P9.2b，2026-09-08 用户拍板）：字段外壳（前/后标签、占位）保留，
- * **输入内容以 `***` 替代显示**（不再用 visibility 整字段隐藏）。
- * **空值不打码**（2026-09-08 补充口径）：无内容可脱敏，显示 `***` 反而暗示
- * 「这里有隐藏数据」——空串/纯空白保持原样渲染。
+ * HIDDEN 脱敏口径（P9.2b）：字段外壳（前/后标签、占位）保留，**输入内容以 `***` 替代显示**
+ * （不再用 visibility 整字段隐藏）。**空值也打码**：HIDDEN 字段无论是否有值一律显示 `***`——
+ * 脱敏占位统一，不暴露「此处是否有隐藏数据」（推翻此前「空值不打码」口径）。
  * ⚠️ 真实值不进 DOM → `collectFieldValues` 必须跳过脱敏字段（见 collectFieldValues.ts），
  * 否则 DOM 遍历采集会把假值 `***` 写回数据造成污染；消费页 `getFormData`（响应式数据侧）
  * 不受影响，仍返回真实值。
  */
 const fieldMasked = computed(() => fieldPermission.value === "HIDDEN");
 const MASK_TEXT = "***";
-/** 展示值：HIDDEN 字段以 `***` 替代非空真实值；空值保持原样（不打码）。 */
+/** 展示值：HIDDEN 字段一律以 `***` 替代真实值（含空值，脱敏占位统一）。 */
 function displayValue(node: PNodeV2): string {
   if (!fieldMasked.value) return fieldValue(node);
-  const raw = fieldValue(node);
-  return raw.trim() === "" ? raw : MASK_TEXT;
+  return MASK_TEXT;
 }
-/** 展示行：HIDDEN 字段有任一非空行 → 整体一行 `***`（多行不展开，避免行数泄露内容长度）；全空 → 保持原行（占位）。 */
+/** 展示行：HIDDEN 字段一律单行 `***`（含全空；多行不展开，避免行数泄露内容长度）。 */
 function displayLines(node: PNodeV2): string[] {
   if (!fieldMasked.value) return fieldLines(node);
-  const lines = fieldLines(node);
-  return lines.some((line) => line.trim() !== "") ? [MASK_TEXT] : lines;
+  return [MASK_TEXT];
 }
 
 /**

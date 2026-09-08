@@ -93,12 +93,12 @@ describe("字段级权限（P9.2a/P9.2b fieldPermissions）", () => {
     expect(collectFieldValues(wrapper.element)["测试字段"]).toBeUndefined();
   });
 
-  it("HIDDEN 空值：不打码，保持空白（无内容可脱敏，*** 反而暗示有隐藏数据）", () => {
+  it("HIDDEN 空值：也打码为 ***（脱敏占位统一，不暴露是否有隐藏数据）", () => {
     const wrapper = mountField(fieldNode(), { 测试字段: "HIDDEN" }, {
       测试字段: "",
     });
     expect(wrapper.classes()).toContain("layout-p--hidden");
-    expect(wrapper.text()).toBe("");
+    expect(wrapper.text()).toBe("***");
   });
 
   it("复合字段 READ：前/后标签照常渲染，仅输入区锁定", () => {
