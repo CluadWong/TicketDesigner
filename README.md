@@ -75,29 +75,29 @@ Schema 只描述版式，不携带数据；数据（含字段权限、校验规�
 
 ## 八、分支
 
-- `release`：对外发布分支，发布到公共 npmjs（`@cluadwong/ticket-designer`），只保留源码、测试与对外文档
+- `release`：对外发布分支，发布到公共 npmjs（`@aikkk/ticket-designer`），只保留源码、测试与对外文档
 - `dev`：内部开发分支，发布到内网 GitLab Package Registry，含过程记录与调试样本
 
 ## 九、作为 npm 包使用（对外）
 
-组件库以公共 npm 包形式发布：`@cluadwong/ticket-designer`。
+组件库以公共 npm 包形式发布：`@aikkk/ticket-designer`。
 
 ```bash
-npm i @cluadwong/ticket-designer
+npm i @aikkk/ticket-designer
 ```
 
 两个按需入口：
 
 | 入口 | 内容 | 谁用 |
 |---|---|---|
-| `@cluadwong/ticket-designer/renderer` | `FormRenderer` / `GridFormRenderer` / `printForm` / `collectFieldValues` / Schema 类型 | 消费端：渲染、填写、打印 |
-| `@cluadwong/ticket-designer/designer` | `DesignerApp` / `defaultDesignerUIConfig` / `buildBlankSchema` | 需要在宿主内编排模板时 |
+| `@aikkk/ticket-designer/renderer` | `FormRenderer` / `GridFormRenderer` / `printForm` / `collectFieldValues` / Schema 类型 | 消费端：渲染、填写、打印 |
+| `@aikkk/ticket-designer/designer` | `DesignerApp` / `defaultDesignerUIConfig` / `buildBlankSchema` | 需要在宿主内编排模板时 |
 
 样式按入口分离，别引错（`vue` 是 peerDependency，宿主必须 `resolve.dedupe: ['vue']`）：
 
 ```ts
-import { FormRenderer } from '@cluadwong/ticket-designer/renderer'
-import '@cluadwong/ticket-designer/renderer/style.css'
+import { FormRenderer } from '@aikkk/ticket-designer/renderer'
+import '@aikkk/ticket-designer/renderer/style.css'
 ```
 
 更完整的接入示例与坑见 [docs/publish-npm.md](./docs/publish-npm.md)。
