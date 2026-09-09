@@ -47,14 +47,27 @@ GitLab → Preferences → Access Tokens，勾选 `api`（或 Deploy Token 勾 `
 
 ### 3. 发布
 
+发布命令必须在**能直连 `10.8.0.102` 的机器**上执行。本 agent 沙箱出口走代理，到内网 GitLab 的 TLS 隧道被拦截（返回 502），无法从此环境直接 `npm publish`。任选其一：
+
+**方案 A — 从源码构建后发（推荐，最标准）**
+
 ```bash
-npm version patch          # 或 minor / major，语义化版本
+npm ci
+npm run build:lib && npm run build:types   # 产出 dist/（已验证：117 文件 / d.ts 内 @/ = 0 / CSS 拆分）
 export NPM_TOKEN=<你的 token>
-npm run pack:check         # 先校验产物
+npm run pack:check                         # 先校验产物（npm pack --dry-run）
 npm publish
 ```
 
-> 每个版本号只能发一次，重发会 409。改 bug 请升版本号。
+**方案 B — 直接发已打好的 tarball（不用重建）**
+
+```bash
+export NPM_TOKEN=<你的 token>
+npm publish ./huangshichuang-ticket-designer-0.1.0.tgz \
+  --registry=https://10.8.0.102/api/v4/projects/huangshichuang%2Fticketdesigner/packages/npm/
+```
+
+> 每个版本号只能发一次，重发会 409。改 bug 请升版本号（`npm version patch`）。
 
 ## 四、ERP 侧接入
 
