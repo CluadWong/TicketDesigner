@@ -1,9 +1,9 @@
 # 表单设计器业务设计
 
 > 本文描述嵌套 Schema 下的组件语义和设计器操作。总体架构见 [design.md](./design.md)，
-> 渲染算法见 [engine.md](./engine.md)，实施路线见 [development-plan.md](./development-plan.md)。
+> 渲染算法见 [engine.md](./engine.md)，总体说明见 [README.md](../README.md)。
 >
-> 本文为业务/交互设计目标（spec）；具体能力是否已实现、当前缺口见 [development-plan.md](./development-plan.md) §2.1；
+> 本文为业务/交互设计目标（spec）；总体说明见 [README.md](../README.md)；
 > P0–P8 阶段详细规格存档见 [archive/phase-specs-p0-p8.md](./archive/phase-specs-p0-p8.md)；文档总索引见 [README.md](./README.md)。
 
 ## 1. 产品产物
@@ -34,7 +34,7 @@
 
 画布操作围绕 Page、Grid 和组件进行，不提供绝对坐标定位；GridRow/GridCell 仅作为内部布局槽位。
 
-注：上图为交互目标。当前 `DesignerApp.vue` 工具栏仅提供“新建空白模板 / 载入前五行样例”，纸张、边距、基础行高、预览、保存、撤销等控件尚未接入（见 development-plan P5 / P8 / P9）。
+注：上图为交互目标。当前 `DesignerApp.vue` 工具栏仅提供“新建空白模板 / 载入前五行样例”，纸张、边距、基础行高、预览、保存、撤销等控件尚未接入（见根 README.md）。
 
 ## 3. 节点与选择
 
@@ -207,7 +207,7 @@ Table 用于规则明细，不用于整张表单排版。
 
 Grid 的 rows/cells 是内部布局数据，不作为节点链或独立配置节点；结构字段通过 Grid 的专用控件修改，不允许在普通 JSON 文本框里直接编辑 rows/cells/children。
 
-注：当前实现仅覆盖基础子集——Grid（行数/列数/边框）、P（固定文本/字段名/前后标签）、Table（最小行数）；inputType、下划线、文字样式、columns 编辑、HTML/Image 配置尚未接入（见 development-plan §2.1 / P7）。
+注：当前实现仅覆盖基础子集——Grid（行数/列数/边框）、P（固定文本/字段名/前后标签）、Table（最小行数）；inputType、下划线、文字样式、columns 编辑、HTML/Image 配置尚未接入（见根 README.md）。
 
 ## 11. 数据与权限
 
@@ -252,7 +252,7 @@ interface FormPreviewProps {
 
 ## 13. 前五行验收场景
 
-本场景与 [development-plan.md](./development-plan.md) P10 的验收步骤**完全一致**，此处按测试人员操作顺序展开，供独立验收时逐项勾选。步骤编号与措辞以 P10 为准，不再另立；逐行字段与边框以 [前五行字段/边框规格表](./acceptance-row-spec.md) 为准。
+本场景即 P10 前五行闭环的验收步骤，此处按测试人员操作顺序展开，供独立验收时逐项勾选；逐行字段与边框以 [前五行字段/边框规格表](./acceptance-row-spec.md) 为准。
 
 测试人员必须从空白 A4 页面操作：
 
@@ -272,4 +272,4 @@ interface FormPreviewProps {
 
 只有全部步骤无需修改源码或手写 JSON 才视为设计器方案成立。
 
-注：本场景即 development-plan P10 的验收用例，步骤一一对应；目前因 P7/P8/P9 未完成尚不能全程通过 UI 完成，缺口见其 §2.1。
+注：本场景即 P10 前五行闭环的验收用例，步骤一一对应。

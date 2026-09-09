@@ -2,8 +2,8 @@
 
 > 本文定义唯一正式 Schema V2 的索引、校验、递归渲染、尺寸、溢出和打印契约。
 >
-> 本文为渲染引擎契约（spec）；实现进度与缺口见 [development-plan.md](./development-plan.md) §2.1。
-> 阶段规格：P4 / P8 存档于 [archive/phase-specs-p0-p8.md](./archive/phase-specs-p0-p8.md)，P9 见 development-plan.md §13；文档总索引见 [README.md](./README.md)。
+> 本文为渲染引擎契约（spec）；实现状态见 [README.md](../README.md)。
+> 文档总索引见 [README.md](./README.md)。
 
 ## 1. 引擎职责
 
@@ -156,7 +156,7 @@ cellStyle = {
 
 Cell.children 按数组顺序渲染。多个子节点默认纵向流；需要横向排列时使用子 Grid，不增加隐式 flex 规则。
 
-注：渲染层已支持 mm/fr/auto 列宽（`track()` 已实现 number→`${n}mm`、`fr`、`auto` 转换）；设计器侧列宽编辑尚未暴露给用户（development-plan P6.2）。
+注：渲染层已支持 mm/fr/auto 列宽（`track()` 已实现 number→`${n}mm`、`fr`、`auto` 转换）；设计器侧列宽编辑尚未暴露给用户（见根 README.md）。
 
 ## 7. 固定尺寸
 
@@ -366,7 +366,7 @@ updateNode(schema, nodeId, patch)
 
 ## 17. 旧代码清理
 
-`src/engine/paginate.ts`、`FormRenderer` 与 `FormSchema.body[]` 等迁移前遗留实现已在 P0 阶段移除。**2026-09-02 十八续：旧 v1 引擎目录 `src/engine/`（DOM 测量版，含其 `__tests__`）已整体删除**，此前为绕开其旧 Schema 类型而加的 `tsconfig.json` / `vitest.config.ts` `exclude` 也已撤销——分页实现自此只有一套：`src/engine-v2/pagination.ts`（确定性、DOM 无关）。剩余清理工作（旧类型残留等）归入 [development-plan.md](./development-plan.md) P12。清理目标仍是避免出现两套 Schema、分页和设计器状态。
+`src/engine/paginate.ts`、`FormRenderer` 与 `FormSchema.body[]` 等迁移前遗留实现已在 P0 阶段移除。**2026-09-02 十八续：旧 v1 引擎目录 `src/engine/`（DOM 测量版，含其 `__tests__`）已整体删除**，此前为绕开其旧 Schema 类型而加的 `tsconfig.json` / `vitest.config.ts` `exclude` 也已撤销——分页实现自此只有一套：`src/engine-v2/pagination.ts`（确定性、DOM 无关）。剩余清理工作（旧类型残留等）归入 [README.md](../README.md) P12。清理目标仍是避免出现两套 Schema、分页和设计器状态。
 
 ## 18. 节点地址契约（C2 / A5 分层重构）
 

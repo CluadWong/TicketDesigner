@@ -3,10 +3,10 @@
 > 本文定义固定版式表单设计器的唯一目标架构：嵌套 Grid Schema V2。
 >
 > 组件业务语义见 [design-biz.md](./design-biz.md)，渲染契约见 [engine.md](./engine.md)，
-> 实施顺序见 [development-plan.md](./development-plan.md)。若旧文档或代码注释与本文冲突，以本文为准。
+> 总体说明见 [README.md](../README.md)。若旧文档或代码注释与本文冲突，以本文为准。
 >
-> 本文为设计目标契约（spec）；各项能力的实现进度与当前缺口以 [development-plan.md](./development-plan.md) §2.1 为准。
-> **P0–P8 阶段详细规格已存档**至 [archive/phase-specs-p0-p8.md](./archive/phase-specs-p0-p8.md)，P9–P12 见 development-plan.md §13–§16；文档总索引见 [README.md](./README.md)。
+> 本文为设计目标契约（spec）；总体说明见 [README.md](../README.md)。
+> 文档总索引见 [README.md](./README.md)。
 
 ## 1. 目标
 
@@ -346,7 +346,7 @@ V2 是唯一正式模型和唯一设计器入口。旧流式实现属于待移�
 
 ## 14. 第一阶段验收基线
 
-云铝电气第二种工作票前五行必须满足以下架构判定。其**具体操作步骤与验收指标以 [development-plan.md](./development-plan.md) P10 为准**，本文不再另列步骤，避免三处描述出现偏差。
+云铝电气第二种工作票前五行必须满足以下架构判定。其**具体操作步骤与验收指标见 [acceptance-row-spec.md](./acceptance-row-spec.md)**，本文不再另列步骤，避免三处描述出现偏差。
 
 1. 能从空白 A4 页面通过 UI 创建，而不是手写 Schema。
 2. 标题、四个基本信息行（单位/编号、负责人/班组、成员、设备名称）和工作任务行结构正确，外层 Grid 带 all 边框；逐行字段与边框见 [前五行字段/边框规格表](./acceptance-row-spec.md)。
@@ -359,7 +359,7 @@ V2 是唯一正式模型和唯一设计器入口。旧流式实现属于待移�
 
 只有完成上述闭环，才能判断该模型确实能通过设计器实现完整表单。
 
-注：本基线是 P10 验收的架构判定视角；当前因 P7/P8/P9 未完成尚不能全程通过 UI 达成，缺口见 development-plan §2.1。
+注：本基线是 P10 验收的架构判定视角。
 
 ## 15. 决策记录
 
