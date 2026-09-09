@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
-# scripts/release.sh —— 一键发布：升版本 → 构建 → 发布 npm → 推 GitHub(release + main)
+# scripts/release.sh —— 一键发布：升版本 → 构建 → 发布 npm → 推 GitHub(release + tags) + 开 PR 到 main
+#
+# 注：main 已设分支保护（Require a pull request before merging），禁止直推。
+#     本脚本改为推 release + tags，再自动开 PR(release → main) 并请求自动合并。
 #
 # 用法：
-#   npm run release                        # patch 升版 + 构建 + 发布 + 推 release/main
+#   npm run release                        # patch 升版 + 构建 + 发布 + 推 release + 开 PR 到 main
 #   npm run release -- minor               # 升 minor
 #   npm run release -- --otp=123456        # 带 2FA OTP 发布（OTP 30s 有效、一次性）
 #   npm run release -- minor --otp=123456
 #   npm run release -- --no-push           # 只发布到 npm，不推 GitHub
-#   npm run release -- --no-publish        # 只构建+提交+推 GitHub，不发 npm
+#   npm run release -- --no-publish        # 只构建+提交+推 GitHub(release)+开 PR，不发 npm
 #   npm run release -- --dry-run           # 仅打印将执行的步骤，不做任何改动
 #
 # 前置条件：
@@ -66,13 +69,32 @@ else
 fi
 
 if [ $DO_PUSH -eq 1 ]; then
-  info "4/4 推 GitHub：release + main（+ tags）"
+  info "4/4 推 GitHub：release + tags，再开 PR 到 main（main 已设分支保护，禁止直推）"
   run git push github release
-  # main 为 release 的历史前缀，release:main 是快进推送（无需强推）
-  run git push github release:main
   run git push github --tags
+
+  # main 受「Require a pull request before merging」保护，禁止直接推送。
+  # 改为开 PR(release → main) 并请求自动合并；无 gh 时给出手动建 PR 的链接。
+  VER=$(node -p "require('./package.json').version")
+  PR_URL="https://github.com/CluadWong/TicketDesigner/compare/main...release"
+  if command -v gh >/dev/null 2>&1; then
+    if gh pr view release --json number >/dev/null 2>&1; then
+      info "release → main 的 PR 已存在，跳过创建"
+    elif ! run gh pr create --base main --head release \
+        --title "release: v$VER" \
+        --body "自动发布流程提交的版本 v$VER。包体已发至 npmjs（@aikkk/ticket-designer）。" \
+        --auto-merge 2>/dev/null; then
+      info "auto-merge 不可用，改用普通 PR（需手动或自动合并）"
+      run gh pr create --base main --head release \
+        --title "release: v$VER" \
+        --body "自动发布流程提交的版本 v$VER。包体已发至 npmjs（@aikkk/ticket-designer）。"
+    fi
+  else
+    echo "未检测到 gh CLI，请手动创建 PR 将 release 合并到 main：" >&2
+    echo "  $PR_URL" >&2
+  fi
 else
-  info "4/4 跳过 GitHub 推送 (--no-push)"
+  info "4/4 跳过 GitHub 推送与 PR (--no-push)"
 fi
 
 info "完成"
