@@ -49,6 +49,7 @@
     "build:types": "vue-tsc -p tsconfig.lib.json --declaration --emitDeclarationOnly --outDir dist && node scripts/fix-dts-alias.mjs",
     "pack:check": "npm run build:lib && npm run build:types && npm pack --dry-run",
     "release": "bash scripts/release.sh",
+    "promote": "bash scripts/promote-to-release.sh",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest"
