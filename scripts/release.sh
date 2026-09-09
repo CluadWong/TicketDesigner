@@ -70,8 +70,8 @@ fi
 
 if [ $DO_PUSH -eq 1 ]; then
   info "4/4 推 GitHub：release + tags，再开 PR 到 main（main 已设分支保护，禁止直推）"
-  run git push github release
-  run git push github --tags
+  run git push origin release
+  run git push origin --tags
 
   # main 受「Require a pull request before merging」保护，禁止直接推送。
   # 改为开 PR(release → main) 并请求自动合并；无 gh 时给出手动建 PR 的链接。

@@ -2,14 +2,14 @@
 # scripts/promote-to-release.sh —— 将 dev 的迭代安全提升到 release（对外公共分支）
 #
 # 解决「直接 git merge dev」会带来的问题：
-#   1. 包名回退（dev 是 @huangshichuang，release 是 @aikkk）—— 合并后强制恢复 release 的 package.json
+#   1. 包名回退（dev 仍是内部开发分支，可能带不同包名/协议）—— 合并后强制恢复 release 的 package.json
 #   2. GitLab CI 泄漏（.gitlab-ci.yml 只在 dev）—— 合并后删除
 #   3. 过程文档 / demo 回流 —— 合并后按清单裁剪
-#   4. 推送目标错乱 —— 默认只本地提交，--push 仅推 github release（不碰 GitLab origin）
+#   4. 推送目标错乱 —— 默认只本地提交，--push 仅推 origin release（不碰其他 remote）
 #
 # 用法：
 #   scripts/promote-to-release.sh            # 合并 + 裁剪 + 验证 + 本地提交（不推送）
-#   scripts/promote-to-release.sh --push     # 提交后再推 github release
+#   scripts/promote-to-release.sh --push     # 提交后再推 origin release
 #   scripts/promote-to-release.sh --no-verify# 跳过 vitest / vue-tsc
 #   scripts/promote-to-release.sh --dry-run  # 仅打印步骤，不改动
 #
@@ -105,10 +105,10 @@ else
 fi
 
 if [ $DO_PUSH -eq 1 ]; then
-  info "推送 github release"
-  run git push github release
+  info "推送 origin release"
+  run git push origin release
 else
-  info "未推送（加 --push 可推 github release；发版请用 npm run release）"
+  info "未推送（加 --push 可推 origin release；发版请用 npm run release）"
 fi
 
 info "完成。随后发版：npm run release -- --otp=<6位码>"

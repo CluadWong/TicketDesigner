@@ -77,7 +77,7 @@ Schema 只描述版式，不携带数据；数据（含字段权限、校验规�
 
 - `release`：对外发布分支，发布到公共 npmjs（`@aikkk/ticket-designer`），只保留源码、测试与对外文档。一键发布脚本 `npm run release` 在此分支运行。
 - `main`：GitHub 默认分支，**已设分支保护（Require a pull request before merging），禁止直推**。`release` 发布后由脚本自动开 PR(`release → main`) 并请求自动合并；无 `gh` CLI 时打印手动建 PR 链接。
-- `dev`：内部开发分支，发布到内网 GitLab Package Registry，含过程记录与调试样本。
+- `dev`：内部开发分支，含过程记录与调试样本（源码同样托管在 GitHub）。
 
 ## 九、作为 npm 包使用（对外）
 
