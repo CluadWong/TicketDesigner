@@ -53,7 +53,8 @@ const scaleText = computed(() => `${Math.round(scale.value * 100)}%`);
  * 使这些元素上的指针手势不触发平移——字段可编辑/选中、设计态可拖拽节点，其余区域照常平移。
  * 同时把表单控件的 `user-select` 恢复为 `text`（抵消 panzoom 对整体的 `user-select:none`）。
  */
-const EXCLUDE_SELECTOR = "input, textarea, select, [contenteditable], [draggable='true']";
+const EXCLUDE_SELECTOR =
+  "input, textarea, select, [contenteditable], [draggable='true']";
 /**
  * 给表单控件与「可拖拽节点」打 `panzoom-exclude` 标记（isExcluded 会向上查祖先），
  * 使这些元素上的指针手势不触发平移——字段可编辑/选中、设计态可拖拽节点，其余区域照常平移。
@@ -73,14 +74,12 @@ function tagExclusions(): void {
     .querySelectorAll<HTMLElement>(".panzoom-exclude")
     .forEach((el) => el.classList.remove("panzoom-exclude"));
   // 再按当前选择器重新打标。
-  root
-    .querySelectorAll<HTMLElement>(EXCLUDE_SELECTOR)
-    .forEach((el) => {
-      el.classList.add("panzoom-exclude");
-      if (el.matches("input, textarea, select, [contenteditable]")) {
-        el.style.userSelect = "text";
-      }
-    });
+  root.querySelectorAll<HTMLElement>(EXCLUDE_SELECTOR).forEach((el) => {
+    el.classList.add("panzoom-exclude");
+    if (el.matches("input, textarea, select, [contenteditable]")) {
+      el.style.userSelect = "text";
+    }
+  });
 }
 
 // ── 空格长按平移 ──
@@ -95,8 +94,8 @@ function isTypingTarget(t: EventTarget | null): boolean {
   const el = t as HTMLElement | null;
   return Boolean(
     el &&
-      typeof el.closest === "function" &&
-      el.closest("input, textarea, select, [contenteditable]"),
+    typeof el.closest === "function" &&
+    el.closest("input, textarea, select, [contenteditable]"),
   );
 }
 
@@ -228,14 +227,32 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="viewport" class="paper-viewport" :class="{ 'is-space-pan': panMode }">
+  <div
+    ref="viewport"
+    class="paper-viewport"
+    :class="{ 'is-space-pan': panMode }"
+  >
     <div ref="scaler" class="paper-viewport__scaler">
       <slot />
     </div>
     <div class="paper-viewport__bar" role="toolbar" aria-label="缩放控制">
-      <button type="button" class="paper-viewport__btn" title="缩小" @click="zoomOut">−</button>
+      <button
+        type="button"
+        class="paper-viewport__btn"
+        title="缩小"
+        @click="zoomOut"
+      >
+        −
+      </button>
       <span class="paper-viewport__scale">{{ scaleText }}</span>
-      <button type="button" class="paper-viewport__btn" title="放大" @click="zoomIn">+</button>
+      <button
+        type="button"
+        class="paper-viewport__btn"
+        title="放大"
+        @click="zoomIn"
+      >
+        +
+      </button>
       <button
         type="button"
         class="paper-viewport__btn paper-viewport__btn--text"
