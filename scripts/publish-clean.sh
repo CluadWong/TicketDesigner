@@ -198,10 +198,21 @@ for p in "${PRUNE_PATHS[@]}"; do
 done
 info "共剔除 ${#PRUNED[@]} 项"
 
+# 对外文档覆盖：dev 的 docs/README.md 指向过程文档，发布版必须换成对外索引。
+# 模板由 scripts/publish-assets/ 维护，改口径时改模板，不要手改发布分支。
+ASSETS_DIR="scripts/publish-assets"
+if [[ -f "$ASSETS_DIR/docs-README.clean.md" ]]; then
+  run cp -f "$ASSETS_DIR/docs-README.clean.md" docs/README.md
+  info "docs/README.md 已替换为对外版（模板 $ASSETS_DIR/docs-README.clean.md）"
+else
+  warn "缺少模板 $ASSETS_DIR/docs-README.clean.md，docs/README.md 将沿用开发版"
+fi
+
 step "3/7 扫描死链（指向已剔除内容的引用）"
-if git grep -nE "$DEADREF_PATTERN" -- . >/dev/null 2>&1; then
+# 排除 .gitignore（其中的忽略规则本身就是关键词）与本脚本（内含关键词定义）
+if git grep -nE "$DEADREF_PATTERN" -- . ':(exclude).gitignore' ':(exclude)scripts' >/dev/null 2>&1; then
   warn "以下位置仍引用已剔除内容，请人工处理："
-  git grep -nE "$DEADREF_PATTERN" -- . || true
+  git grep -nE "$DEADREF_PATTERN" -- . ':(exclude).gitignore' ':(exclude)scripts' || true
   [[ $ASSUME_YES -eq 1 ]] || confirm "仍要继续提交吗？" || die "已中止"
 else
   info "无死链"
