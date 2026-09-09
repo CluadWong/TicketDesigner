@@ -2,7 +2,7 @@
 
 本组件库以**公共 npm 包**形式交付，发布到 **npmjs.com**（包名 `@aikkk/ticket-designer`）。源码托管在 GitHub（[CluadWong/TicketDesigner](https://github.com/CluadWong/TicketDesigner)），`release` 分支为对外发布分支。
 
-> 内网 GitLab Package Registry 仅由 `dev` 分支使用，与本指南无关。
+> 本指南只覆盖公共 npmjs 发布（`@aikkk/ticket-designer`），由 `release` 分支经 `npm run release` 完成；`dev` 为内部开发分支，不参与 npm 发布。
 
 ## 一、包结构（两个入口，按需引用）
 
@@ -45,7 +45,7 @@ npm publish                                 # 发布（package.json 已配 publi
 ```
 
 > 每个版本号只能发一次，重发会 409。改 bug 请升版本号（`npm version patch`）。
-> 若本机残留 `.npmrc` 把 `@aikkk` scope 指向了内网 GitLab，发布前务必删除它（或加 `registry=https://registry.npmjs.org/` 覆盖），否则会发错地方。
+> 若本机残留 `.npmrc` 把 `@aikkk` scope 指向了其他私有 registry，发布前务必删除它（或加 `registry=https://registry.npmjs.org/` 覆盖），否则会发错地方。
 
 ## 四、消费端接入
 
