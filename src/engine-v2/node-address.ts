@@ -4,7 +4,7 @@
  * 渲染内核（renderer-v2）为每个可被设计器交互的节点输出两类定位属性，
  * 设计表面层（designer/CanvasSurface 及 DesignerApp 的拖拽/选中逻辑）据此反查节点与所属格。
  * 内核负责"暴露稳定地址"，表面层负责"交互"——这是内核与表面层之间唯一可接受的边界
- * （见 docs/architecture-layering-review.md §6.2）。
+ * （分层约束见 docs/design.md）。
  *
  * 约定：
  * - `data-node-id`：每个可交互节点的唯一 id（page / grid / row? 否 / cell / p / text / table / html / image）。

@@ -208,7 +208,7 @@ describe("分页引擎 pagination", () => {
   });
 
   it("Table（50 行数据）按数据行跨页切分，总行数不丢", () => {
-    // 构造与用户 grid-50-rows.json 一致的结构：Grid(1行) → Cell → Table(minRows:50)
+    // 构造复现用户报的结构：Grid(1行) → Cell → Table(minRows:50)
     const schema: FormSchemaV2 = {
       version: 2,
       paper: { size: "A4" },

@@ -2,7 +2,7 @@
  * 云南铝业股份有限公司 电气第二种工作票 —— 完整版 Schema 样例
  *
  * 本样例与设计器 UI 完整编辑后导出的
- * `ticket-schema-v2-1788315240965.json` 逐字对齐，采用「扁平结构」：
+ * 设计器 UI 导出的整票 JSON 逐字对齐，采用「扁平结构」：
  * 每个业务段为一个独立 grid，border 取 all / outer / none，内部列通过 `columns`
  * 描述；字段统一用 prefix / suffix / action / default / innerBorder 表达
  * （签名字段 action:"signature"、日期字段 action:"date"、人数等用 innerBorder）。
@@ -506,7 +506,7 @@ const completionGrid = grid(
 //
 // 扁平结构：page.children 为 13 个独立 grid，每段自带 border 与 columns，
 // 相邻段外框由渲染器 suppressBorders 去重（仅画 1 条分隔线，无 2px 双边框）。
-// 与设计器 UI 导出的 ticket-schema-v2-1788315240965.json 一致。
+// 与设计器 UI 导出的整票 JSON 一致。
 
 export function makeYunlvSecondTicketFullSchema(): FormSchemaV2 {
   return {

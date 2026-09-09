@@ -25,7 +25,7 @@ import type { FormSchemaV2, FormDataV2, FormNodeV2 } from "@/types";
  *   落点结果以语义事件 `drop-node` / `drop-palette` / `drag-end` 上抛，由 DesignerApp 提交 schema。
  *
  * 关键拆分：内核不再持有 `selectedNodeId`、不处理拖拽 DOM 事件（A5/A6）；
- * 选中与拖拽交互均在本表面层完成，内核保持纯净（见 docs/architecture-layering-review.md §6.5）。
+ * 选中与拖拽交互均在本表面层完成，内核保持纯净（分层约束见 docs/design.md）。
  */
 type CanvasSurfaceMode = "design" | "preview";
 type NodeKind = "text" | "field" | "table" | "html" | "image" | "grid";
