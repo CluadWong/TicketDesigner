@@ -8,8 +8,12 @@ pnpm-debug.log*
 
 node_modules
 dist
+dist-app
 dist-ssr
 *.local
+
+# npm 私有源凭据（含 token，绝不入库）
+.npmrc
 
 # Editor directories and files
 .vscode/*
@@ -29,3 +33,6 @@ dist-ssr
 
 # Vite / Vitest 临时配置缓存（esbuild 转译 *.config.ts 的副产物，运行中断会残留，可安全忽略/删除）
 *.timestamp-*.mjs
+
+# 发布包消费端验证脚手架（临时，含 npm pack 产物与假 node_modules，不入库）
+.tmp-erp-check/
