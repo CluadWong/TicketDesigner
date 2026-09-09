@@ -30,6 +30,8 @@ npm run pack:check         # 上面两步 + npm pack --dry-run，发布前必跑
 产物：`dist/{index,renderer,designer}.js` + `dist/chunks/{renderer-core,designer-ui}.js` + `dist/{renderer-core,designer-ui}.css` + 类型声明。
 当前包体约 **104 KB（压缩）/ 368 KB（解压）**。
 
+> `build:types` 末尾会自动跑 `scripts/fix-dts-alias.mjs`：把 `vue-tsc` 产物里残存的 `@/` 路径别名改写成相对路径。发布包**不能带 `@/`**（消费端没有这个别名，一 import 就报 `Cannot find module '@/types'`）。`tsconfig.lib.json` 已排除 `src/dev`，调试类型桩不会进包。改动这两处后必须重跑 `npm run build:types` 再 `npm pack`。
+
 ## 三、发布到 GitLab Package Registry
 
 ### 1. 建 token

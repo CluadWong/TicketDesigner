@@ -11,7 +11,7 @@
   "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.vue"],
   "exclude": [
     "src/**/__tests__/**",
-    "src/dev/__tests__/**",
+    "src/dev/**",
     "src/main.ts",
     "src/preview/**",
     "src/test-utils/**",

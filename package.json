@@ -35,7 +35,7 @@
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "build:lib": "vite build --config vite.lib.config.ts",
-    "build:types": "vue-tsc -p tsconfig.lib.json --declaration --emitDeclarationOnly --outDir dist",
+    "build:types": "vue-tsc -p tsconfig.lib.json --declaration --emitDeclarationOnly --outDir dist && node scripts/fix-dts-alias.mjs",
     "pack:check": "npm run build:lib && npm run build:types && npm pack --dry-run",
     "preview": "vite preview",
     "test": "vitest run",
