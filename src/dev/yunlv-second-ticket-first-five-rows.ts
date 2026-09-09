@@ -1,8 +1,7 @@
 /**
  * ⚠️ 本文件是「测试夹具」，不是交付样例——请勿以「样例已由 full 取代」为由删除。
  *
- * 被 11 个测试文件引用（`P10Acceptance` 11 例验收、`FirstFiveRowsSnapshot` 快照基线、
- * designer/renderer 多套断言，合计 132 个测试）。它是**唯一**覆盖复杂结构（行内多列 /
+ * 被 designer/renderer 与 types 多套测试引用。它是**唯一**覆盖复杂结构（行内多列 /
  * colspan / 合并格 / 表格动态行 / 嵌套 Grid）的 fixture——full 样例是扁平 13-grid、
  * 节点 id 全变（`row-station` / `cell-o-l` / `owner-label` 等在此处才有），无法替代。
  * 删除会直接导致上述测试集体失败。
@@ -35,7 +34,7 @@ import {
 /**
  * 云铝电气第二种工作票：标题及「计划工作时间」之前的五个布局行。
  *
- * 结构（对齐 acceptance-row-spec.md）：1 个外层 Grid（all 边框，id=ticket-layout）+ 5 个内部行，
+ * 结构：1 个外层 Grid（all 边框，id=ticket-layout）+ 5 个内部行，
  * 标题为独立单行无边框 Grid（id=ticket-title-layout）。这样五行同为同一外层 Grid 的内部行，
  * 区块接缝处不会出现 2px 双边框（此前用 4 个并排 all 边框 Grid 会导致接缝双边框）。
  *
@@ -43,7 +42,11 @@ import {
  * 显式 id 仅用于快照稳定与测试断言。
  */
 export function makeYunlvSecondTicketFirstFiveRowsSchema(): FormSchemaV2 {
-  const textNode = (id: string, text: string, style?: TextStyleV2): TextNodeV2 => ({
+  const textNode = (
+    id: string,
+    text: string,
+    style?: TextStyleV2,
+  ): TextNodeV2 => ({
     id,
     type: "text",
     text,
@@ -76,7 +79,12 @@ export function makeYunlvSecondTicketFirstFiveRowsSchema(): FormSchemaV2 {
     id: string,
     columnKey: string,
     child: FormNodeV2,
-  ): TableCellTemplateV2 => ({ id, type: "table-cell-template", columnKey, children: [child] });
+  ): TableCellTemplateV2 => ({
+    id,
+    type: "table-cell-template",
+    columnKey,
+    children: [child],
+  });
 
   const getGrid = (schema: FormSchemaV2, gridId: string): GridNodeV2 => {
     for (const page of schema.pages) {
@@ -93,13 +101,17 @@ export function makeYunlvSecondTicketFirstFiveRowsSchema(): FormSchemaV2 {
     border: "none",
     rows: [
       row("row-title", 2, [
-        cell("cell-title", [
-          textNode("title-text", "云南铝业股份有限公司 电气第二种工作票", {
-            align: "center",
-            fontSize: 22,
-            fontWeight: "bold",
-          }),
-        ], { width: "1fr" }),
+        cell(
+          "cell-title",
+          [
+            textNode("title-text", "云南铝业股份有限公司 电气第二种工作票", {
+              align: "center",
+              fontSize: 22,
+              fontWeight: "bold",
+            }),
+          ],
+          { width: "1fr" },
+        ),
       ]),
     ],
   };
@@ -111,9 +123,17 @@ export function makeYunlvSecondTicketFirstFiveRowsSchema(): FormSchemaV2 {
     columns: ["1fr", "1fr", "1fr", "1fr"],
     rows: [
       row("row-unit-number", 1, [
-        cell("cell-u-l", [textNode("unit-label", "单位", { align: "center" })], { width: "1fr" }),
+        cell(
+          "cell-u-l",
+          [textNode("unit-label", "单位", { align: "center" })],
+          { width: "1fr" },
+        ),
         cell("cell-u-f", [fieldP("unit-field", "单位")], { width: "1fr" }),
-        cell("cell-n-l", [textNode("number-label", "编号", { align: "center" })], { width: "1fr" }),
+        cell(
+          "cell-n-l",
+          [textNode("number-label", "编号", { align: "center" })],
+          { width: "1fr" },
+        ),
         cell("cell-n-f", [fieldP("number-field", "编号")], { width: "1fr" }),
       ]),
       row("row-owner-team", 1, [
@@ -135,14 +155,18 @@ export function makeYunlvSecondTicketFirstFiveRowsSchema(): FormSchemaV2 {
         cell("cell-st-f", [], { width: "1fr" }),
       ]),
       row("row-work-task", 5, [
-        cell("cell-wt-label", [
-          textNode("work-task-label", "工作任务", {
-            align: "center",
-            verticalAlign: "middle",
-            writingMode: "vertical-rl",
-            fontWeight: "bold",
-          }),
-        ], { width: "1fr" }),
+        cell(
+          "cell-wt-label",
+          [
+            textNode("work-task-label", "工作任务", {
+              align: "center",
+              verticalAlign: "middle",
+              writingMode: "vertical-rl",
+              fontWeight: "bold",
+            }),
+          ],
+          { width: "1fr" },
+        ),
         cell("cell-wt-r1", [], { width: "1fr" }),
         cell("cell-wt-r2", [], { width: "1fr" }),
         cell("cell-wt-r3", [], { width: "1fr" }),
@@ -188,28 +212,65 @@ export function makeYunlvSecondTicketFirstFiveRowsSchema(): FormSchemaV2 {
   };
   mergeRightThree("ticket-layout", 4);
 
-  schema = appendNodeToCellV2(schema, "cell-o-l", textNode("owner-label", "工作负责人（监护人）："));
-  schema = appendNodeToCellV2(schema, "cell-o-l", fieldP("owner-field", "工作负责人（监护人）"));
-  schema = appendNodeToCellV2(schema, "cell-o-l", textNode("team-label", "班组："));
+  schema = appendNodeToCellV2(
+    schema,
+    "cell-o-l",
+    textNode("owner-label", "工作负责人（监护人）："),
+  );
+  schema = appendNodeToCellV2(
+    schema,
+    "cell-o-l",
+    fieldP("owner-field", "工作负责人（监护人）"),
+  );
+  schema = appendNodeToCellV2(
+    schema,
+    "cell-o-l",
+    textNode("team-label", "班组："),
+  );
   schema = appendNodeToCellV2(schema, "cell-o-l", fieldP("team-field", "班组"));
 
-  schema = appendNodeToCellV2(schema, "cell-m-l", textNode("members-label", "工作班成员（不包括工作负责人）："));
-  schema = appendNodeToCellV2(schema, "cell-m-l", fieldP("members-field", "工作班成员"));
-  schema = appendNodeToCellV2(schema, "cell-m-l", fieldP("member-count-field", "工作班成员人数", {
-    prefix: "共",
-    suffix: "人",
-    style: { align: "center" },
-  }));
+  schema = appendNodeToCellV2(
+    schema,
+    "cell-m-l",
+    textNode("members-label", "工作班成员（不包括工作负责人）："),
+  );
+  schema = appendNodeToCellV2(
+    schema,
+    "cell-m-l",
+    fieldP("members-field", "工作班成员"),
+  );
+  schema = appendNodeToCellV2(
+    schema,
+    "cell-m-l",
+    fieldP("member-count-field", "工作班成员人数", {
+      prefix: "共",
+      suffix: "人",
+      style: { align: "center" },
+    }),
+  );
 
-  schema = appendNodeToCellV2(schema, "cell-s-l", textNode("station-label", "工作的变、配电站名称及设备名称："));
-  schema = appendNodeToCellV2(schema, "cell-s-l", fieldP("station-field", "电站设备"));
+  schema = appendNodeToCellV2(
+    schema,
+    "cell-s-l",
+    textNode("station-label", "工作的变、配电站名称及设备名称："),
+  );
+  schema = appendNodeToCellV2(
+    schema,
+    "cell-s-l",
+    fieldP("station-field", "电站设备"),
+  );
 
   const workTaskTable: TableNodeV2 = {
     ...createTableNodeV2(),
     id: "work-task-table",
     field: "工作任务",
     columns: [
-      { key: "工作地点", title: "工作地点或地段", width: "1fr", align: "center" },
+      {
+        key: "工作地点",
+        title: "工作地点或地段",
+        width: "1fr",
+        align: "center",
+      },
       { key: "工作内容", title: "工作内容", width: "1fr", align: "center" },
     ],
     // 行模板内字段由渲染期按「列key_行号」自动派生（见 schema-v2-table-rows.ts 的

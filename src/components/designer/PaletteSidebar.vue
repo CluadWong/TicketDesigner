@@ -34,8 +34,6 @@ const emit = defineEmits<{
 
 <template>
   <aside class="v2-sidebar v2-sidebar--left">
-    <div class="v2-sidebar__heading">模板</div>
-
     <div class="v2-sidebar__group-title">基础组件</div>
     <button
       class="v2-palette-item v2-palette-item--button"
@@ -241,5 +239,8 @@ const emit = defineEmits<{
   color: #1e293b;
   font-size: 12px;
   font-weight: 700;
+}
+.v2-sidebar__group-title:first-child {
+  margin-top: 0;
 }
 </style>
