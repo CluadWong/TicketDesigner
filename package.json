@@ -5,6 +5,17 @@
   "type": "module",
   "description": "固定布局表单设计器与渲染组件（Schema V2）：可视化编排版式 → 导出 Schema JSON → 渲染 / 填写 / 打印",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/CluadWong/TicketDesigner.git"
+  },
+  "homepage": "https://github.com/CluadWong/TicketDesigner",
+  "bugs": {
+    "url": "https://github.com/CluadWong/TicketDesigner/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "files": [
     "dist"
   ],
@@ -37,6 +48,8 @@
     "build:lib": "vite build --config vite.lib.config.ts",
     "build:types": "vue-tsc -p tsconfig.lib.json --declaration --emitDeclarationOnly --outDir dist && node scripts/fix-dts-alias.mjs",
     "pack:check": "npm run build:lib && npm run build:types && npm pack --dry-run",
+    "release": "bash scripts/release.sh",
+    "promote": "bash scripts/promote-to-release.sh",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest"

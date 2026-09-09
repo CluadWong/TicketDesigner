@@ -9,7 +9,7 @@
  *   - 显示分页警告数（结构校验警告 + 分页超高告警）
  *   - 缩放控件占位（阶段 5 完善）
  *
- * 设计依据：docs/design-biz.md §2.1（设计器界面）、docs/development-plan.md §3（已锁定决策）。
+ * 设计依据：docs/design-biz.md §2.1（设计器界面）。
  */
 
 defineProps<{
