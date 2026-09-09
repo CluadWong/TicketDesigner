@@ -8,8 +8,12 @@ pnpm-debug.log*
 
 node_modules
 dist
+dist-app
 dist-ssr
 *.local
+
+# npm 私有源凭据（含 token，绝不入库）
+.npmrc
 
 # Editor directories and files
 .vscode/*
