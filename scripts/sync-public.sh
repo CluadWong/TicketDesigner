@@ -4,7 +4,8 @@
 # 为什么不能直接 `git merge lab`：
 #   lab 上刻意不存在任何对外发布资产（发布脚本 / 对外 README / 发布指南 / 包名与协议等
 #   发布身份字段）。merge 时 lab 的「这些文件不存在」会被当成删除应用掉，所以合并后
-#   必须从 release@{1}（合并前的 release）逐个恢复。
+#   必须从 release@{1}（合并前的 release）逐个恢复。反向地，只属于 lab 的内部资产
+#   （本脚本自身）要从 release 移除，不能随发布分支出去。
 #
 # 另一个坑：本脚本只存在于 lab。切到 release 后它在工作树里就没了，而 bash 是按偏移
 #   逐行读脚本文件的 —— 内容被替换或删除会执行到错误的东西（2026-09-10 在 promote
@@ -92,6 +93,19 @@ for p in "${PUBLIC_ASSETS[@]}"; do
     run git checkout "release@{1}" -- "$p"
   else
     warn "  跳过（release@{1} 无此路径）：$p"
+  fi
+done
+
+# ---- 4b. 移除只属于 lab 的内部资产（不该出现在对外发布分支） ----
+info "4b 移除 release 侧不该有的内部资产"
+LAB_ONLY_ASSETS=(
+  scripts/sync-public.sh
+)
+for p in "${LAB_ONLY_ASSETS[@]}"; do
+  if [ -e "$p" ]; then
+    run git rm --cached -q -- "$p"
+    if [ $DRY -eq 0 ]; then rm -f "$p"; fi
+    info "  已移除：$p"
   fi
 done
 
