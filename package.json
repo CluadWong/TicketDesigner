@@ -37,7 +37,7 @@
     },
     "./renderer/style.css": "./dist/renderer-core.css",
     "./designer/style.css": "./dist/designer-ui.css",
-    "./style.css": "./dist/renderer-core.css"
+    "./style.css": "./dist/ticket-designer.css"
   },
   "sideEffects": [
     "**/*.css"

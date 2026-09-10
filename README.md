@@ -58,7 +58,7 @@ const data = ref<FormDataV2>({})
 需要在宿主内编排模板时，改用 `designer` 入口：
 
 ```ts
-import { DesignerApp, buildBlankSchema } from '@aikkk/ticket-designer/designer'
+import { FormDesigner, buildBlankSchema } from '@aikkk/ticket-designer/designer'
 import '@aikkk/ticket-designer/designer/style.css'
 ```
 
@@ -69,7 +69,7 @@ import '@aikkk/ticket-designer/designer/style.css'
 | 入口 | 内容 | 谁用 |
 |---|---|---|
 | `@aikkk/ticket-designer/renderer` | `FormRenderer` / `GridFormRenderer` / `printForm` / `collectFieldValues` / Schema 类型 | 消费端：渲染、填写、打印 |
-| `@aikkk/ticket-designer/designer` | `DesignerApp` / `defaultDesignerUIConfig` / `buildBlankSchema` | 需要在宿主内编排模板时 |
+| `@aikkk/ticket-designer/designer` | `FormDesigner` / `defaultDesignerUIConfig` / `buildBlankSchema` | 需要在宿主内编排模板时 |
 
 数据流：
 
@@ -94,7 +94,7 @@ src/
 ├── engine-v2/            # 渲染期领域逻辑：分页引擎、派生计算、节点地址
 ├── components/
 │   ├── renderer-v2/      # 渲染内核：GridFormRenderer / FormRenderer / GridSchemaNode / HtmlBlock / PaperViewport
-│   └── designer/         # 设计器：DesignerApp 编排层 + CanvasSurface 表面层 + composables + inspectors
+│   └── designer/         # 设计器：FormDesigner 编排层 + CanvasSurface 表面层 + composables + inspectors
 ├── preview/              # 预览/填写演示页
 ├── dev/                  # 示例数据与测试夹具（被测试与演示页引用）
 ├── utils/ styles/ samples/ test-utils/
@@ -135,7 +135,7 @@ npm run preview    # 预览构建产物
 
 - `release`：对外发布分支，发布到公共 npmjs（`@aikkk/ticket-designer`），只保留源码、测试与对外文档。一键发布脚本 `npm run release` 在此分支运行。
 - `main`：GitHub 默认分支，**已设分支保护（Require a pull request before merging），禁止直推**。`release` 发布后由脚本自动开 PR(`release → main`) 并请求自动合并；无 `gh` CLI 时打印手动建 PR 链接。
-- `dev`：内部开发分支，含过程记录与调试样本（源码同样托管在 GitHub）。
+- `dev`：内部开发分支（源码同样托管在 GitHub）。`npm run promote` 后再执行 `npm run release` 完成发版。
 
 ## License
 

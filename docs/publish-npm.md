@@ -15,11 +15,19 @@
 样式按入口分离，**别引错**：
 
 ```
-@aikkk/ticket-designer/renderer/style.css   → 渲染样式（含 .layout-* 版式类）
-@aikkk/ticket-designer/designer/style.css   → 设计器样式（含 .v2-* 面板类）
+@aikkk/ticket-designer/renderer/style.css   → 渲染样式（.grid-form-paper / .layout-* / .paper-viewport）
+@aikkk/ticket-designer/designer/style.css   → 渲染样式 + 设计器样式（.v2-* 面板类），**自足，不要再额外引 renderer 的**
+@aikkk/ticket-designer/style.css            → 全量（根入口用，= renderer + designer）
 ```
 
 只做渲染/填写的页面**只引 renderer 的样式**，否则设计器的非 scoped 样式会洒进宿主全局。
+
+> **为什么 designer 的样式里含渲染样式**（2026-09-10 修复）：
+> 渲染内核的 scoped CSS 只跟随 `renderer-core` chunk 输出一次，若 `designer-ui.css` 不含它，
+> 只引 `designer/style.css` 的宿主会丢掉 `.grid-form-paper`（纸张没白底/阴影，只有选中节点时才被
+> `.is-design-selected` 高亮出轮廓）、`.layout-grid__row/cell`（版式塌掉）、`.paper-viewport`。
+> 现在 `build:lib` 末尾由 `mergeDesignerCss()` 插件把 `renderer-core.css` **前置拼接**进
+> `designer-ui.css`（renderer 在前，保证设计器覆盖生效），三档样式各自自足。
 
 ## 二、本地构建与校验（发布前必跑）
 
@@ -29,7 +37,7 @@ npm run build:types        # 产出 dist/*.d.ts
 npm run pack:check         # 上面两步 + npm pack --dry-run，发布前必跑
 ```
 
-产物：`dist/{index,renderer,designer}.js` + `dist/chunks/{renderer-core,designer-ui}.js` + `dist/{renderer-core,designer-ui}.css` + 类型声明。
+产物：`dist/{index,renderer,designer}.js` + `dist/chunks/{renderer-core,designer-ui}.js` + `dist/{renderer-core,designer-ui,ticket-designer}.css` + 类型声明。
 
 > `build:types` 末尾会自动跑 `scripts/fix-dts-alias.mjs`：把 `vue-tsc` 产物里残存的 `@/` 路径别名改写成相对路径。发布包**不能带 `@/`**（消费端没有这个别名，一 import 就报 `Cannot find module '@/types'`）。
 
