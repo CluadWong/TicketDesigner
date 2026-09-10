@@ -2,7 +2,9 @@
 # scripts/promote-to-release.sh —— 将 dev 的迭代安全提升到 release（对外公共分支）
 #
 # 解决「直接 git merge dev」会带来的问题：
-#   1. 包名回退（dev 仍是内部开发分支，可能带不同包名/协议）—— 合并后强制恢复 release 的 package.json
+#   1. 包名回退（dev 仍是内部开发分支，可能带不同包名/协议）—— 合并后恢复 release 的
+#      **发布身份字段**（name/license/repository/publishConfig/files/peerDependencies + scripts.release|promote），
+#      由 scripts/merge-package-json.mjs 按字段覆盖，**不整体覆盖 package.json**（否则会把 dev 的合法改动一并吞掉）
 #   2. GitLab CI 泄漏（.gitlab-ci.yml 只在 dev）—— 合并后删除
 #   3. 过程文档 / demo 回流 —— 合并后按清单裁剪
 #   4. 推送目标错乱 —— 默认只本地提交，--push 仅推 origin release（不碰其他 remote）
@@ -38,7 +40,9 @@ run() { if [ $DRY -eq 1 ]; then printf '%s[dry-run]%s %s\n' "$c_bold" "$c_reset"
 [ -z "$(git status --porcelain)" ] \
   || { echo "工作树不干净，请先提交或暂存改动" >&2; exit 1; }
 
-# release 侧权威的 package.json 先备份，合并后强制恢复（防 @huangshichuang / UNLICENSED 回退）
+# release 侧权威的 package.json 先备份，合并后恢复「发布身份」字段
+# 注意：只恢复身份字段（name/license/repository/publishConfig/...），**不做整体覆盖** ——
+# 整体覆盖会把 dev 的合法改动一并吞掉（2026-09-10 踩中：exports["./style.css"] 的修复被丢弃）。
 PKG_BAK="$(mktemp)"
 run cp package.json "$PKG_BAK"
 
@@ -47,8 +51,8 @@ run git merge --no-edit -X theirs dev || {
   echo "合并产生需人工解决的冲突，请处理后重试" >&2; exit 1;
 }
 
-info "2/6 恢复 release 的 package.json（@aikkk / MIT / GitHub / 无 GitLab CI）"
-run cp "$PKG_BAK" package.json
+info "2/6 恢复 release 的发布身份字段（@aikkk / MIT / GitHub / public）"
+run node scripts/merge-package-json.mjs package.json "$PKG_BAK"
 run git add package.json
 rm -f "$PKG_BAK"
 
