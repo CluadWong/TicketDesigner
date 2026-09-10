@@ -128,7 +128,7 @@ npm run preview    # 预览构建产物
 
 ### 验证基线
 
-- `npx vitest run`：**364 passed（46 文件）**
+- `npx vitest run`：**365 passed（46 文件）**
 - `npx vue-tsc --noEmit`：无错误
 
 ### 分支

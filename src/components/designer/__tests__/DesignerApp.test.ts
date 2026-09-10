@@ -702,7 +702,11 @@ describe("结构树 折叠全部 / 展开全部", () => {
 });
 
 describe("DesignerApp 帮助面板接线", () => {
-  it("工具栏「帮助」按钮打开面板，面板内 ✕ 关闭", async () => {
+  // DesignerApp 内部常量，此处按值锁定（改名时测试会红，属预期追溯点）。
+  const HELP_SEEN_STORAGE_KEY = "ticket-designer-help-seen-v1";
+
+  it("已看过引导（localStorage 有标记）时初始不弹面板，工具栏「帮助」按钮打开、面板内 ✕ 关闭", async () => {
+    localStorage.setItem(HELP_SEEN_STORAGE_KEY, "1");
     const wrapper = mountDesigner();
     expect(wrapper.find(".v2-help").exists()).toBe(false);
 
@@ -716,5 +720,19 @@ describe("DesignerApp 帮助面板接线", () => {
 
     await wrapper.find(".v2-help__close").trigger("click");
     expect(wrapper.find(".v2-help").exists()).toBe(false);
+  });
+
+  it("首次使用（无已读标记）默认弹出帮助面板，✕ 关闭后落已读标记", async () => {
+    localStorage.removeItem(HELP_SEEN_STORAGE_KEY);
+    const wrapper = mountDesigner();
+    expect(wrapper.find(".v2-help").exists()).toBe(true);
+
+    await wrapper.find(".v2-help__close").trigger("click");
+    expect(wrapper.find(".v2-help").exists()).toBe(false);
+    expect(localStorage.getItem(HELP_SEEN_STORAGE_KEY)).toBe("1");
+
+    // 已读标记生效：重新挂载不再弹出。
+    const remounted = mountDesigner();
+    expect(remounted.find(".v2-help").exists()).toBe(false);
   });
 });

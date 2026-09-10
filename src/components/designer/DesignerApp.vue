@@ -20,7 +20,10 @@ import HelpPanel from "./HelpPanel.vue";
 // PaletteSidebar / InspectorPanel 都依赖这些非 scoped 类，挂在 InspectorPanel 上
 // 会造成「宿主壳层样式依赖右侧面板引入」的错误归属与时序耦合。
 import "./styles/designer-ui.css";
-import { buildBlankSchema, useSchemaDocument } from "./composables/useSchemaDocument";
+import {
+  buildBlankSchema,
+  useSchemaDocument,
+} from "./composables/useSchemaDocument";
 import { useNodeSelection } from "./composables/useNodeSelection";
 import { useSchemaEdits, type NodeKind } from "./composables/useSchemaEdits";
 import { useFillData } from "./composables/useFillData";
@@ -69,8 +72,33 @@ const editable = computed(() => !previewMode.value);
  * 此开关只影响设计态画布。
  */
 const paginate = ref(true);
-/** 应用内帮助面板开关（工具栏「帮助」按钮触发，HelpPanel 自管 Esc/遮罩关闭）。 */
-const helpOpen = ref(false);
+/** localStorage 键：帮助面板「已看过首次引导」标记（命名跟随 ticket-designer-* 惯例）。 */
+const HELP_SEEN_STORAGE_KEY = "ticket-designer-help-seen-v1";
+
+/**
+ * 是否已看过首次使用引导。localStorage 不可用（隐私模式等）时视为未看过——
+ * 宁可多弹一次引导，也不让它永不出现。
+ */
+function hasSeenHelpOnce(): boolean {
+  try {
+    return localStorage.getItem(HELP_SEEN_STORAGE_KEY) !== null;
+  } catch {
+    return false;
+  }
+}
+
+/** 关闭帮助面板并落「已看过」标记，保证首次使用引导只出现一次。 */
+function closeHelp(): void {
+  helpOpen.value = false;
+  try {
+    localStorage.setItem(HELP_SEEN_STORAGE_KEY, "1");
+  } catch {
+    // 标记写不进（配额/隐私模式）时静默降级：下次会话引导会再弹，不影响本次关闭。
+  }
+}
+
+/** 应用内帮助面板开关：工具栏「帮助」按钮触发；首次挂载若无已读标记则默认弹出（首次使用引导）。 */
+const helpOpen = ref(!hasSeenHelpOnce());
 const canvasEl = ref<HTMLElement | null>(null);
 
 // ── 文档：schema / 历史 / 持久化 ────────────────────────────
@@ -285,7 +313,9 @@ const warningCount = computed(() => issues.value.length);
  * 与渲染内核 `GridFormRenderer` 调的是**同一个** `paginateSchema` 且入参口径一致，
  * 因此状态栏数字与画布物理页必然一致，不会两处各算一套而漂移。
  */
-const pagination = computed(() => paginateSchema(schema.value, { data: previewData.value }));
+const pagination = computed(() =>
+  paginateSchema(schema.value, { data: previewData.value }),
+);
 
 // ── 快捷键与离开确认 ───────────────────────────────────────
 /** 焦点在表单控件 / 可编辑区内时，快捷键让位给浏览器原生（文本复制、撤销、退格等）。 */
@@ -293,7 +323,12 @@ function isTypingTarget(event: KeyboardEvent): boolean {
   const t = event.target as HTMLElement | null;
   if (!t) return false;
   const tag = t.tagName;
-  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || t.isContentEditable;
+  return (
+    tag === "INPUT" ||
+    tag === "TEXTAREA" ||
+    tag === "SELECT" ||
+    t.isContentEditable
+  );
 }
 
 function onKeydown(event: KeyboardEvent): void {
@@ -461,7 +496,7 @@ onUnmounted(() => {
       @change="importFillDataFile"
     />
 
-    <HelpPanel :open="helpOpen" @close="helpOpen = false" />
+    <HelpPanel :open="helpOpen" @close="closeHelp" />
   </div>
 </template>
 
