@@ -37,6 +37,12 @@ const AUTHORITATIVE = [
 /** scripts 中必须存在的键（发布流程依赖，开发主线裁剪掉也要补回）。 */
 const REQUIRED_SCRIPTS = ["release"];
 
+/**
+ * scripts 中必须删除的键：只属于开发主线，release 上对应脚本已被同步流程移除，
+ * 留着会指向不存在的文件。
+ */
+const FORBIDDEN_SCRIPTS = ["sync"];
+
 const [destPath, srcPath] = process.argv.slice(2);
 if (!destPath || !srcPath) {
   console.error("用法: node scripts/merge-package-json.mjs <目标 package.json> <release 侧备份>");
@@ -55,13 +61,18 @@ for (const key of AUTHORITATIVE) {
   applied.push(key);
 }
 
-// scripts：跟随开发主线，但补回 release 侧必需的发布脚本。
-if (released.scripts) {
-  dest.scripts = { ...(dest.scripts ?? {}) };
+// scripts：跟随开发主线，但补回 release 侧必需的发布脚本、移除只属开发主线的脚本。
+if (dest.scripts) {
   for (const key of REQUIRED_SCRIPTS) {
-    if (!(key in dest.scripts) && key in released.scripts) {
+    if (!(key in dest.scripts) && released.scripts && key in released.scripts) {
       dest.scripts[key] = released.scripts[key];
       applied.push(`scripts.${key}`);
+    }
+  }
+  for (const key of FORBIDDEN_SCRIPTS) {
+    if (key in dest.scripts) {
+      delete dest.scripts[key];
+      applied.push(`scripts.${key}(已移除)`);
     }
   }
 }
