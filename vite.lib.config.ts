@@ -22,7 +22,7 @@ import path from "node:path";
  * 背景：`manualChunks` 把 `src/components/renderer-v2/**` 整体归到 `renderer-core` chunk，
  * 而 CSS 只跟随模块所在 chunk 输出一次 —— 于是 `.grid-form-paper` / `.layout-grid__row` /
  * `.paper-viewport` 等渲染内核 scoped 样式全部只落在 `renderer-core.css`。
- * 后果：宿主只引 `@aikkk/ticket-designer/designer/style.css` 时纸张没有白底与阴影、
+ * 后果：宿主只引 `ticket-designer/designer/style.css` 时纸张没有白底与阴影、
  * 网格版式塌掉（选中节点时因 `.is-design-selected` 在 designer-ui.css 里才看得到纸）。
  *
  * 修法：构建后把 `renderer-core.css` 内容 **前置拼接** 到 `designer-ui.css`
