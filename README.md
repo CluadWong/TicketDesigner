@@ -1,6 +1,9 @@
-# ticket-designer
+# @aikkk/ticket-designer
 
 > 固定布局表单设计器：可视化编排版式 → 导出 Schema JSON → 由渲染组件消费并填充/打印。
+
+[![npm version](https://img.shields.io/npm/v/@aikkk/ticket-designer)](https://www.npmjs.com/package/@aikkk/ticket-designer)
+[![license](https://img.shields.io/npm/l/@aikkk/ticket-designer)](./LICENSE)
 
 技术栈 Vue 3.5 + TypeScript + Vite + Vitest，无后端依赖。
 
@@ -19,18 +22,12 @@
 - **纸张与打印**：A4/A3 尺寸驱动方向，`@page` 由渲染内核运行时注入
 - **完整类型声明**：Schema V2 类型、渲染期领域逻辑（分页 / 派生）随包导出
 
-## 产物与接入
-
-本分支为内部开发主线，不发布到任何公共源。宿主接入走以下两种方式：
+## 安装
 
 ```bash
-# 1. 本地联调：构建产物后 link
-npm run build:lib
-npm run build:types
-npm link                # 本仓库
-npm link ticket-designer  # 宿主项目
-
-# 2. 内部源：由维护者发布到内部 registry（地址见内网文档）
+npm i @aikkk/ticket-designer
+# 或
+pnpm add @aikkk/ticket-designer
 ```
 
 `vue` 是 peerDependency（`^3.5.0`），宿主需自备；同仓多实例时务必 `resolve.dedupe: ['vue']`（见下方注意事项）。
@@ -42,10 +39,10 @@ npm link ticket-designer  # 宿主项目
 ```vue
 <script setup lang="ts">
 import { ref } from 'vue'
-import { FormRenderer, printForm } from 'ticket-designer/renderer'
-import type { FormSchemaV2, FormDataV2 } from 'ticket-designer/renderer'
+import { FormRenderer, printForm } from '@aikkk/ticket-designer/renderer'
+import type { FormSchemaV2, FormDataV2 } from '@aikkk/ticket-designer/renderer'
 // 样式按入口分离，引入 renderer 对应的样式
-import 'ticket-designer/renderer/style.css'
+import '@aikkk/ticket-designer/renderer/style.css'
 
 // 设计器导出的 Schema JSON（服务端存储后下发）
 const schema = ref<FormSchemaV2>(/* ... */)
@@ -61,8 +58,8 @@ const data = ref<FormDataV2>({})
 需要在宿主内编排模板时，改用 `designer` 入口：
 
 ```ts
-import { FormDesigner, buildBlankSchema } from 'ticket-designer/designer'
-import 'ticket-designer/designer/style.css'
+import { FormDesigner, buildBlankSchema } from '@aikkk/ticket-designer/designer'
+import '@aikkk/ticket-designer/designer/style.css'
 ```
 
 ## 用法
@@ -71,8 +68,8 @@ import 'ticket-designer/designer/style.css'
 
 | 入口 | 内容 | 谁用 |
 |---|---|---|
-| `ticket-designer/renderer` | `FormRenderer` / `GridFormRenderer` / `printForm` / `collectFieldValues` / Schema 类型 | 消费端：渲染、填写、打印 |
-| `ticket-designer/designer` | `FormDesigner` / `defaultDesignerUIConfig` / `buildBlankSchema` | 需要在宿主内编排模板时 |
+| `@aikkk/ticket-designer/renderer` | `FormRenderer` / `GridFormRenderer` / `printForm` / `collectFieldValues` / Schema 类型 | 消费端：渲染、填写、打印 |
+| `@aikkk/ticket-designer/designer` | `FormDesigner` / `defaultDesignerUIConfig` / `buildBlankSchema` | 需要在宿主内编排模板时 |
 
 数据流：
 
@@ -134,25 +131,11 @@ npm run preview    # 预览构建产物
 - `npx vitest run`：**365 passed（46 文件）**
 - `npx vue-tsc --noEmit`：无错误
 
-### 分支与同步
+### 分支
 
-三条分支，两套 remote：
-
-| 分支 | remote | 用途 |
-|---|---|---|
-| `lab` | `origin`（内部仓库） | **内部开发主线**。日常开发在这里，不含任何对外发布资产与发布脚本 |
-| `release` | `public` | 对外发布分支。由 `npm run sync` 从 `lab` 单向同步，只保留源码、测试与对外文档 |
-| `main` | `public` | 公开仓库默认分支，已设分支保护禁止直推；`release` 发版后由脚本自动开 PR 合并 |
-
-同步（在 `lab` 分支、工作树干净时执行）：
-
-```bash
-npm run sync            # 合并 lab → release，恢复发布资产，跑验证，本地提交
-npm run sync -- --push   # 额外推 public（release + lab）
-```
-
-`sync` 会自动把 `release` 侧的发布资产（发布脚本、对外 README、包名与协议等发布身份字段）恢复回来，
-这些文件在 `lab` 上刻意不存在，因此**不要手动把 `release` 合并回 `lab`**。
+- `release`：对外发布分支，发布到公共 npmjs（`@aikkk/ticket-designer`），只保留源码、测试与对外文档。一键发布脚本 `npm run release` 在此分支运行。
+- `main`：GitHub 默认分支，**已设分支保护（Require a pull request before merging），禁止直推**。`release` 发布后由脚本自动开 PR(`release → main`) 并请求自动合并；无 `gh` CLI 时打印手动建 PR 链接。
+- `dev`：内部开发分支（源码同样托管在 GitHub）。`npm run promote` 后再执行 `npm run release` 完成发版。
 
 ## License
 
