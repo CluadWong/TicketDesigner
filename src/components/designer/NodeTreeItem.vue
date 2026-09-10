@@ -19,7 +19,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{ (event: "select", id: string): void }>();
 
-/** 全局折叠/展开信号（由 DesignerApp 经 provide 下发）。 */
+/** 全局折叠/展开信号（由 FormDesigner 经 provide 下发）。 */
 const control = inject<TreeControl | null>(TreeControlKey, null);
 /**
  * 局部展开态：默认展开。若处于全局信号管控下，新节点以当前 `target` 作为

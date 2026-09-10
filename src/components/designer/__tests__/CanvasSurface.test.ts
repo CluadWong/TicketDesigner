@@ -64,8 +64,8 @@ describe("CanvasSurface selection highlight (A5)", () => {
     expect(selected).not.toContain("unit-field");
   });
 
-  it("is mode-agnostic: highlights whenever selectedNodeId is set (preview suppression is DesignerApp's job)", async () => {
-    // 表面层只认 selectedNodeId，不感知 mode；预览态「无选中」由 DesignerApp 传 null 实现，
+  it("is mode-agnostic: highlights whenever selectedNodeId is set (preview suppression is FormDesigner's job)", async () => {
+    // 表面层只认 selectedNodeId，不感知 mode；预览态「无选中」由 FormDesigner 传 null 实现，
     // 本测试确认表面层本身的行为：只要传了非 null selectedNodeId 就高亮（与 mode 无关）。
     const wrapper = mount(CanvasSurface, {
       props: { schema, mode: "preview", selectedNodeId: "unit-field" },

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { nextTick } from "vue";
 import { mount } from "@vue/test-utils";
-import DesignerApp from "@/components/designer/DesignerApp.vue";
+import FormDesigner from "@/components/designer/FormDesigner.vue";
 import type { FormSchemaV2 } from "@/types";
 import { makeFiftyRowGridSchema } from "@/dev/gridPaginationDemo";
 
@@ -47,12 +47,12 @@ function makeOversizedRowSchema(): FormSchemaV2 {
  * 确保分页效果可验证。
  */
 function mountWithTallSchema() {
-  return mount(DesignerApp, {
+  return mount(FormDesigner, {
     props: { initialSchema: makeFiftyRowGridSchema() },
   });
 }
 
-describe("DesignerApp 分页渲染", () => {
+describe("FormDesigner 分页渲染", () => {
   it("超高 Schema 在设计器中渲染为多张物理页，且行数不丢失", () => {
     const wrapper = mountWithTallSchema();
     const papers = wrapper.findAll(".grid-form-paper");
@@ -71,7 +71,7 @@ describe("DesignerApp 分页渲染", () => {
   });
 
   it("空白 Schema 仍只渲染一张纸（分页不产生空页）", () => {
-    const wrapper = mount(DesignerApp);
+    const wrapper = mount(FormDesigner);
     expect(wrapper.findAll(".grid-form-paper")).toHaveLength(1);
   });
 
@@ -91,7 +91,7 @@ describe("DesignerApp 分页渲染", () => {
   });
 });
 
-describe("DesignerApp 状态栏暴露分页结果", () => {
+describe("FormDesigner 状态栏暴露分页结果", () => {
   it("内容超高时显示物理（打印）页数，且与画布纸张数一致", () => {
     const wrapper = mountWithTallSchema();
     const paperCount = wrapper.findAll(".grid-form-paper").length;
@@ -104,12 +104,12 @@ describe("DesignerApp 状态栏暴露分页结果", () => {
   });
 
   it("逻辑页与物理页相同（空白 Schema）时不额外显示打印页数", () => {
-    const wrapper = mount(DesignerApp);
+    const wrapper = mount(FormDesigner);
     expect(wrapper.find('[data-physical-page-count="true"]').exists()).toBe(false);
   });
 
   it("单节点比整页还高时，状态栏显示分页告警", () => {
-    const wrapper = mount(DesignerApp, {
+    const wrapper = mount(FormDesigner, {
       props: { initialSchema: makeOversizedRowSchema() },
     });
     expect(wrapper.find('[data-paginate-warning-count="true"]').exists()).toBe(true);

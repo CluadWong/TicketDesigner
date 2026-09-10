@@ -1,7 +1,7 @@
 /**
  * 填充数据（预览态）生命周期：预览数据本身 + 导入 / 导出 / 存本地 / 读本地。
  *
- * 从 `DesignerApp.vue` 抽出（2026-09-07 批次 1 拆分）：只管「表单数据」，
+ * 从 `FormDesigner.vue` 抽出（2026-09-07 批次 1 拆分）：只管「表单数据」，
  * 与 schema 存储键隔离（`DATA_STORAGE_KEY` vs `SCHEMA_STORAGE_KEY`）。
  *
  * 导出 / 保存只在预览态可用：值由渲染 DOM 遍历采集（`collectFieldValues`），

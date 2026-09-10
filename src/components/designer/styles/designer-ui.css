@@ -5,9 +5,9 @@
  * 放在任一组件的 `<style scoped>` 里都无法命中其他组件的元素（scoped 加属性选择器）。
  * 因此提取为全局样式表。批次 3（2026-09-08）壳层拆件后，`DesignerToolbar` /
  * `PaletteSidebar` 也依赖 `.v2-toolbar*` / `.v2-sidebar*` 等类，故引入点自批次 4 起
- * 上移到宿主 `DesignerApp.vue`（不再挂在 `InspectorPanel.vue`）。
+ * 上移到宿主 `FormDesigner.vue`（不再挂在 `InspectorPanel.vue`）。
  */
-/* 工具条：工具栏（DesignerApp）与检查器内的按钮行（CellInspector 合并/拆分）共用，
+/* 工具条：工具栏（FormDesigner）与检查器内的按钮行（CellInspector 合并/拆分）共用，
    放全局以免跨组件 scoped 失配。 */
 .v2-toolbar {
   display: flex;
@@ -205,7 +205,7 @@
   font-size: 11px;
 }
 
-/* 打印：工具条与两侧面板跨组件（DesignerApp 工具栏 / InspectorPanel 侧栏）统一隐藏，
+/* 打印：工具条与两侧面板跨组件（FormDesigner 工具栏 / InspectorPanel 侧栏）统一隐藏，
    故放全局而非任一组件的 scoped 样式。 */
 @media print {
   .v2-toolbar,

@@ -22,7 +22,7 @@ import type {
  * - 一个 50 行 `grid`（border=all，3 列），每格一个字段 P，字段 key 形如 `c{列}_{行}`
  *
  * 该 Schema 仅被单测复用（engine-v2/pagination.test.ts、GridFormRenderer.pagination.test.ts、
- * DesignerApp.pagination.test.ts 等），作为「超高 Schema」的分页测试夹具；预览页下拉已于廿二续移除。
+ * FormDesigner.pagination.test.ts 等），作为「超高 Schema」的分页测试夹具；预览页下拉已于廿二续移除。
  */
 
 const BASE_ROW_HEIGHT = 8;

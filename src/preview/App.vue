@@ -5,7 +5,7 @@ import { makeYunlvSecondTicketFullSchema } from "@/dev/yunlv-second-ticket-full"
 /**
  * 消费页演示（G8 独立运行，最简形态）：schema → 渲染，
  * 只验证渲染内核可脱离设计器独立运行。
- * 设计页（DesignerApp）保持纯设计用途。
+ * 设计页（FormDesigner）保持纯设计用途。
  */
 const schema = makeYunlvSecondTicketFullSchema();
 </script>

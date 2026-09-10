@@ -1,7 +1,7 @@
 /**
  * 结构编辑 composable 单测（2026-09-07 批次 1 拆分）：验证编辑闸门与提交接线。
  *
- * 关注点不是每个 Inspector 字段（那仍由 DesignerApp.test.ts 经 DOM 覆盖），
+ * 关注点不是每个 Inspector 字段（那仍由 FormDesigner.test.ts 经 DOM 覆盖），
  * 而是：① 非设计态一切结构编辑被闸门挡住；② 编辑动作确实落到文档并进入历史。
  */
 import { describe, expect, it } from "vitest";

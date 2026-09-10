@@ -8,7 +8,7 @@
  * - `t(key, params?)`：当前语言缺 key → 回退 `DEFAULT_LOCALE`；仍缺 → 回退 key 本身
  *   （便于发现漏翻，而非空白）。`{name}` 占位由 params 替换。
  * - 语言来源：设计页通过全局配置 `uiConfig.locale` 注入（见 `components/designer/config.ts`），
- *   `DesignerApp` 在挂载/配置变化时 `setLocale`；默认 `zh-CN`。
+ *   `FormDesigner` 在挂载/配置变化时 `setLocale`；默认 `zh-CN`。
  */
 import { ref } from "vue";
 import type { Locale, Messages } from "./types";

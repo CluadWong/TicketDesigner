@@ -1,7 +1,7 @@
 /**
  * 文档 composable 单测（2026-09-07 批次 1 拆分）。
  *
- * 拆分前这些行为只能通过 DesignerApp 的 DOM 点击间接验证；现在可脱离组件直接测：
+ * 拆分前这些行为只能通过 FormDesigner 的 DOM 点击间接验证；现在可脱离组件直接测：
  * 提交 / 撤销 / 重做 / tag 合并窗口 / 整份替换 / 本地持久化往返。
  */
 import { describe, beforeEach, expect, it, vi } from "vitest";

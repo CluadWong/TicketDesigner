@@ -62,7 +62,7 @@ export interface FormRendererOptions {
 /**
  * 公共渲染入口（G8）：消费页引用渲染器的唯一公开组件。
  *
- * 设计器（DesignerApp）仍直接引用内核 `GridFormRenderer`（并包 `CanvasSurface` 负责组件编辑）；
+ * 设计器（FormDesigner）仍直接引用内核 `GridFormRenderer`（并包 `CanvasSurface` 负责组件编辑）；
  * 本组件是在内核之上收敛出的「消费页友好」包装——props 收敛为 `schema / data / options`，
  * 不暴露任何设计器私有状态（`selectedNodeId` / 拖拽态 / `node-drag-start`），从而可被独立引用与库化。
  *

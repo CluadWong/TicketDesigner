@@ -21,8 +21,8 @@ import type { FormSchemaV2, FormDataV2, FormNodeV2 } from "@/types";
  *   设计态字段 p 需 Alt）、写入 NODE_MOVE_MIME，再计算合法投放格与插入下标；
  *   内核不再感知拖拽：落点（dragover / drop / dragend）与**源**（dragstart）均在本层以事件委托处理，
  *   插入指示线也由本层用 overlay 绝对定位绘制（见 `indicatorStyle`），内核模板零拖拽 DOM 分支（D3）。
- * - 透传 `node-drag-start` / `field-change` 给上层 DesignerApp；
- *   落点结果以语义事件 `drop-node` / `drop-palette` / `drag-end` 上抛，由 DesignerApp 提交 schema。
+ * - 透传 `node-drag-start` / `field-change` 给上层 FormDesigner；
+ *   落点结果以语义事件 `drop-node` / `drop-palette` / `drag-end` 上抛，由 FormDesigner 提交 schema。
  *
  * 关键拆分：内核不再持有 `selectedNodeId`、不处理拖拽 DOM 事件（A5/A6）；
  * 选中与拖拽交互均在本表面层完成，内核保持纯净（分层约束见 docs/design.md）。
@@ -214,7 +214,7 @@ function computeInsertionIndex(cellEl: HTMLElement, clientY: number): number {
 /**
  * 拖拽源（内核 GridSchemaNode 的 dragstart）冒泡到表面层：记录被拖拽节点，
  * 计算「合法投放格」集合（排除被拖拽节点自身及其后代容器，含嵌套 Grid / Table 内部格），
- * 并向上透传选中态给 DesignerApp。
+ * 并向上透传选中态给 FormDesigner。
  */
 function onNodeDragStart(id: string): void {
   const index = buildEditorNodeIndexV2(props.schema);

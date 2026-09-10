@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { mount, type DOMWrapper } from "@vue/test-utils";
 import { nextTick as vueNextTick } from "vue";
-import DesignerApp from "@/components/designer/DesignerApp.vue";
+import FormDesigner from "@/components/designer/FormDesigner.vue";
 
 /** 定位「填充数据」工具组，避免与 schema 组的「保存 / 导出文件」按钮混淆。 */
 function findFillDataGroup(wrapper: ReturnType<typeof mount>): DOMWrapper<Element> {
@@ -22,7 +22,7 @@ function buttonByText(
 
 describe("B2 填充数据导入/导出生命周期（三十续）", () => {
   it("设计态：填充数据组含 导入数据/导出数据/读取数据/保存数据，且导出/保存禁用", () => {
-    const wrapper = mount(DesignerApp, { props: { uiConfig: { showFillDataModule: true } } });
+    const wrapper = mount(FormDesigner, { props: { uiConfig: { showFillDataModule: true } } });
     const group = findFillDataGroup(wrapper);
     const importBtn = buttonByText(group, "导入数据");
     const exportBtn = buttonByText(group, "导出数据");
@@ -39,7 +39,7 @@ describe("B2 填充数据导入/导出生命周期（三十续）", () => {
   });
 
   it("预览态：导出数据/保存数据转为可用", async () => {
-    const wrapper = mount(DesignerApp, { props: { uiConfig: { showFillDataModule: true } } });
+    const wrapper = mount(FormDesigner, { props: { uiConfig: { showFillDataModule: true } } });
     await wrapper.find('[data-view-mode="preview"]').trigger("click");
     await vueNextTick();
 

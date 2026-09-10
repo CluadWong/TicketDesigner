@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { nextTick } from "vue";
 import { mount, type VueWrapper } from "@vue/test-utils";
-import DesignerApp from "@/components/designer/DesignerApp.vue";
+import FormDesigner from "@/components/designer/FormDesigner.vue";
 import type { FormSchemaV2 } from "@/types";
 import { makeYunlvSecondTicketFirstFiveRowsSchema } from "@/dev/yunlv-second-ticket-first-five-rows";
 
@@ -31,11 +31,11 @@ function findOwnerCellOfField(schema: FormSchemaV2, fieldId: string) {
 }
 
 /**
- * 默认初始化已改为空白（见 DesignerApp 改造），故需显式注入前五行样例，
+ * 默认初始化已改为空白（见 FormDesigner 改造），故需显式注入前五行样例，
  * 使依赖其 fixture 节点（unit-field / ticket-layout / work-task-table 等）的用例仍可运行。
  */
 function mountDesigner() {
-  return mount(DesignerApp, {
+  return mount(FormDesigner, {
     props: {
       initialSchema: makeYunlvSecondTicketFirstFiveRowsSchema(),
       // 预览不再注入预置种子数据（2026-09-08）：进入预览即为空表单。
@@ -43,7 +43,7 @@ function mountDesigner() {
   });
 }
 
-describe("DesignerApp V2 selection and deletion", () => {
+describe("FormDesigner V2 selection and deletion", () => {
   it("cycles from a filled cell component through its cell to ancestors", async () => {
     const wrapper = mountDesigner();
     const field = wrapper.find('[data-node-id="unit-field"]');
@@ -317,7 +317,7 @@ describe("DesignerApp V2 selection and deletion", () => {
   });
 });
 
-describe("DesignerApp 把 Grid 放进 / 拖进 cell（Grid 嵌套，九续）", () => {
+describe("FormDesigner 把 Grid 放进 / 拖进 cell（Grid 嵌套，九续）", () => {
   it("选中某格后点击「添加 Grid」会把 Grid 嵌进该格并渲染嵌套 Grid", async () => {
     const wrapper = mountDesigner();
     // 选中位于外层 Grid 某单元格内的字段，使 insertionSlot 指向其所属 cell
@@ -410,7 +410,7 @@ describe("DesignerApp 把 Grid 放进 / 拖进 cell（Grid 嵌套，九续）", 
   });
 });
 
-describe("DesignerApp 拖拽重排已有节点（P9）", () => {
+describe("FormDesigner 拖拽重排已有节点（P9）", () => {
   /** 模拟 HTML5 DataTransfer：jsdom 未实现，自建最小实现供拖拽测试使用。 */
   class MockDataTransfer {
     private store = new Map<string, string>();
@@ -511,7 +511,7 @@ describe("DesignerApp 拖拽重排已有节点（P9）", () => {
   });
 });
 
-describe("DesignerApp 预览态只读（不可添加组件 / 不可输入）", () => {
+describe("FormDesigner 预览态只读（不可添加组件 / 不可输入）", () => {
   const paletteButtons = (wrapper: VueWrapper) =>
     wrapper.findAll(".v2-palette-item--button");
 
@@ -570,7 +570,7 @@ describe("DesignerApp 预览态只读（不可添加组件 / 不可输入）", (
   });
 });
 
-describe("DesignerApp 排列方向配置隐藏（text/p 分支不再暴露 writingMode）", () => {
+describe("FormDesigner 排列方向配置隐藏（text/p 分支不再暴露 writingMode）", () => {
   it("选中 text 节点时 Inspector 不再显示「排列方向」", async () => {
     const wrapper = mountDesigner();
     await wrapper.find('[data-node-id="title-text"]').trigger("click");
@@ -585,7 +585,7 @@ describe("DesignerApp 排列方向配置隐藏（text/p 分支不再暴露 writi
   });
 });
 
-describe("DesignerApp 字段组件配置：宽度 / 默认内容 / 内部边框", () => {
+describe("FormDesigner 字段组件配置：宽度 / 默认内容 / 内部边框", () => {
   /** 取 fixture 中指定 id 的字段节点（p 节点，每次重新读取以反映最新 schema）。 */
   function fieldNodeById(schema: FormSchemaV2, id: string) {
     const owner = findOwnerCellOfField(schema, id);
@@ -701,8 +701,8 @@ describe("结构树 折叠全部 / 展开全部", () => {
   });
 });
 
-describe("DesignerApp 帮助面板接线", () => {
-  // DesignerApp 内部常量，此处按值锁定（改名时测试会红，属预期追溯点）。
+describe("FormDesigner 帮助面板接线", () => {
+  // FormDesigner 内部常量，此处按值锁定（改名时测试会红，属预期追溯点）。
   const HELP_SEEN_STORAGE_KEY = "ticket-designer-help-seen-v1";
 
   it("已看过引导（localStorage 有标记）时初始不弹面板，工具栏「帮助」按钮打开、面板内 ✕ 关闭", async () => {

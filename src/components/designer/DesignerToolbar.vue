@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * 顶部工具栏（批次 3 壳层拆件，2026-09-08）：**纯展示 + 事件上抛**，不持有文档状态。
- * - 样例集 / dirty / 撤销重做可用性 / 预览态由宿主（DesignerApp 编排层）注入；
+ * - 样例集 / dirty / 撤销重做可用性 / 预览态由宿主（FormDesigner 编排层）注入；
  * - 一切动作（保存/读取/导入导出/打印/帮助…）经 emit 回宿主编排层执行；
  * - 两个隐藏 file input 留在宿主（`useSchemaDocument` / `useFillData` 直接持有其 ref），
  *   不随工具栏下放；`.v2-toolbar` 基础样式在非 scoped `styles/designer-ui.css`。

@@ -14,7 +14,7 @@ import type {
  *
  * 原本这些"派生 / 布局 / 取值计算"散落在 `@/types`（schema-v2-operations /
  * schema-v2-table-rows），导致渲染组件必须 import 类型层才能拿到计算逻辑。
- * 现统一收口到 engine：渲染组件（GridSchemaNode / DesignerApp）只做视图映射，
+ * 现统一收口到 engine：渲染组件（GridSchemaNode / FormDesigner）只做视图映射，
  * 按 `列key_行号` 派生字段、表格动态行数、字段清单枚举、单元格盒解析均由本模块负责。
  */
 

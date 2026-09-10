@@ -7,10 +7,10 @@
  * 设计约定：
  * - `defaultDesignerUIConfig` 是**全局默认值**——默认显示除「填充数据」模块之外的全部按钮
  *   （`showFillDataModule: false`）；「填充数据」模块（导入/导出/读取/保存数据）默认隐藏，
- *   由宿主按需经 `DesignerApp` 的 `uiConfig` prop 开启。
+ *   由宿主按需经 `FormDesigner` 的 `uiConfig` prop 开启。
  * - 默认语言 `locale: "zh-CN"`（见 `src/i18n`）；宿主经 `uiConfig.locale` 切换，如
- *   `<DesignerApp :ui-config="{ locale: 'en' }" />` 即可整页切英文（已迁移到 `t()` 的文案生效）。
- * - 宿主通过 `<DesignerApp :ui-config="{ showFillDataModule: true }" />` 局部覆盖；
+ *   `<FormDesigner :ui-config="{ locale: 'en' }" />` 即可整页切英文（已迁移到 `t()` 的文案生效）。
+ * - 宿主通过 `<FormDesigner :ui-config="{ showFillDataModule: true }" />` 局部覆盖；
  *   `resolveDesignerUIConfig` 做浅合并（每个开关独立），未提供的键回退到默认。
  * - 组件内统一用 `resolveDesignerUIConfig(props.uiConfig)` 得到完整配置，避免散落默认值。
  */

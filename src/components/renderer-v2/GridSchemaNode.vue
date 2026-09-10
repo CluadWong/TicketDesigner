@@ -381,7 +381,7 @@ function isEditable(node: PNodeV2): "true" | undefined {
 
 /**
  * 失焦（blur）回写：用户离开字段时 emit 一次 `field-change(field, value)`，
- * 由使用方（FormRenderer / DesignerApp）决定写回响应式 data，满足 P9.1b「数据回写正确」。
+ * 由使用方（FormRenderer / FormDesigner）决定写回响应式 data，满足 P9.1b「数据回写正确」。
  * 输入过程中不实时回写（用户需求：预览 / 填写不必逐键记录）；取值亦可经
  * `collectFieldValues(rootEl)` 直接遍历渲染 DOM 收集（用户需求：DOM 遍历采集）。
  * 内核不再依赖任何字符串 key 的 inject 约定（A4 / G15）。设计态不回写。

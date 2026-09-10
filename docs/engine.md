@@ -382,5 +382,5 @@ updateNode(schema, nodeId, patch)
 ### 消费方约定
 
 - 选择器常量与辅助函数集中在 `src/engine-v2/node-address.ts`（`NODE_ID_ATTR` / `LAYOUT_ID_ATTR` / `nodeIdSelector` / `layoutIdSelector`），消费侧应引用它们，避免多处硬编码属性名字符串而静默失效。
-- 地址属性是**契约而非实现细节**：改名须同步内核输出与表面层消费两侧，并回归 DesignerApp 拖拽/选中测试。
+- 地址属性是**契约而非实现细节**：改名须同步内核输出与表面层消费两侧，并回归 FormDesigner 拖拽/选中测试。
 - 选中高亮（`.is-design-selected`）由表面层 `designer/CanvasSurface.vue` 在渲染 DOM 上直接加/去类实现（A5），内核不再持有 `selectedNodeId`、不再输出 `.layout-node--selected`。

@@ -9,7 +9,7 @@
 | 入口 | 内容 | 谁用 |
 |---|---|---|
 | `@aikkk/ticket-designer/renderer` | `FormRenderer` / `GridFormRenderer` / `printForm` / `collectFieldValues` / Schema 类型 | **消费端**：渲染、填写、打印 |
-| `@aikkk/ticket-designer/designer` | `DesignerApp` / `defaultDesignerUIConfig` / `buildBlankSchema` | 需要在宿主内编排模板时 |
+| `@aikkk/ticket-designer/designer` | `FormDesigner` / `defaultDesignerUIConfig` / `buildBlankSchema` | 需要在宿主内编排模板时 |
 | `@aikkk/ticket-designer` | 上面两个的合集 | 不推荐生产使用（会把设计器一起打进产物） |
 
 样式按入口分离，**别引错**：
