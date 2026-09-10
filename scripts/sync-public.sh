@@ -99,7 +99,7 @@ done
 info "5/7 恢复发布身份字段（包名 / 协议 / 仓库地址）"
 run node scripts/merge-package-json.mjs package.json "$REL_PKG"
 run git add package.json
-rm -f "$REL_PKG"
+rm -f "$REL_PKG" 2>/dev/null || true
 
 # ---- 6. 验证 ----
 if [ $DO_VERIFY -eq 1 ]; then
